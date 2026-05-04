@@ -1,10 +1,9 @@
 from pydantic import BaseModel
-from typing import Optional, Literal
+from typing import Optional, Literal, List
 from datetime import datetime
 
-
 # ✅ Allowed values
-TaskStatus = Literal["todo", "in_progress", "done"]
+TaskStatus = Literal["todo", "in_progress", "review", "done"]
 TaskPriority = Literal["low", "medium", "high"]
 
 
@@ -44,4 +43,14 @@ class TaskAssign(BaseModel):
 
 
 class TaskStatusUpdate(BaseModel):
-    status: TaskStatus   
+    status: TaskStatus
+
+
+class KanbanResponse(BaseModel):
+    todo: list[TaskOut]
+    in_progress: list[TaskOut]
+    review: list[TaskOut]
+    done: list[TaskOut]
+
+    class Config:
+        from_attributes = True

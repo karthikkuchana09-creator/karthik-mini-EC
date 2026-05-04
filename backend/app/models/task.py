@@ -9,12 +9,13 @@ class Task(Base):
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String(255))
     description = Column(Text)
-    status = Column(String(50))
+    status = Column(String(50), default="todo")
     priority = Column(String(50))
     due_date = Column(DateTime)
 
     created_by_id = Column(Integer, ForeignKey("users.id"))
     assigned_to_id = Column(Integer, ForeignKey("users.id"))
+    updated_by = Column(Integer, ForeignKey("users.id"), nullable=True)
 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -29,4 +30,10 @@ class Task(Base):
         "User",
         foreign_keys=[assigned_to_id],
         back_populates="assigned_tasks"
+    )
+
+    updater = relationship(
+        "User",
+        foreign_keys=[updated_by],
+        back_populates="updated_tasks"
     )

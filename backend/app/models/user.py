@@ -45,3 +45,9 @@ class User(Base):
         foreign_keys="Task.assigned_to_id",
         back_populates="assignee"
     )
+
+    updated_tasks = relationship(
+        "Task",
+        foreign_keys="Task.updated_by",
+        back_populates="updater"
+    )
