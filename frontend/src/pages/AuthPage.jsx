@@ -44,15 +44,15 @@ function AuthPage() {
       </div>
 
       <div className="relative w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-2xl shadow-xl mb-4">
-            <span className="text-white font-bold text-xl">M</span>
+        <div className="text-center mb-6 sm:mb-8">
+          <div className="inline-flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-2xl shadow-xl mb-3 sm:mb-4">
+            <span className="text-white font-bold text-lg sm:text-xl">M</span>
           </div>
-          <h1 className="text-3xl font-bold text-white tracking-tight">Mini EC</h1>
-          <p className="text-indigo-300 mt-2 text-sm">{isLogin ? 'Welcome back' : 'Create your account'}</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">Mini EC</h1>
+          <p className="text-indigo-300 mt-2 text-xs sm:text-sm">{isLogin ? 'Welcome back' : 'Create your account'}</p>
         </div>
 
-        <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-8 shadow-2xl border border-white/10">
+        <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-6 sm:p-8 shadow-2xl border border-white/10">
           {error && (
             <div className="mb-6 p-4 rounded-lg bg-red-500/20 border border-red-500/30">
               <div className="flex items-start gap-2">

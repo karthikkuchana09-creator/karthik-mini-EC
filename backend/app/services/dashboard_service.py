@@ -3,6 +3,9 @@ from sqlalchemy import func
 from app.models.task import Task
 from app.models.approval import Approval
 from app.models.user import User
+from app.core.log import get_logger
+
+logger = get_logger("dashboard_service")
 
 
 def get_summary(db: Session):
@@ -14,6 +17,9 @@ def get_summary(db: Session):
         Approval.status == "pending"
     ).count()
 
+    logger.info("Dashboard summary: total=%d completed=%d pending=%d approvals=%d",
+                total_tasks, completed, pending, approvals_pending)
+
     return {
         "total_tasks": total_tasks,
         "completed_tasks": completed,
@@ -23,21 +29,25 @@ def get_summary(db: Session):
 
 
 def get_task_distribution(db: Session):
-    return [
+    distribution = [
         {"name": "To Do", "count": db.query(Task).filter(Task.status == "todo").count()},
         {"name": "In Progress", "count": db.query(Task).filter(Task.status == "in_progress").count()},
         {"name": "Review", "count": db.query(Task).filter(Task.status == "review").count()},
         {"name": "Done", "count": db.query(Task).filter(Task.status == "done").count()},
     ]
+    logger.debug("Task distribution: %s", distribution)
+    return distribution
 
 
 def get_approval_stats(db: Session):
-    return {
+    stats = {
         "pending": db.query(Approval).filter(Approval.status == "pending").count(),
         "approved": db.query(Approval).filter(Approval.status == "approved").count(),
         "rejected": db.query(Approval).filter(Approval.status == "rejected").count(),
         "hold": db.query(Approval).filter(Approval.status == "hold").count(),
     }
+    logger.debug("Approval stats: %s", stats)
+    return stats
 
 
 def get_performance(db: Session):
@@ -48,7 +58,6 @@ def get_performance(db: Session):
      .group_by(User.name)\
      .all()
 
-    return [
-        {"user": name, "tasks": count}
-        for name, count in data
-    ]
+    performance = [{"user": name, "tasks": count} for name, count in data]
+    logger.debug("Performance data: %s", performance)
+    return performance

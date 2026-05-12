@@ -4,18 +4,35 @@ export function useRolePermissions() {
   const { user } = useAuth();
   const role = user?.role || '';
 
+  const isAdmin = role === 'admin';
+  const isManager = role === 'manager';
+  const isEmployee = role === 'employee';
+  const isAdminOrManager = isAdmin || isManager;
+
   return {
     role,
-    isAdmin: role === 'admin',
-    isManager: role === 'manager',
-    isEmployee: role === 'employee',
-    canCreateTask: role === 'admin' || role === 'manager',
-    canEditTask: role === 'admin' || role === 'manager',
-    canDeleteTask: role === 'admin',
-    canAssignTask: role === 'admin' || role === 'manager',
-    canApprove: role === 'admin' || role === 'manager',
-    canViewAllTasks: role === 'admin' || role === 'manager',
-    canManage: role === 'admin' || role === 'manager',
-    canAccessAdminPage: role === 'admin',
+    isAdmin,
+    isManager,
+    isEmployee,
+    isAdminOrManager,
+
+    canCreateTask: isAdminOrManager,
+    canEditTask: isAdminOrManager,
+    canDeleteTask: isAdmin,
+    canAssignTask: isAdminOrManager,
+    canApprove: isAdminOrManager,
+    canViewAllTasks: isAdminOrManager,
+    canManage: isAdminOrManager,
+    canAccessAdminPage: isAdmin,
+
+    canViewAIInsights: isAdminOrManager,
+    canViewPersonalInsights: true,
+    canViewAuditLogs: isAdmin,
+    canViewTeamDocuments: isAdminOrManager,
+    canUploadDocuments: true,
+    canDownloadDocuments: true,
+    canManageDocuments: isAdminOrManager,
+    canViewActivityFeed: true,
+    canReceiveNotifications: true,
   };
 }

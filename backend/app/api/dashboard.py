@@ -1,28 +1,52 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from app.api.deps import get_db
+from app.api.deps import get_db, get_current_user
 from app.services.dashboard_service import (
     get_summary,
     get_task_distribution,
     get_approval_stats,
     get_performance
 )
+from app.services.ai_service import generate_ai_summary
 
 router = APIRouter(prefix="/dashboard")
 
+
 @router.get("/summary")
-def get_summary_endpoint(db: Session = Depends(get_db)):
+def get_summary_endpoint(
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user)
+):
     return get_summary(db)
 
 
 @router.get("/task-distribution")
-def task_distribution_endpoint(db: Session = Depends(get_db)):
+def task_distribution_endpoint(
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user)
+):
     return get_task_distribution(db)
 
+
 @router.get("/approvals")
-def approval_stats_endpoint(db: Session = Depends(get_db)):
+def approval_stats_endpoint(
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user)
+):
     return get_approval_stats(db)
 
+
 @router.get("/performance")
-def performance_endpoint(db: Session = Depends(get_db)):
-    return get_performance(db) 
+def performance_endpoint(
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user)
+):
+    return get_performance(db)
+
+
+@router.get("/ai-summary")
+def ai_summary_endpoint(
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    return generate_ai_summary(db, user)

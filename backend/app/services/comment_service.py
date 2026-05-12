@@ -2,13 +2,22 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 from app.models.comment import Comment
 from app.models.task import Task
-from app.schemas.comment import CommentCreate, CommentOut
+from app.schemas.comment import CommentCreate
+from app.core.log import get_logger
+from app.services.audit_log_service import log_action
+from app.services.notification_service import create_notification
+
+logger = get_logger("comment_service")
 
 
 def add_comment(db: Session, task_id: int, comment_data: CommentCreate, current_user):
+    logger.info("Adding comment to task id=%d by user_id=%d is_internal=%s",
+                task_id, current_user.id, comment_data.is_internal)
+
     task = db.query(Task).filter(Task.id == task_id).first()
 
     if not task:
+        logger.warning("Comment failed: task not found id=%d", task_id)
         raise HTTPException(404, "Task not found")
 
     comment = Comment(
@@ -22,13 +31,37 @@ def add_comment(db: Session, task_id: int, comment_data: CommentCreate, current_
     db.commit()
     db.refresh(comment)
 
+    log_action(db, current_user.id, "create", "comment", comment.id)
+    notify_user_id = task.assigned_to_id if task.assigned_to_id != current_user.id else task.created_by_id
+    if notify_user_id:
+        create_notification(db, notify_user_id, f"New comment on Task #{task_id}")
+    logger.info("Comment id=%d added to task id=%d successfully", comment.id, task_id)
     return comment
 
 
 def get_comments(db: Session, task_id: int, current_user):
+    logger.debug("Fetching comments for task id=%d by user_id=%d", task_id, current_user.id)
+
     query = db.query(Comment).filter(Comment.task_id == task_id)
 
     if current_user.role == "employee":
         query = query.filter(Comment.is_internal == False)
 
-    return query.order_by(Comment.created_at.desc()).all()
+    comments = query.order_by(Comment.created_at.desc()).all()
+    logger.debug("Fetched %d comments for task id=%d", len(comments), task_id)
+    return comments
+
+
+def delete_all_comments(db: Session, task_id: int, current_user):
+    task = db.query(Task).filter(Task.id == task_id).first()
+    if not task:
+        raise HTTPException(404, "Task not found")
+
+    if current_user.role == "employee":
+        raise HTTPException(403, "Not enough permissions")
+
+    count = db.query(Comment).filter(Comment.task_id == task_id).delete()
+    db.commit()
+
+    log_action(db, current_user.id, "delete", "comment", task_id)
+    return {"message": f"Deleted {count} comments"}

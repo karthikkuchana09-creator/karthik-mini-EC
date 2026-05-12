@@ -51,3 +51,5 @@ class User(Base):
         foreign_keys="Task.updated_by",
         back_populates="updater"
     )
+
+    documents = relationship("Document", back_populates="uploader")

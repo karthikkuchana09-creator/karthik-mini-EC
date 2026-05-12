@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import Navbar from '../components/Navbar';
+import toast from 'react-hot-toast';
 import { getTask, getUsers, assignTask } from '../api/tasks';
-import { getComments, addComment } from '../api/comments';
+import { getComments, addComment, deleteAllComments } from '../api/comments';
 import { useRolePermissions } from '../hooks/useRolePermissions';
 import { STATUS_CONFIG, PRIORITY_CONFIG, CARD_CLASSES, CARD_NO_HOVER, BTN_PRIMARY, BTN_SECONDARY, INPUT_CLASSES, INPUT_ERROR_CLASSES, MODAL_OVERLAY, MODAL_CONTENT, ERROR_ALERT } from '../config/ui';
 
@@ -148,6 +148,7 @@ function TaskDetail() {
   const [isInternal, setIsInternal] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [assigning, setAssigning] = useState(false);
+  const [deletingAll, setDeletingAll] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -180,8 +181,24 @@ function TaskDetail() {
       setComments((prev) => [...prev, data]);
       setNewComment('');
       setIsInternal(false);
+      toast.success('Comment added');
     } catch (err) {
-      setError(err.response?.data?.detail || err.message || 'Failed to add comment');
+      toast.error(err.response?.data?.detail || err.message || 'Failed to add comment');
+    }
+  };
+
+  const handleDeleteAll = async () => {
+    if (!window.confirm('Delete all comments? This cannot be undone.')) return;
+    setDeletingAll(true);
+    setError(null);
+    try {
+      await deleteAllComments(id);
+      setComments([]);
+      toast.success('All comments deleted');
+    } catch (err) {
+      toast.error(err.response?.data?.detail || err.message || 'Failed to delete comments');
+    } finally {
+      setDeletingAll(false);
     }
   };
 
@@ -191,17 +208,18 @@ function TaskDetail() {
 
     try {
       await assignTask(id, assignedToId);
-      
+
       const assigneeUser = users.find((u) => u.id === assignedToId);
       setTask((prev) => ({
         ...prev,
         assigned_to_id: assignedToId,
         assignee: assigneeUser || prev.assignee,
       }));
-      
+
       setShowAssignModal(false);
+      toast.success('Task assigned successfully');
     } catch (err) {
-      setError(err.response?.data?.detail || err.message || 'Failed to assign task');
+      toast.error(err.response?.data?.detail || err.message || 'Failed to assign task');
     } finally {
       setAssigning(false);
     }
@@ -220,9 +238,7 @@ function TaskDetail() {
 
   if (error && !task) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <Navbar />
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className={ERROR_ALERT}>
             <p className="text-sm text-red-700">{error}</p>
           </div>
@@ -233,7 +249,6 @@ function TaskDetail() {
             Back to Tasks
           </Link>
         </div>
-      </div>
     );
   }
 
@@ -248,9 +263,7 @@ function TaskDetail() {
   const isOverdue = task.due_date && new Date(task.due_date) < new Date() && task.status !== 'done';
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Navbar />
-
+    <>
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
           <Link to="/tasks" className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">
@@ -329,8 +342,32 @@ function TaskDetail() {
             </div>
 
             <div className={CARD_NO_HOVER}>
-              <div className="px-6 py-4 border-b border-gray-200">
+              <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
                 <h2 className="text-base font-semibold text-gray-900">Comments <span className="text-gray-400 font-normal">({comments.length})</span></h2>
+                {canManage && comments.length > 0 && (
+                  <button
+                    onClick={handleDeleteAll}
+                    disabled={deletingAll}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {deletingAll ? (
+                      <>
+                        <svg className="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                        Deleting...
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        Delete all
+                      </>
+                    )}
+                  </button>
+                )}
               </div>
 
               <div className="p-6 space-y-6">
@@ -367,13 +404,13 @@ function TaskDetail() {
                       </div>
                     )}
 
-                    <div className="flex gap-3">
+                    <div className="flex gap-2 sm:gap-3">
                       <input
                         type="text"
                         value={newComment}
                         onChange={(e) => setNewComment(e.target.value)}
                         placeholder="Type your comment..."
-                        className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent hover:border-gray-400 transition-colors"
+                        className="flex-1 min-w-0 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent hover:border-gray-400 transition-colors"
                         required
                       />
                       <button type="submit" className={BTN_PRIMARY}>
@@ -434,7 +471,7 @@ function TaskDetail() {
           assigning={assigning}
         />
       )}
-    </div>
+    </>
   );
 }
 

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import Navbar from '../components/Navbar';
+
 import { getApprovalHistory } from '../api/approvalHistory';
 import Badge from '../components/ui/Badge';
 
@@ -82,10 +82,7 @@ function ApprovalHistory() {
   }, [id]);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Navbar />
-
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Link to="/approvals" className="btn-secondary text-sm mb-4 inline-flex items-center gap-1">
           <span>←</span> Back to Approvals
         </Link>
@@ -119,7 +116,6 @@ function ApprovalHistory() {
           )}
         </div>
       </div>
-    </div>
   );
 }
 

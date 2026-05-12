@@ -1,10 +1,9 @@
 import { Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import Navbar from '../components/Navbar';
-import Badge from '../components/ui/Badge';
+
 import Button from '../components/ui/Button';
 import { getApprovals, updateApproval } from '../api/approvals';
-import { APPROVAL_STATUS_CONFIG, CARD_NO_HOVER, ERROR_ALERT, MODAL_OVERLAY, MODAL_CONTENT, BTN_SECONDARY } from '../config/ui';
+import { APPROVAL_STATUS_CONFIG, CARD_NO_HOVER, MODAL_OVERLAY, MODAL_CONTENT, BTN_SECONDARY } from '../config/ui';
 
 function Avatar({ email, size = 'sm' }) {
   const sizeClass = size === 'sm' ? 'w-7 h-7 text-[10px]' : 'w-8 h-8 text-xs';
@@ -19,53 +18,98 @@ function ApprovalRow({ approval, onAction }) {
   const status = APPROVAL_STATUS_CONFIG[approval.status] || APPROVAL_STATUS_CONFIG.pending;
 
   return (
-    <tr className="border-b border-gray-100 hover:bg-gray-50/70 transition-colors">
-      <td className="px-6 py-4">
-        <p className="text-sm font-semibold text-gray-900">{approval.title}</p>
-      </td>
-      <td className="px-6 py-4">
-        <div className="flex items-center gap-2">
-          <Avatar email={approval.requested_by?.email} />
-          <span className="text-sm text-gray-600">{approval.requested_by?.email}</span>
-        </div>
-      </td>
-      <td className="px-6 py-4">
-        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${status.badge}`}>
-          {status.label}
-        </span>
-      </td>
-      <td className="px-6 py-4">
-        <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-200">
-          Level {approval.current_level}
-        </span>
-      </td>
-      <td className="px-6 py-4">
-        <span className="text-sm text-gray-500">{new Date(approval.created_at).toLocaleDateString()}</span>
-      </td>
-      <td className="px-6 py-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <Link
-            to={`/approvals/${approval.id}/history`}
-            className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            History
-          </Link>
-          {approval.status === 'pending' && (
-            <>
-              <Button variant="success" size="sm" onClick={() => onAction(approval.id, 'approve')}>
-                Approve
-              </Button>
-              <Button variant="danger" size="sm" onClick={() => onAction(approval.id, 'reject')}>
-                Reject
-              </Button>
-              <Button variant="secondary" size="sm" onClick={() => onAction(approval.id, 'hold')}>
-                Hold
-              </Button>
-            </>
-          )}
-        </div>
-      </td>
-    </tr>
+    <>
+      <tr className="border-b border-gray-100 hover:bg-gray-50/70 transition-colors hidden sm:table-row">
+        <td className="px-6 py-4">
+          <p className="text-sm font-semibold text-gray-900">{approval.title}</p>
+        </td>
+        <td className="px-6 py-4">
+          <div className="flex items-center gap-2">
+            <Avatar email={approval.requested_by?.email} />
+            <span className="text-sm text-gray-600">{approval.requested_by?.email}</span>
+          </div>
+        </td>
+        <td className="px-6 py-4">
+          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${status.badge}`}>
+            {status.label}
+          </span>
+        </td>
+        <td className="px-6 py-4">
+          <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-200">
+            Level {approval.current_level}
+          </span>
+        </td>
+        <td className="px-6 py-4">
+          <span className="text-sm text-gray-500">{new Date(approval.created_at).toLocaleDateString()}</span>
+        </td>
+        <td className="px-6 py-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              to={`/approvals/${approval.id}/history`}
+              className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              History
+            </Link>
+            {approval.status === 'pending' && (
+              <>
+                <Button variant="success" size="sm" onClick={() => onAction(approval.id, 'approve')}>
+                  Approve
+                </Button>
+                <Button variant="danger" size="sm" onClick={() => onAction(approval.id, 'reject')}>
+                  Reject
+                </Button>
+                <Button variant="secondary" size="sm" onClick={() => onAction(approval.id, 'hold')}>
+                  Hold
+                </Button>
+              </>
+            )}
+          </div>
+        </td>
+      </tr>
+      <tr className="sm:hidden border-b border-gray-100">
+        <td colSpan="6" className="px-4 py-4">
+          <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-3">
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-sm font-semibold text-gray-900 flex-1">{approval.title}</p>
+              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border shrink-0 ${status.badge}`}>
+                {status.label}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-gray-600">
+              <Avatar email={approval.requested_by?.email} />
+              <span>{approval.requested_by?.email}</span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-200">
+                Level {approval.current_level}
+              </span>
+              <span className="text-gray-500">{new Date(approval.created_at).toLocaleDateString()}</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-gray-100">
+              <Link
+                to={`/approvals/${approval.id}/history`}
+                className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                History
+              </Link>
+              {approval.status === 'pending' && (
+                <>
+                  <Button variant="success" size="sm" onClick={() => onAction(approval.id, 'approve')}>
+                    Approve
+                  </Button>
+                  <Button variant="danger" size="sm" onClick={() => onAction(approval.id, 'reject')}>
+                    Reject
+                  </Button>
+                  <Button variant="secondary" size="sm" onClick={() => onAction(approval.id, 'hold')}>
+                    Hold
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
+        </td>
+      </tr>
+    </>
   );
 }
 
@@ -127,9 +171,7 @@ function Approvals() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Navbar />
-
+    <>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Approvals</h1>
@@ -139,7 +181,7 @@ function Approvals() {
         <div className={`${CARD_NO_HOVER} overflow-hidden`}>
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-50/80 border-b border-gray-200">
+              <thead className="bg-gray-50/80 border-b border-gray-200 hidden sm:table-header-group">
                 <tr>
                   <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-3">Title</th>
                   <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-6 py-3">Requested By</th>
@@ -249,7 +291,7 @@ function Approvals() {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
 

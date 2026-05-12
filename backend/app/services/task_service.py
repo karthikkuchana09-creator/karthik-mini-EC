@@ -1,17 +1,25 @@
 from fastapi import HTTPException
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy.orm.attributes import flag_modified
 from app.models.task import Task
 from app.models.user import User
-from app.schemas.task import TaskCreate, TaskUpdate, KanbanResponse
+from app.schemas.task import TaskCreate, TaskUpdate
 from datetime import datetime
 from app.core.workflow import validate_transition
+from app.core.log import get_logger
+from app.services.audit_log_service import log_action
+from app.services.notification_service import create_notification
 from fastapi.encoders import jsonable_encoder
+
+logger = get_logger("task_service")
 
 
 def create_task(db: Session, task_data: TaskCreate, current_user):
+    logger.info("Creating task: title=%s assigned_to=%d by user_id=%d",
+                task_data.title, task_data.assigned_to_id, current_user.id)
+
     assigned_user = db.query(User).filter(User.id == task_data.assigned_to_id).first()
     if not assigned_user:
+        logger.warning("Task creation failed: assigned user not found user_id=%d", task_data.assigned_to_id)
         raise HTTPException(404, "Assigned user not found")
 
     new_task = Task(
@@ -28,10 +36,14 @@ def create_task(db: Session, task_data: TaskCreate, current_user):
     db.commit()
     db.refresh(new_task)
 
+    log_action(db, current_user.id, "create", "task", new_task.id)
+    create_notification(db, task_data.assigned_to_id, f"You have been assigned Task #{new_task.id}")
+    logger.info("Task created successfully id=%d title=%s", new_task.id, new_task.title)
     return new_task
 
 
 def get_tasks(db: Session, current_user):
+    logger.debug("Fetching tasks for user_id=%d role=%s", current_user.id, current_user.role)
     query = db.query(Task).options(joinedload(Task.assignee))
 
     if current_user.role == "admin":
@@ -46,11 +58,13 @@ def get_tasks(db: Session, current_user):
             Task.assigned_to_id == current_user.id
         ).all()
 
+    logger.debug("Fetched %d tasks for user_id=%d", len(tasks), current_user.id)
     return jsonable_encoder(tasks)
 
 
 def get_kanban_view(db: Session):
     tasks = db.query(Task).all()
+    logger.debug("Kanban view: %d total tasks", len(tasks))
 
     return {
         "todo": [t for t in tasks if t.status == "todo"],
@@ -61,28 +75,34 @@ def get_kanban_view(db: Session):
 
 
 def get_task_by_id(db: Session, task_id: int, current_user):
+    logger.debug("Fetching task id=%d by user_id=%d", task_id, current_user.id)
     task = db.query(Task).options(
         joinedload(Task.assignee),
         joinedload(Task.creator)
     ).filter(Task.id == task_id).first()
 
     if not task:
+        logger.warning("Task not found id=%d", task_id)
         raise HTTPException(404, "Task not found")
 
     if current_user.role == "employee" and task.assigned_to_id != current_user.id:
+        logger.warning("Employee user_id=%d not allowed to view task id=%d", current_user.id, task_id)
         raise HTTPException(403, "Not allowed")
 
     return jsonable_encoder(task)
 
 
 def update_task(db: Session, task_id: int, task_data: TaskUpdate, current_user):
+    logger.info("Updating task id=%d by user_id=%d", task_id, current_user.id)
     task = db.query(Task).filter(Task.id == task_id).first()
 
     if not task:
+        logger.warning("Task update failed: not found id=%d", task_id)
         raise HTTPException(404, "Task not found")
 
     if current_user.role == "employee":
         if task.assigned_to_id != current_user.id:
+            logger.warning("Employee user_id=%d not authorized to update task id=%d", current_user.id, task_id)
             raise HTTPException(403, "Not allowed")
 
         if task_data.status:
@@ -100,32 +120,44 @@ def update_task(db: Session, task_id: int, task_data: TaskUpdate, current_user):
     db.commit()
     db.refresh(task)
 
+    log_action(db, current_user.id, "update", "task", task_id)
+    if task.assigned_to_id:
+        create_notification(db, task.assigned_to_id, f"Task #{task_id} has been updated")
+    logger.info("Task id=%d updated successfully", task_id)
     return jsonable_encoder(task)
 
 
-def delete_task(db: Session, task_id: int):
+def delete_task(db: Session, task_id: int, current_user):
+    logger.info("Deleting task id=%d", task_id)
     task = db.query(Task).filter(Task.id == task_id).first()
 
     if not task:
+        logger.warning("Task delete failed: not found id=%d", task_id)
         raise HTTPException(404, "Task not found")
 
     db.delete(task)
     db.commit()
 
+    log_action(db, current_user.id, "delete", "task", task_id)
+    logger.info("Task id=%d deleted successfully", task_id)
     return {"message": "Task deleted"}
 
 
-def assign_task(db: Session, task_id: int, assigned_to_id: int):
+def assign_task(db: Session, task_id: int, assigned_to_id: int, current_user):
+    logger.info("Assigning task id=%d to user_id=%d", task_id, assigned_to_id)
     task = db.query(Task).filter(Task.id == task_id).first()
 
     if not task:
+        logger.warning("Task assign failed: task not found id=%d", task_id)
         raise HTTPException(404, "Task not found")
 
     assigned_user = db.query(User).filter(User.id == assigned_to_id).first()
     if not assigned_user:
+        logger.warning("Task assign failed: user not found user_id=%d", assigned_to_id)
         raise HTTPException(404, "User not found")
 
     if assigned_user.role == "admin":
+        logger.warning("Task assign failed: cannot assign to admin user_id=%d", assigned_to_id)
         raise HTTPException(400, "Cannot assign task to admin")
 
     task.assigned_to_id = assigned_to_id
@@ -134,22 +166,29 @@ def assign_task(db: Session, task_id: int, assigned_to_id: int):
     db.commit()
     db.refresh(task)
 
+    log_action(db, current_user.id, "assign", "task", task_id)
+    create_notification(db, assigned_to_id, f"You have been assigned Task #{task_id}")
+    logger.info("Task id=%d assigned to user_id=%d successfully", task_id, assigned_to_id)
     return {"message": "Task assigned successfully"}
 
 
 def update_task_status(db: Session, task_id: int, new_status: str, current_user):
+    logger.info("Updating task id=%d status to %s by user_id=%d", task_id, new_status, current_user.id)
     task = db.query(Task).filter(Task.id == task_id).first()
 
     if not task:
+        logger.warning("Status update failed: task not found id=%d", task_id)
         raise HTTPException(404, "Task not found")
 
     if current_user.role == "employee" and task.assigned_to_id != current_user.id:
+        logger.warning("Employee user_id=%d cannot update task id=%d status", current_user.id, task_id)
         raise HTTPException(403, "You can only update your tasks")
 
     if not validate_transition(task.status, new_status):
+        logger.warning("Invalid status transition: %s -> %s for task id=%d", task.status, new_status, task_id)
         raise HTTPException(
             400,
-            f"Invalid transition: {task.status} → {new_status}"
+            f"Invalid transition: {task.status} \u2192 {new_status}"
         )
 
     task.status = new_status
@@ -158,4 +197,8 @@ def update_task_status(db: Session, task_id: int, new_status: str, current_user)
     db.commit()
     db.refresh(task)
 
+    log_action(db, current_user.id, "status_update", "task", task_id)
+    if task.assigned_to_id and task.assigned_to_id != current_user.id:
+        create_notification(db, task.assigned_to_id, f"Task #{task_id} status changed to {new_status}")
+    logger.info("Task id=%d status updated to %s successfully", task_id, new_status)
     return {"message": "Status updated successfully"}

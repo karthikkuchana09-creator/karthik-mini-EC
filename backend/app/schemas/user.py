@@ -23,6 +23,10 @@ class UserOut(BaseModel):
         from_attributes = True
 
 
-class LoginSchema(BaseModel):
+class UserUpdate(BaseModel):
+    name: str
     email: EmailStr
-    password: str   
+    role: UserRole
+    is_active: bool = True
+
+

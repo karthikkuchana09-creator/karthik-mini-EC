@@ -119,4 +119,8 @@
   .tabular-nums {
     font-variant-numeric: tabular-nums;
   }
+
+  .sidebar-transition {
+    transition: transform 0.2s ease-in-out;
+  }
 }

@@ -1,8 +1,9 @@
 import os
 from pydantic_settings import BaseSettings
+from app.core.log import get_logger
 
-# Get backend directory path
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+logger = get_logger("config")
 
 class Settings(BaseSettings):
     DATABASE_URL: str
@@ -16,8 +17,7 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
-# DEBUG (remove later)
-print("ENV PATH:", os.path.join(BASE_DIR, ".env"))
-print("DATABASE_URL:", settings.DATABASE_URL)
-print("SECRET_KEY:", settings.SECRET_KEY)
-print("ACCESS_TOKEN_EXPIRE_MINUTES:", settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+logger.info("Configuration loaded")
+logger.debug("ENV_PATH=%s", os.path.join(BASE_DIR, ".env"))
+logger.debug("DATABASE_URL=%s", settings.DATABASE_URL)
+logger.debug("ACCESS_TOKEN_EXPIRE_MINUTES=%d", settings.ACCESS_TOKEN_EXPIRE_MINUTES)

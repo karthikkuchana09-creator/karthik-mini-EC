@@ -37,3 +37,5 @@ class Task(Base):
         foreign_keys=[updated_by],
         back_populates="updated_tasks"
     )
+
+    documents = relationship("Document", back_populates="task")

@@ -32,6 +32,7 @@ def get_tasks_endpoint(
 ):
     return get_tasks(db, user)
 
+
 @router.get("/kanban")
 def get_kanban_endpoint(
     db: Session = Depends(get_db),
@@ -65,7 +66,7 @@ def delete_task_endpoint(
     db: Session = Depends(get_db),
     user=Depends(require_roles(["admin"]))
 ):
-    return delete_task(db, task_id)
+    return delete_task(db, task_id, user)
 
 
 @router.patch("/{task_id}/assign")
@@ -75,7 +76,7 @@ def assign_task_endpoint(
     db: Session = Depends(get_db),
     user=Depends(require_roles(["admin", "manager"]))
 ):
-    return assign_task(db, task_id, assigned_to_id)
+    return assign_task(db, task_id, assigned_to_id, user)
 
 
 @router.patch("/{task_id}/status")
