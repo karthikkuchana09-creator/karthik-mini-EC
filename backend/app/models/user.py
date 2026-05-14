@@ -25,6 +25,10 @@ class User(Base):
 
     is_active = Column(Boolean, default=True)
 
+    google_id = Column(String(255), unique=True, nullable=True, index=True)
+    avatar_url = Column(String(500), nullable=True)
+    auth_provider = Column(String(50), default="email")
+
     created_at = Column(DateTime, default=datetime.utcnow)
 
     updated_at = Column(

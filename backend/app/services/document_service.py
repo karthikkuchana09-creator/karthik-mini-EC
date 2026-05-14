@@ -123,7 +123,17 @@ def download_document(db: Session, document_id: int, current_user):
     )
 
 
-def get_documents(db: Session, current_user, task_id: int | None = None):
+from typing import Optional as _Optional
+
+def get_documents(
+    db: Session,
+    current_user,
+    task_id: _Optional[int] = None,
+    page: int = 1,
+    size: int = 20,
+    sort_by: _Optional[str] = None,
+    sort_order: str = "desc",
+):
     logger.debug("Fetching documents for user_id=%d", current_user.id)
     query = db.query(Document)
 
@@ -133,7 +143,12 @@ def get_documents(db: Session, current_user, task_id: int | None = None):
     if task_id is not None:
         query = query.filter(Document.task_id == task_id)
 
-    return query.all()
+    from app.utils.pagination import paginate_query
+    return paginate_query(
+        db, query,
+        page=page, size=size,
+        sort_by=sort_by, sort_order=sort_order,
+    )
 
 
 def get_task_documents(db: Session, task_id: int, current_user):

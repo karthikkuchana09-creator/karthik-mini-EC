@@ -1,13 +1,47 @@
 import axios from 'axios';
+import toast from 'react-hot-toast';
+
+let isRefreshing = false;
+let failedQueue = [];
+
+function processQueue(error, token = null) {
+  failedQueue.forEach(({ resolve, reject }) => {
+    if (error) reject(error);
+    else resolve(token);
+  });
+  failedQueue = [];
+}
+
+const TOKEN_KEY = 'karthik_ec_access_token';
+const REFRESH_KEY = 'karthik_ec_refresh_token';
+
+function getToken() {
+  try { return JSON.parse(sessionStorage.getItem(TOKEN_KEY)); } catch { return null; }
+}
+function setToken(t) {
+  try { sessionStorage.setItem(TOKEN_KEY, JSON.stringify(t)); } catch {}
+}
+function getRefreshToken() {
+  try { return JSON.parse(sessionStorage.getItem(REFRESH_KEY)); } catch { return null; }
+}
+function setRefreshToken(t) {
+  try { sessionStorage.setItem(REFRESH_KEY, JSON.stringify(t)); } catch {}
+}
+function clearAuthTokens() {
+  try {
+    Object.keys(sessionStorage).filter(k => k.startsWith('karthik_ec_')).forEach(k => sessionStorage.removeItem(k));
+  } catch {}
+}
 
 const api = axios.create({
-  baseURL: 'http://127.0.0.1:8000',
+  baseURL: import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000',
   timeout: 30000,
+  headers: { 'Content-Type': 'application/json' },
 });
 
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token');
+    const token = getToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -18,14 +52,50 @@ api.interceptors.request.use(
 
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login';
+  async (error) => {
+    const originalRequest = error.config;
+
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      if (isRefreshing) {
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject });
+        }).then((token) => {
+          originalRequest.headers.Authorization = `Bearer ${token}`;
+          return api(originalRequest);
+        });
+      }
+
+      originalRequest._retry = true;
+      isRefreshing = true;
+
+      try {
+        const rt = getRefreshToken();
+        if (!rt) throw new Error('No refresh token');
+
+        const response = await axios.post(
+          `${import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000'}/auth/refresh`,
+          { refresh_token: rt }
+        );
+
+        const { access_token, refresh_token: newRt } = response.data;
+
+        if (access_token) setToken(access_token);
+        if (newRt) setRefreshToken(newRt);
+
+        processQueue(null, access_token);
+        originalRequest.headers.Authorization = `Bearer ${access_token}`;
+        return api(originalRequest);
+      } catch (refreshError) {
+        processQueue(refreshError, null);
+        clearAuthTokens();
+        toast.error('Session expired. Please login again.');
+        window.dispatchEvent(new CustomEvent('auth:logout'));
+        return Promise.reject(refreshError);
+      } finally {
+        isRefreshing = false;
       }
     }
+
     return Promise.reject(error);
   }
 );

@@ -14,7 +14,7 @@ export function NotificationProvider({ children }) {
     setLoading(true);
     try {
       const data = await getNotifications();
-      const list = Array.isArray(data) ? data : data.notifications || data.results || [];
+      const list = Array.isArray(data) ? data : data.items || data.notifications || data.results || [];
       setNotifications(list);
       setUnreadCount(list.filter((n) => !n.is_read).length);
     } catch {}

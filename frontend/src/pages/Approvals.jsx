@@ -125,7 +125,7 @@ function Approvals() {
     const fetchApprovals = async () => {
       try {
         const data = await getApprovals();
-        setApprovals(data);
+        setApprovals(Array.isArray(data) ? data : (data?.items || []));
       } catch (err) {
         setError(err.response?.data?.message || 'Failed to load approvals');
       } finally {

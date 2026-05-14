@@ -1,18 +1,32 @@
+from typing import Optional
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 from app.models.user import User
 from app.schemas.user import UserUpdate
 from app.core.log import get_logger
+from app.utils.pagination import paginate_query
 from fastapi.encoders import jsonable_encoder
 
 logger = get_logger("user_service")
 
 
-def get_all_users(db: Session):
+def get_all_users(
+    db: Session,
+    page: int = 1,
+    size: int = 20,
+    sort_by: Optional[str] = None,
+    sort_order: str = "asc",
+    search: Optional[str] = None,
+):
     logger.debug("Fetching all users")
-    users = db.query(User).all()
-    logger.debug("Fetched %d users", len(users))
-    return [
+    query = db.query(User)
+    result = paginate_query(
+        db, query,
+        page=page, size=size,
+        sort_by=sort_by, sort_order=sort_order,
+        search=search, search_columns=[User.name, User.email],
+    )
+    result["items"] = [
         {
             "id": u.id,
             "name": u.name,
@@ -20,8 +34,10 @@ def get_all_users(db: Session):
             "role": u.role.value if hasattr(u.role, "value") else u.role,
             "is_active": u.is_active,
         }
-        for u in users
+        for u in result["items"]
     ]
+    logger.debug("Fetched %d users", len(result["items"]))
+    return result
 
 
 def get_user_by_id(db: Session, user_id: int):

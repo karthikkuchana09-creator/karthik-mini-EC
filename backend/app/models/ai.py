@@ -2,12 +2,13 @@ from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
 from datetime import datetime
 from app.db.base import Base
 
+
 class AIAnalysis(Base):
     __tablename__ = "ai_analyses"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    task_id = Column(Integer, ForeignKey("tasks.id"), nullable=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    task_id = Column(Integer, ForeignKey("tasks.id"), nullable=True, index=True)
     prompt = Column(Text, nullable=False)
     response = Column(Text, nullable=False)
     model_name = Column(String(100), default="gpt-4")

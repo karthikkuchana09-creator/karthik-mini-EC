@@ -1,16 +1,40 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing import Optional
 from datetime import datetime
+from app.core.validators import string_length, PROMPT_MAX_LENGTH
+from app.core.sanitizer import sanitize_prompt
+
 
 class AIRequest(BaseModel):
     prompt: str
     task_id: Optional[int] = None
     context: Optional[str] = None
 
+    @field_validator("prompt", mode="before")
+    @classmethod
+    def clean_prompt(cls, v):
+        if isinstance(v, str):
+            return sanitize_prompt(v)
+        return v
+
+    @field_validator("prompt")
+    @classmethod
+    def validate_prompt_length(cls, v):
+        return string_length(1, PROMPT_MAX_LENGTH)(v)
+
+    @field_validator("context", mode="before")
+    @classmethod
+    def clean_context(cls, v):
+        if isinstance(v, str):
+            return sanitize_prompt(v)
+        return v
+
+
 class AIResponse(BaseModel):
     suggestion: str
     model_used: str
     tokens_used: int
+
 
 class AIOut(BaseModel):
     id: int
@@ -24,6 +48,7 @@ class AIOut(BaseModel):
 
     class Config:
         from_attributes = True
+
 
 class AISummaryOut(BaseModel):
     summary: str

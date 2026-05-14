@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { login, register } from '../api/auth';
+import GoogleLoginButton from '../components/GoogleLoginButton';
 
 function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
@@ -22,11 +23,11 @@ function AuthPage() {
     try {
       if (isLogin) {
         const data = await login(email, password);
-        authLogin(data.user, data.access_token);
+        authLogin(data.user, data.access_token, data.refresh_token);
       } else {
         await register(name, email, password, role);
         const data = await login(email, password);
-        authLogin(data.user, data.access_token);
+        authLogin(data.user, data.access_token, data.refresh_token);
       }
       navigate('/dashboard');
     } catch (err) {
@@ -140,6 +141,17 @@ function AuthPage() {
               )}
             </button>
           </form>
+
+          <div className="relative my-6">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-white/20" />
+            </div>
+            <div className="relative flex justify-center text-xs">
+              <span className="bg-transparent px-2 text-indigo-300">or continue with</span>
+            </div>
+          </div>
+
+          <GoogleLoginButton />
 
           <div className="mt-6 text-center">
             <p className="text-sm text-indigo-300">

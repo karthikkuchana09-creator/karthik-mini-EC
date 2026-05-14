@@ -37,7 +37,7 @@ function Admin() {
   const fetchUsers = async () => {
     try {
       const data = await getUsers();
-      setUsers(Array.isArray(data) ? data : []);
+        setUsers(Array.isArray(data) ? data : (data?.items || []));
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to load users');
     } finally {

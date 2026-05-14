@@ -1,3 +1,4 @@
+from typing import Optional
 from fastapi import HTTPException
 from sqlalchemy.orm import Session, joinedload
 from app.models.task import Task
@@ -6,11 +7,24 @@ from app.schemas.task import TaskCreate, TaskUpdate
 from datetime import datetime
 from app.core.workflow import validate_transition
 from app.core.log import get_logger
+from app.core.cache import cache_delete_pattern
 from app.services.audit_log_service import log_action
 from app.services.notification_service import create_notification
+from app.utils.pagination import paginate_query
 from fastapi.encoders import jsonable_encoder
 
 logger = get_logger("task_service")
+
+
+def _invalidate_task_caches():
+    import asyncio
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        loop.run_until_complete(cache_delete_pattern("dashboard:*"))
+        loop.run_until_complete(cache_delete_pattern("ai:summary:*"))
+    finally:
+        loop.close()
 
 
 def create_task(db: Session, task_data: TaskCreate, current_user):
@@ -39,27 +53,42 @@ def create_task(db: Session, task_data: TaskCreate, current_user):
     log_action(db, current_user.id, "create", "task", new_task.id)
     create_notification(db, task_data.assigned_to_id, f"You have been assigned Task #{new_task.id}")
     logger.info("Task created successfully id=%d title=%s", new_task.id, new_task.title)
+    _invalidate_task_caches()
     return new_task
 
 
-def get_tasks(db: Session, current_user):
+def get_tasks(
+    db: Session,
+    current_user,
+    page: int = 1,
+    size: int = 20,
+    sort_by: Optional[str] = None,
+    sort_order: str = "desc",
+    search: Optional[str] = None,
+):
     logger.debug("Fetching tasks for user_id=%d role=%s", current_user.id, current_user.role)
     query = db.query(Task).options(joinedload(Task.assignee))
 
     if current_user.role == "admin":
-        tasks = query.all()
+        pass
     elif current_user.role == "manager":
-        tasks = query.filter(
+        query = query.filter(
             (Task.created_by_id == current_user.id) |
             (Task.assigned_to_id == current_user.id)
-        ).all()
+        )
     else:
-        tasks = query.filter(
-            Task.assigned_to_id == current_user.id
-        ).all()
+        query = query.filter(Task.assigned_to_id == current_user.id)
 
-    logger.debug("Fetched %d tasks for user_id=%d", len(tasks), current_user.id)
-    return jsonable_encoder(tasks)
+    result = paginate_query(
+        db, query,
+        page=page, size=size,
+        sort_by=sort_by, sort_order=sort_order,
+        search=search, search_columns=[Task.title, Task.description],
+    )
+
+    result["items"] = jsonable_encoder(result["items"])
+    logger.debug("Fetched %d tasks for user_id=%d", len(result["items"]), current_user.id)
+    return result
 
 
 def get_kanban_view(db: Session):
@@ -124,6 +153,7 @@ def update_task(db: Session, task_id: int, task_data: TaskUpdate, current_user):
     if task.assigned_to_id:
         create_notification(db, task.assigned_to_id, f"Task #{task_id} has been updated")
     logger.info("Task id=%d updated successfully", task_id)
+    _invalidate_task_caches()
     return jsonable_encoder(task)
 
 
@@ -140,6 +170,7 @@ def delete_task(db: Session, task_id: int, current_user):
 
     log_action(db, current_user.id, "delete", "task", task_id)
     logger.info("Task id=%d deleted successfully", task_id)
+    _invalidate_task_caches()
     return {"message": "Task deleted"}
 
 
@@ -169,6 +200,7 @@ def assign_task(db: Session, task_id: int, assigned_to_id: int, current_user):
     log_action(db, current_user.id, "assign", "task", task_id)
     create_notification(db, assigned_to_id, f"You have been assigned Task #{task_id}")
     logger.info("Task id=%d assigned to user_id=%d successfully", task_id, assigned_to_id)
+    _invalidate_task_caches()
     return {"message": "Task assigned successfully"}
 
 
@@ -201,4 +233,5 @@ def update_task_status(db: Session, task_id: int, new_status: str, current_user)
     if task.assigned_to_id and task.assigned_to_id != current_user.id:
         create_notification(db, task.assigned_to_id, f"Task #{task_id} status changed to {new_status}")
     logger.info("Task id=%d status updated to %s successfully", task_id, new_status)
+    _invalidate_task_caches()
     return {"message": "Status updated successfully"}

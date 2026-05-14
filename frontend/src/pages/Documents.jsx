@@ -36,7 +36,7 @@ function Documents() {
   useEffect(() => {
     getTasks()
       .then((data) => {
-        const list = Array.isArray(data) ? data : data.tasks || data.results || [];
+        const list = Array.isArray(data) ? data : data.items || data.tasks || data.results || [];
         setTasks(list);
       })
       .catch(() => {});

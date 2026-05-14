@@ -39,7 +39,13 @@ def add_comment(db: Session, task_id: int, comment_data: CommentCreate, current_
     return comment
 
 
-def get_comments(db: Session, task_id: int, current_user):
+def get_comments(
+    db: Session,
+    task_id: int,
+    current_user,
+    page: int = 1,
+    size: int = 50,
+):
     logger.debug("Fetching comments for task id=%d by user_id=%d", task_id, current_user.id)
 
     query = db.query(Comment).filter(Comment.task_id == task_id)
@@ -47,9 +53,14 @@ def get_comments(db: Session, task_id: int, current_user):
     if current_user.role == "employee":
         query = query.filter(Comment.is_internal == False)
 
-    comments = query.order_by(Comment.created_at.desc()).all()
-    logger.debug("Fetched %d comments for task id=%d", len(comments), task_id)
-    return comments
+    from app.utils.pagination import paginate_query
+
+    result = paginate_query(
+        db, query.order_by(Comment.created_at.desc()),
+        page=page, size=size,
+    )
+    logger.debug("Fetched %d comments for task id=%d", len(result["items"]), task_id)
+    return result["items"]
 
 
 def delete_all_comments(db: Session, task_id: int, current_user):

@@ -1,47 +1,118 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
+import toast from 'react-hot-toast';
+import { storage } from '../utils/secureStorage';
+import { isTokenExpired, getTokenExpiry } from '../utils/jwt';
 
 const AuthContext = createContext(null);
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+
+function getAutoLogoutDelay(token) {
+  const exp = getTokenExpiry(token);
+  if (!exp) return null;
+  const now = Math.floor(Date.now() / 1000);
+  const remaining = (exp - now) * 1000;
+  return Math.max(0, remaining - 30000);
+}
+
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(() => {
-    const saved = localStorage.getItem('user');
-    return saved ? JSON.parse(saved) : null;
-  });
+  const [user, setUser] = useState(() => storage.getUser());
+  const [token, setToken] = useState(() => storage.getToken());
+  const [loading, setLoading] = useState(true);
+  const logoutTimerRef = useRef(null);
+  const navigate = useNavigate();
 
-  const [token, setToken] = useState(() => {
-    return localStorage.getItem('token') || null;
-  });
+  const clearAuth = useCallback(() => {
+    setUser(null);
+    setToken(null);
+    storage.clearAuth();
+  }, []);
 
-  useEffect(() => {
-    if (user) {
-      localStorage.setItem('user', JSON.stringify(user));
-    } else {
-      localStorage.removeItem('user');
+  const logout = useCallback((reason) => {
+    clearAuth();
+    if (reason) toast.error(reason);
+    navigate('/login', { replace: true });
+  }, [clearAuth, navigate]);
+
+  const scheduleAutoLogout = useCallback((newToken) => {
+    if (logoutTimerRef.current) clearTimeout(logoutTimerRef.current);
+    if (!newToken) return;
+    const delay = getAutoLogoutDelay(newToken);
+    if (delay === null || delay <= 0) {
+      logout('Session expired. Please login again.');
+      return;
     }
-  }, [user]);
+    logoutTimerRef.current = setTimeout(() => {
+      logout('Session expired. Please login again.');
+    }, delay);
+  }, [logout]);
+
+  const login = useCallback((userData, accessToken, refreshToken) => {
+    setUser(userData);
+    setToken(accessToken);
+    storage.setUser(userData);
+    storage.setToken(accessToken);
+    if (refreshToken) storage.setRefreshToken(refreshToken);
+    scheduleAutoLogout(accessToken);
+  }, [scheduleAutoLogout]);
 
   useEffect(() => {
     if (token) {
-      localStorage.setItem('token', token);
+      if (isTokenExpired(token)) {
+        const rt = storage.getRefreshToken();
+        if (rt && !isTokenExpired(rt)) {
+          axios.post(`${API_URL}/auth/refresh`, { refresh_token: rt })
+            .then((res) => {
+              const { access_token, refresh_token: newRt } = res.data;
+              login(storage.getUser(), access_token, newRt || rt);
+            })
+            .catch(() => logout('Session expired. Please login again.'))
+            .finally(() => setLoading(false));
+        } else {
+          logout('Session expired. Please login again.');
+          setLoading(false);
+        }
+      } else {
+        scheduleAutoLogout(token);
+        setLoading(false);
+      }
     } else {
-      localStorage.removeItem('token');
+      setLoading(false);
     }
-  }, [token]);
+  }, []);
 
-  const login = (userData, authToken) => {
-    setUser(userData);
-    setToken(authToken);
-  };
+  useEffect(() => {
+    const handleForceLogout = () => {
+      const savedUser = storage.getUser();
+      if (savedUser || storage.getToken()) {
+        clearAuth();
+        navigate('/login', { replace: true });
+      }
+    };
+    window.addEventListener('auth:logout', handleForceLogout);
+    return () => window.removeEventListener('auth:logout', handleForceLogout);
+  }, [clearAuth, navigate]);
 
-  const logout = () => {
-    setUser(null);
-    setToken(null);
-    localStorage.removeItem('user');
-    localStorage.removeItem('token');
-  };
+  useEffect(() => {
+    return () => {
+      if (logoutTimerRef.current) clearTimeout(logoutTimerRef.current);
+    };
+  }, []);
+
+  const isAuthenticated = !!token && !isTokenExpired(token);
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout }}>
+    <AuthContext.Provider value={{
+      user,
+      token,
+      loading,
+      isAuthenticated,
+      login,
+      logout,
+      clearAuth,
+    }}>
       {children}
     </AuthContext.Provider>
   );
@@ -49,8 +120,6 @@ export function AuthProvider({ children }) {
 
 export function useAuth() {
   const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
+  if (!context) throw new Error('useAuth must be used within an AuthProvider');
   return context;
 }

@@ -6,6 +6,8 @@ from sqlalchemy import func
 from app.models.ai import AIAnalysis
 from app.models.task import Task
 from app.core.log import get_logger
+from app.core.config import settings
+from app.core.cache import cached
 from app.schemas.ai import AIRequest
 
 logger = get_logger("ai_service")
@@ -69,6 +71,7 @@ def generate_suggestion(db: Session, request: AIRequest, current_user):
     }
 
 
+@cached(prefix="ai:summary", ttl=lambda: settings.CACHE_TTL_AI, exclude_args=[0], exclude_kwargs=None)
 def generate_ai_summary(db: Session, current_user):
     logger.info("Generating AI summary for user_id=%d role=%s", current_user.id, current_user.role)
     now = datetime.utcnow()

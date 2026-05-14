@@ -1,8 +1,9 @@
-from math import ceil
-from sqlalchemy.orm import Session
-from app.models.audit_log import AuditLog
-from app.core.log import get_logger
 from typing import Optional
+from sqlalchemy.orm import Session, joinedload
+from app.models.audit_log import AuditLog
+from app.models.user import User
+from app.core.log import get_logger
+from app.utils.pagination import paginate_query
 
 logger = get_logger("audit_log_service")
 
@@ -34,10 +35,11 @@ def get_audit_logs(
     entity: Optional[str] = None,
     entity_id: Optional[int] = None,
     page: int = 1,
-    page_size: int = 50,
+    size: int = 50,
+    sort_by: Optional[str] = None,
+    sort_order: str = "desc",
 ):
-    from app.models.user import User
-    query = db.query(AuditLog)
+    query = db.query(AuditLog).options(joinedload(AuditLog.user))
 
     if user_id is not None:
         query = query.filter(AuditLog.user_id == user_id)
@@ -46,18 +48,19 @@ def get_audit_logs(
     if entity_id is not None:
         query = query.filter(AuditLog.entity_id == entity_id)
 
-    total = query.count()
-    items = (
-        query.order_by(AuditLog.timestamp.desc())
-        .offset((page - 1) * page_size)
-        .limit(page_size)
-        .all()
+    if not sort_by:
+        query = query.order_by(AuditLog.timestamp.desc())
+
+    result = paginate_query(
+        db, query,
+        page=page, size=size,
+        sort_by=sort_by, sort_order=sort_order,
     )
 
-    result = []
-    for log in items:
-        u = db.query(User).filter(User.id == log.user_id).first()
-        result.append({
+    enriched = []
+    for log in result["items"]:
+        u = log.user
+        enriched.append({
             "id": log.id,
             "user_id": log.user_id,
             "user": {
@@ -71,12 +74,8 @@ def get_audit_logs(
             "timestamp": log.timestamp.isoformat() if log.timestamp else None,
         })
 
-    return {
-        "total": total,
-        "page": page,
-        "page_size": page_size,
-        "items": result,
-    }
+    result["items"] = enriched
+    return result
 
 
 def get_audit_logs_by_entity(db: Session, entity: str, entity_id: int):

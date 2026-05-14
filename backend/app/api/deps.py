@@ -1,15 +1,15 @@
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
-from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 from app.db.session import SessionLocal
 from app.models.user import User
+from app.core.security import decode_token
+from app.core.rate_limiter import rate_limit as _rate_limit
 from app.core.config import settings
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 
-# ✅ DB Dependency
 def get_db():
     db = SessionLocal()
     try:
@@ -18,8 +18,8 @@ def get_db():
         db.close()
 
 
-# ✅ Get Current User
 def get_current_user(
+    request: Request,
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db)
 ):
@@ -29,19 +29,15 @@ def get_current_user(
         headers={"WWW-Authenticate": "Bearer"},
     )
 
-    try:
-        payload = jwt.decode(
-            token,
-            settings.SECRET_KEY,
-            algorithms=[settings.ALGORITHM]
-        )
-        user_id = payload.get("user_id")
-
-        if user_id is None:
-            raise credentials_exception
-
-    except JWTError:
+    payload = decode_token(token)
+    if payload is None:
         raise credentials_exception
+
+    user_id = payload.get("user_id")
+    if user_id is None:
+        raise credentials_exception
+
+    request.state.user_id = user_id
 
     user = db.query(User).filter(User.id == user_id).first()
 
@@ -51,15 +47,9 @@ def get_current_user(
     return user
 
 
-# ✅ Role-based dependency
-def require_roles(allowed_roles: list):
-    def role_checker(user: User = Depends(get_current_user)):
-        # 🔥 FIX: compare enum properly
-        if user.role.value not in allowed_roles:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Not enough permissions"
-            )
-        return user
-
-    return role_checker
+def rate_limit(requests: int, window: int, prefix: str = "default"):
+    if not settings.RATE_LIMIT_ENABLED:
+        def noop():
+            return True
+        return noop
+    return _rate_limit(requests, window, prefix)

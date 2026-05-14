@@ -152,7 +152,7 @@ function TaskList() {
     const fetchTasks = async () => {
       try {
         const data = await getTasks();
-        setTasks(Array.isArray(data) ? data : []);
+        setTasks(Array.isArray(data) ? data : (data?.items || []));
       } catch (err) {
         console.error('Task fetch error:', err);
         setError(err.response?.data?.detail || err.response?.data?.message || err.message || 'Failed to load tasks');

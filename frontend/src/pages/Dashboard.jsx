@@ -80,7 +80,7 @@ function NotificationsPanel() {
   useEffect(() => {
     getNotifications()
       .then((data) => {
-        const list = Array.isArray(data) ? data : data.notifications || data.results || [];
+        const list = Array.isArray(data) ? data : data.items || data.notifications || data.results || [];
         setNotifications(list.slice(0, 5));
       })
       .catch(() => {})

@@ -1,14 +1,27 @@
+from typing import Optional
 from fastapi import HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from app.models.approval import Approval
 from app.models.approval_history import ApprovalHistory
 from app.models.user import User
 from app.schemas.approval import ApprovalCreate, ApprovalAction
 from app.core.log import get_logger
+from app.core.cache import cache_delete_pattern
 from app.services.audit_log_service import log_action
 from app.services.notification_service import create_notification
+from app.utils.pagination import paginate_query
 
 logger = get_logger("approval_service")
+
+
+def _invalidate_approval_caches():
+    import asyncio
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        loop.run_until_complete(cache_delete_pattern("dashboard:*"))
+    finally:
+        loop.close()
 
 
 def create_approval(db: Session, approval_data: ApprovalCreate, current_user):
@@ -26,28 +39,42 @@ def create_approval(db: Session, approval_data: ApprovalCreate, current_user):
 
     log_action(db, current_user.id, "create", "approval", approval.id)
     logger.info("Approval id=%d created successfully", approval.id)
+    _invalidate_approval_caches()
     return approval
 
 
-def get_approvals(db: Session, current_user):
+def get_approvals(
+    db: Session,
+    current_user,
+    page: int = 1,
+    size: int = 20,
+    sort_by: Optional[str] = None,
+    sort_order: str = "desc",
+    search: Optional[str] = None,
+):
     role = current_user.role.value if hasattr(current_user.role, "value") else str(current_user.role)
     logger.debug("Fetching approvals for user_id=%d role=%s", current_user.id, role)
 
-    if role == "admin":
-        approvals = db.query(Approval).all()
-    elif role == "manager":
-        approvals = db.query(Approval).filter(
-            Approval.current_level == "manager"
-        ).all()
-    else:
-        approvals = db.query(Approval).filter(
-            Approval.requested_by == current_user.id
-        ).all()
+    query = db.query(Approval).options(joinedload(Approval.requester))
 
-    result = []
-    for a in approvals:
-        requester = db.query(User).filter(User.id == a.requested_by).first()
-        result.append({
+    if role == "admin":
+        pass
+    elif role == "manager":
+        query = query.filter(Approval.current_level == "manager")
+    else:
+        query = query.filter(Approval.requested_by == current_user.id)
+
+    result = paginate_query(
+        db, query,
+        page=page, size=size,
+        sort_by=sort_by, sort_order=sort_order,
+        search=search, search_columns=[Approval.title, Approval.description],
+    )
+
+    enriched = []
+    for a in result["items"]:
+        requester = a.requester
+        enriched.append({
             "id": a.id,
             "title": a.title,
             "description": a.description,
@@ -62,7 +89,8 @@ def get_approvals(db: Session, current_user):
             "updated_at": a.updated_at.isoformat() if a.updated_at else None,
         })
 
-    logger.debug("Fetched %d approvals for user_id=%d", len(result), current_user.id)
+    result["items"] = enriched
+    logger.debug("Fetched %d approvals for user_id=%d", len(enriched), current_user.id)
     return result
 
 
@@ -131,6 +159,7 @@ def take_approval_action(db: Session, approval_id: int, action_data: ApprovalAct
         f"Approval #{approval_id} was {action_data.action}"
     )
     logger.info("Approval action %s completed for id=%d", action_data.action, approval_id)
+    _invalidate_approval_caches()
     return {"message": "Action completed"}
 
 
