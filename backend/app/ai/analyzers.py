@@ -10,6 +10,7 @@ from app.models.task import Task
 from app.models.approval import Approval
 from app.models.user import User
 from app.models.audit_log import AuditLog
+from app.models.comment import Comment
 from app.core.log import get_logger
 
 logger = get_logger("ai.analyzers")
@@ -773,6 +774,288 @@ class AssignmentRecommender:
 
 
 @dataclass
+class MonthlyTrendData:
+    month: str
+    completed: int
+    avg_completion_days: Optional[float]
+    delay_pct: float
+
+
+@dataclass
+class UserPerfData:
+    user_id: int
+    name: str
+    email: str
+    role: str
+    performance_score: float
+    reliability_score: float
+    speed_score: float
+    avg_completion_days: Optional[float]
+    delay_pct: float
+    total_completed: int
+    total_delayed: int
+    approval_rate: float
+    avg_approval_hours: Optional[float]
+    total_comments: int
+    monthly_trends: list[MonthlyTrendData]
+    suggestions: list[str]
+
+
+@dataclass
+class PerformanceResult:
+    users: list[UserPerfData]
+    top_performers: list[UserPerfData]
+    low_performers: list[UserPerfData]
+    team_avg_completion_days: Optional[float]
+    team_delay_pct: float
+    team_avg_performance: float
+    team_avg_reliability: float
+
+
+class PerformanceAnalyzer:
+    def __init__(self, db: Session):
+        self.db = db
+        self.now = datetime.utcnow()
+
+    def _avg_completion_days(self, user_id: int) -> tuple[Optional[float], int]:
+        result = self.db.query(
+            func.avg(
+                func.extract("epoch", Task.updated_at - Task.created_at) / 86400
+            )
+        ).filter(
+            Task.assigned_to_id == user_id,
+            Task.status == "done",
+            Task.updated_at.isnot(None),
+            Task.created_at.isnot(None),
+        ).scalar()
+        if result is None:
+            return None, 0
+        return round(float(result), 1), 1
+
+    def _delay_stats(self, user_id: int) -> tuple[int, int, float]:
+        done = self.db.query(Task).filter(
+            Task.assigned_to_id == user_id,
+            Task.status == "done",
+        ).count()
+        if done == 0:
+            return 0, 0, 0.0
+        delayed = self.db.query(Task).filter(
+            Task.assigned_to_id == user_id,
+            Task.status == "done",
+            Task.due_date.isnot(None),
+            Task.updated_at > Task.due_date,
+        ).count()
+        return done, delayed, round(delayed / done * 100, 1)
+
+    def _approval_stats(self, user_id: int) -> tuple[float, Optional[float]]:
+        total = self.db.query(Approval).filter(
+            Approval.requested_by == user_id,
+        ).count()
+        if total == 0:
+            return 0.0, None
+        approved = self.db.query(Approval).filter(
+            Approval.requested_by == user_id,
+            Approval.status == "approved",
+        ).count()
+        rate = round(approved / total * 100, 1)
+        avg_time = self.db.query(
+            func.avg(
+                func.extract("epoch", Approval.updated_at - Approval.created_at) / 3600
+            )
+        ).filter(
+            Approval.requested_by == user_id,
+            Approval.status == "approved",
+            Approval.updated_at.isnot(None),
+        ).scalar()
+        avg_hours = round(float(avg_time), 1) if avg_time else None
+        return rate, avg_hours
+
+    def _comment_count(self, user_id: int) -> int:
+        return self.db.query(Comment).filter(
+            Comment.user_id == user_id,
+        ).count()
+
+    def _monthly_trends(self, user_id: int) -> list[MonthlyTrendData]:
+        six_months_ago = self.now - timedelta(days=180)
+        tasks = self.db.query(Task).filter(
+            Task.assigned_to_id == user_id,
+            Task.status == "done",
+            Task.updated_at >= six_months_ago,
+        ).all()
+        monthly = {}
+        for t in tasks:
+            key = t.updated_at.strftime("%Y-%m")
+            if key not in monthly:
+                monthly[key] = {"completed": 0, "delayed": 0, "total_days": 0.0, "count_days": 0}
+            monthly[key]["completed"] += 1
+            if t.due_date and t.updated_at > t.due_date:
+                monthly[key]["delayed"] += 1
+            if t.created_at and t.updated_at:
+                days = (t.updated_at - t.created_at).total_seconds() / 86400
+                monthly[key]["total_days"] += days
+                monthly[key]["count_days"] += 1
+        trends = []
+        for month in sorted(monthly.keys()):
+            m = monthly[month]
+            avg_days = round(m["total_days"] / m["count_days"], 1) if m["count_days"] > 0 else None
+            delay_pct = round(m["delayed"] / m["completed"] * 100, 1) if m["completed"] > 0 else 0.0
+            trends.append(MonthlyTrendData(
+                month=month,
+                completed=m["completed"],
+                avg_completion_days=avg_days,
+                delay_pct=delay_pct,
+            ))
+        return trends
+
+    def _compute_scores(self, avg_days: Optional[float], delay_pct: float, approval_rate: float,
+                        comment_count: int, trends: list[MonthlyTrendData]) -> tuple[float, float, float]:
+        speed_score = 100.0
+        if avg_days is not None:
+            if avg_days <= 1:
+                speed_score = 100
+            elif avg_days <= 3:
+                speed_score = 85
+            elif avg_days <= 7:
+                speed_score = 65
+            elif avg_days <= 14:
+                speed_score = 40
+            else:
+                speed_score = 20
+
+        reliability_score = max(0, 100 - delay_pct * 1.5)
+        reliability_score = min(100, reliability_score)
+
+        approval_score = approval_rate * 0.8 + (100 if approval_rate > 0 else 0) * 0.2
+        approval_score = min(100, approval_score)
+
+        comment_score = min(100, comment_count * 5)
+
+        trend_score = 50.0
+        if len(trends) >= 2:
+            recent = trends[-1]
+            older = trends[-2]
+            if recent.avg_completion_days and older.avg_completion_days:
+                if recent.avg_completion_days < older.avg_completion_days:
+                    trend_score = 80
+                elif recent.avg_completion_days == older.avg_completion_days:
+                    trend_score = 60
+                else:
+                    trend_score = 35
+            if recent.completed > older.completed:
+                trend_score = min(100, trend_score + 10)
+        elif len(trends) == 1:
+            trend_score = 60
+
+        performance_score = (
+            speed_score * 0.30
+            + reliability_score * 0.25
+            + approval_score * 0.20
+            + comment_score * 0.10
+            + trend_score * 0.15
+        )
+        performance_score = round(min(100, performance_score), 1)
+
+        return performance_score, round(reliability_score, 1), round(speed_score, 1)
+
+    def _suggestions(self, perf: UserPerfData) -> list[str]:
+        s = []
+        if perf.delay_pct > 30:
+            s.append("High delay rate — focus on time management and realistic deadlines")
+        if perf.speed_score < 50:
+            s.append("Completion speed is slow — consider breaking tasks into smaller subtasks")
+        if perf.approval_rate < 50 and perf.total_completed > 0:
+            s.append("Low approval rate — review quality of submissions before requesting approval")
+        if perf.total_comments < 5 and perf.total_completed > 3:
+            s.append("Low communication engagement — increase collaboration via task comments")
+        if perf.total_completed == 0:
+            s.append("No tasks completed yet — start with smaller tasks to build momentum")
+        trending_up = False
+        if len(perf.monthly_trends) >= 2:
+            if perf.monthly_trends[-1].completed > perf.monthly_trends[-2].completed:
+                trending_up = True
+        if not trending_up and perf.total_completed >= 3:
+            s.append("Productivity is plateauing — set weekly completion goals")
+        if not s:
+            s.append("Strong performance — maintain current momentum")
+        return s
+
+    def analyze(self) -> PerformanceResult:
+        logger.debug("Starting performance analytics")
+        users = self.db.query(User).filter(
+            User.is_active == True,
+            User.role.in_(["admin", "manager", "employee"]),
+        ).all()
+
+        perf_users = []
+        for u in users:
+            uid = u.id
+            avg_days, _ = self._avg_completion_days(uid)
+            done, delayed, delay_pct = self._delay_stats(uid)
+            appr_rate, appr_hours = self._approval_stats(uid)
+            comments = self._comment_count(uid)
+            trends = self._monthly_trends(uid)
+            perf_score, rel_score, spd_score = self._compute_scores(
+                avg_days, delay_pct, appr_rate, comments, trends,
+            )
+            p = UserPerfData(
+                user_id=uid,
+                name=u.name or u.email,
+                email=u.email,
+                role=u.role.value if hasattr(u.role, "value") else str(u.role),
+                performance_score=perf_score,
+                reliability_score=rel_score,
+                speed_score=spd_score,
+                avg_completion_days=avg_days,
+                delay_pct=delay_pct,
+                total_completed=done,
+                total_delayed=delayed,
+                approval_rate=appr_rate,
+                avg_approval_hours=appr_hours,
+                total_comments=comments,
+                monthly_trends=trends,
+                suggestions=[],
+            )
+            p.suggestions = self._suggestions(p)
+            perf_users.append(p)
+
+        perf_users.sort(key=lambda x: x.performance_score, reverse=True)
+        top = perf_users[:5]
+        low = [u for u in perf_users if u.total_completed > 0]
+        low.sort(key=lambda x: x.performance_score)
+        low = low[:5]
+
+        users_with_data = [u for u in perf_users if u.total_completed > 0]
+        team_avg_days = None
+        if users_with_data:
+            days = [u.avg_completion_days for u in users_with_data if u.avg_completion_days is not None]
+            if days:
+                team_avg_days = round(sum(days) / len(days), 1)
+        team_delay = (
+            round(sum(u.delay_pct for u in users_with_data) / len(users_with_data), 1)
+            if users_with_data else 0.0
+        )
+        team_avg_perf = (
+            round(sum(u.performance_score for u in perf_users) / len(perf_users), 1)
+            if perf_users else 0.0
+        )
+        team_avg_rel = (
+            round(sum(u.reliability_score for u in perf_users) / len(perf_users), 1)
+            if perf_users else 0.0
+        )
+
+        logger.debug(
+            "Performance analytics: %d users, team perf=%.1f, delay=%.1f%%",
+            len(perf_users), team_avg_perf, team_delay,
+        )
+        return PerformanceResult(
+            users=perf_users,
+            top_performers=top,
+            low_performers=low,
+            team_avg_completion_days=team_avg_days,
+            team_delay_pct=team_delay,
+            team_avg_performance=team_avg_perf,
+            team_avg_reliability=team_avg_rel,
+        )
 class EmployeeWorkload:
     user_id: int
     name: str

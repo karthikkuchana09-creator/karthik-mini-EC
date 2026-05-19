@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
-from app.schemas.ai import AIRequest, AIResponse, AIOut, AISummaryOut, HighPriorityTasksOut, DelayRiskOut, AssignmentRecommendRequest, AssignmentRecommendOut, WorkloadAnalysisOut
+from app.schemas.ai import AIRequest, AIResponse, AIOut, AISummaryOut, HighPriorityTasksOut, DelayRiskOut, AssignmentRecommendRequest, AssignmentRecommendOut, WorkloadAnalysisOut, PerformanceAnalyticsOut
 from app.api.deps import get_db
 from app.core.rbac import require_permission, Permissions
 from app.ai import AIService
@@ -57,6 +57,14 @@ def recommend_assignment_endpoint(
         priority=request.priority,
         exclude_user_id=request.exclude_user_id,
     )
+
+
+@router.get("/performance-analytics", response_model=PerformanceAnalyticsOut)
+def performance_analytics_endpoint(
+    db: Session = Depends(get_db),
+    user=Depends(require_permission(Permissions.ai_use)),
+):
+    return AIService(db).get_performance_analytics()
 
 
 @router.get("/workload-analysis", response_model=WorkloadAnalysisOut)

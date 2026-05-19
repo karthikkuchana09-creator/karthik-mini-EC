@@ -9,7 +9,7 @@ from app.core.log import get_logger
 from app.core.config import settings
 from app.core.cache import cached
 from app.ai.rules import RulesEngine
-from app.ai.analyzers import TaskAnalyzer, ApprovalAnalyzer, WorkloadAnalyzer, DelayRiskAnalyzer, AssignmentRecommender, WorkloadAnalysisEngine
+from app.ai.analyzers import TaskAnalyzer, ApprovalAnalyzer, WorkloadAnalyzer, DelayRiskAnalyzer, AssignmentRecommender, WorkloadAnalysisEngine, PerformanceAnalyzer
 from app.ai.insights import InsightGenerator
 from app.schemas.ai import AIRequest
 
@@ -203,6 +203,50 @@ class AIService:
             "suggestion": suggestion,
             "model_used": "ai-engine",
             "tokens_used": analysis.tokens_used,
+        }
+
+    def get_performance_analytics(self) -> dict:
+        logger.info("Running performance analytics")
+        analyzer = PerformanceAnalyzer(self.db)
+        result = analyzer.analyze()
+        return {
+            "team_avg_completion_days": result.team_avg_completion_days,
+            "team_delay_pct": result.team_delay_pct,
+            "team_avg_performance": result.team_avg_performance,
+            "team_avg_reliability": result.team_avg_reliability,
+            "users": [
+                {
+                    "user_id": u.user_id,
+                    "name": u.name,
+                    "email": u.email,
+                    "role": u.role,
+                    "performance_score": u.performance_score,
+                    "reliability_score": u.reliability_score,
+                    "speed_score": u.speed_score,
+                    "avg_completion_days": u.avg_completion_days,
+                    "delay_pct": u.delay_pct,
+                    "total_completed": u.total_completed,
+                    "total_delayed": u.total_delayed,
+                    "approval_rate": u.approval_rate,
+                    "avg_approval_hours": u.avg_approval_hours,
+                    "total_comments": u.total_comments,
+                    "monthly_trends": [
+                        {"month": t.month, "completed": t.completed,
+                         "avg_completion_days": t.avg_completion_days, "delay_pct": t.delay_pct}
+                        for t in u.monthly_trends
+                    ],
+                    "suggestions": u.suggestions,
+                }
+                for u in result.users
+            ],
+            "top_performers": [
+                {"user_id": u.user_id, "name": u.name, "score": u.performance_score}
+                for u in result.top_performers
+            ],
+            "low_performers": [
+                {"user_id": u.user_id, "name": u.name, "score": u.performance_score}
+                for u in result.low_performers
+            ],
         }
 
     def get_workload_analysis(self) -> dict:

@@ -161,6 +161,48 @@ class TeamBalanceOut(BaseModel):
     recommendations: list[str] = []
 
 
+class MonthlyTrendItem(BaseModel):
+    month: str
+    completed: int
+    avg_completion_days: Optional[float] = None
+    delay_pct: float = 0
+
+
+class PerfUserItem(BaseModel):
+    user_id: int
+    name: str
+    email: str
+    role: str
+    performance_score: float
+    reliability_score: float
+    speed_score: float
+    avg_completion_days: Optional[float] = None
+    delay_pct: float = 0
+    total_completed: int = 0
+    total_delayed: int = 0
+    approval_rate: float = 0
+    avg_approval_hours: Optional[float] = None
+    total_comments: int = 0
+    monthly_trends: list[MonthlyTrendItem] = []
+    suggestions: list[str] = []
+
+
+class PerfSummaryItem(BaseModel):
+    user_id: int
+    name: str
+    score: float
+
+
+class PerformanceAnalyticsOut(BaseModel):
+    team_avg_completion_days: Optional[float] = None
+    team_delay_pct: float = 0
+    team_avg_performance: float = 0
+    team_avg_reliability: float = 0
+    users: list[PerfUserItem] = []
+    top_performers: list[PerfSummaryItem] = []
+    low_performers: list[PerfSummaryItem] = []
+
+
 class WorkloadAnalysisOut(BaseModel):
     team_balance: TeamBalanceOut
     distribution: dict[str, int]

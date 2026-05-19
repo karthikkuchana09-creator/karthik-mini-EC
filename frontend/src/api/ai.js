@@ -24,3 +24,8 @@ export const getWorkloadAnalysis = async () => {
   const response = await api.get('/ai/workload-analysis');
   return response.data;
 };
+
+export const getPerformanceAnalytics = async () => {
+  const response = await api.get('/ai/performance-analytics');
+  return response.data;
+};
