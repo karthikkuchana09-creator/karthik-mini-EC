@@ -544,3 +544,228 @@ class DelayRiskAnalyzer:
             sum(1 for r in results if r.risk_level == "medium"),
         )
         return results
+
+
+ASSIGN_WEIGHTS = {
+    "workload": 0.25,
+    "experience": 0.15,
+    "speed": 0.20,
+    "priority_match": 0.15,
+    "role_fit": 0.10,
+    "reliability": 0.15,
+}
+
+
+@dataclass
+class CandidateScore:
+    user_id: int
+    name: str
+    email: str
+    role: str
+    total_score: float
+    factors: dict
+    reason: str
+
+
+class AssignmentRecommender:
+    def __init__(self, db: Session, rules_engine):
+        self.db = db
+        self.rules = rules_engine
+        self.now = datetime.utcnow()
+
+    def _workload_score(self, user_id: int) -> tuple[float, float]:
+        active = self.db.query(Task).filter(
+            Task.assigned_to_id == user_id,
+            Task.status != "done",
+        ).count()
+        if active == 0:
+            return 100.0, 0.9
+        elif active <= 2:
+            return 85.0, 0.85
+        elif active <= 4:
+            return 65.0, 0.8
+        elif active <= 7:
+            return 40.0, 0.75
+        elif active <= 10:
+            return 20.0, 0.7
+        else:
+            return 5.0, 0.65
+
+    def _experience_score(self, user_id: int) -> tuple[float, float]:
+        completed = self.db.query(Task).filter(
+            Task.assigned_to_id == user_id,
+            Task.status == "done",
+        ).count()
+        if completed >= 50:
+            return 100.0, 0.9
+        elif completed >= 30:
+            return 85.0, 0.85
+        elif completed >= 15:
+            return 65.0, 0.8
+        elif completed >= 5:
+            return 40.0, 0.7
+        elif completed >= 1:
+            return 20.0, 0.6
+        else:
+            return 5.0, 0.4
+
+    def _speed_score(self, user_id: int) -> tuple[float, float]:
+        result = self.db.query(
+            func.avg(
+                func.extract("epoch", Task.updated_at - Task.created_at) / 86400
+            )
+        ).filter(
+            Task.assigned_to_id == user_id,
+            Task.status == "done",
+            Task.updated_at.isnot(None),
+            Task.created_at.isnot(None),
+        ).scalar()
+        if result is None:
+            return 50.0, 0.5
+        avg_days = float(result)
+        if avg_days <= 1:
+            return 100.0, 0.9
+        elif avg_days <= 3:
+            return 80.0, 0.85
+        elif avg_days <= 7:
+            return 55.0, 0.8
+        elif avg_days <= 14:
+            return 30.0, 0.7
+        else:
+            return 10.0, 0.6
+
+    def _priority_match_score(self, user_id: int, priority: str) -> tuple[float, float]:
+        if not priority:
+            return 50.0, 0.5
+        same_priority_done = self.db.query(Task).filter(
+            Task.assigned_to_id == user_id,
+            Task.priority == priority,
+            Task.status == "done",
+        ).count()
+        if same_priority_done >= 10:
+            return 100.0, 0.9
+        elif same_priority_done >= 5:
+            return 80.0, 0.85
+        elif same_priority_done >= 2:
+            return 55.0, 0.75
+        elif same_priority_done >= 1:
+            return 30.0, 0.65
+        else:
+            return 10.0, 0.5
+
+    def _role_fit_score(self, user_role: str, task_priority: str) -> tuple[float, float]:
+        if task_priority == "high" and user_role in ("admin", "manager"):
+            return 100.0, 0.9
+        elif task_priority == "high" and user_role == "employee":
+            return 60.0, 0.7
+        elif task_priority == "medium" and user_role in ("manager", "employee"):
+            return 90.0, 0.85
+        elif task_priority == "low":
+            return 95.0, 0.8
+        elif user_role == "admin":
+            return 70.0, 0.6
+        return 80.0, 0.75
+
+    def _reliability_score(self, user_id: int) -> tuple[float, float]:
+        total_done = self.db.query(Task).filter(
+            Task.assigned_to_id == user_id,
+            Task.status == "done",
+        ).count()
+        if total_done == 0:
+            return 50.0, 0.4
+        overdue_done = self.db.query(Task).filter(
+            Task.assigned_to_id == user_id,
+            Task.status == "done",
+            Task.due_date.isnot(None),
+            Task.updated_at > Task.due_date,
+        ).count()
+        on_time = total_done - overdue_done
+        rate = on_time / total_done
+        score = rate * 100
+        if total_done < 5:
+            confidence = 0.5
+        elif total_done < 15:
+            confidence = 0.7
+        else:
+            confidence = 0.85
+        return round(score, 1), confidence
+
+    def _generate_reason(self, user, factors: dict, total_score: float) -> str:
+        reason_parts = []
+        ws = factors.get("workload", {}).get("score", 0)
+        ss = factors.get("speed", {}).get("score", 0)
+        ps = factors.get("priority_match", {}).get("score", 0)
+        rs = factors.get("reliability", {}).get("score", 0)
+        es = factors.get("experience", {}).get("score", 0)
+        if ws >= 80:
+            reason_parts.append("low workload")
+        if ss >= 80:
+            reason_parts.append("fast completion history")
+        elif ss >= 55:
+            reason_parts.append("solid completion speed")
+        if ps >= 80:
+            reason_parts.append("strong track record in similar priority tasks")
+        if rs >= 80:
+            reason_parts.append("high on-time delivery rate")
+        if es >= 65:
+            reason_parts.append("extensive task experience")
+        if not reason_parts:
+            return "Available and suitable for assignment"
+        return " and ".join(reason_parts[:2]) + (
+            f" ({total_score}/100)" if len(reason_parts) <= 2 else ""
+        )
+
+    def recommend(self, priority: Optional[str] = None, exclude_user_id: Optional[int] = None) -> list[CandidateScore]:
+        logger.info("Running assignment recommendation (priority=%s)", priority or "any")
+        users_q = self.db.query(User).filter(
+            User.is_active == True,
+            User.role.in_(["admin", "manager", "employee"]),
+        )
+        if exclude_user_id is not None:
+            users_q = users_q.filter(User.id != exclude_user_id)
+        users = users_q.all()
+
+        candidates = []
+        for u in users:
+            uid = u.id
+            ws, wc = self._workload_score(uid)
+            es, ec = self._experience_score(uid)
+            ss, sc = self._speed_score(uid)
+            ps, pc = self._priority_match_score(uid, priority)
+            rfs, rfc = self._role_fit_score(u.role.value if hasattr(u.role, "value") else str(u.role), priority)
+            rls, rlc = self._reliability_score(uid)
+
+            total = (
+                ws * ASSIGN_WEIGHTS["workload"]
+                + es * ASSIGN_WEIGHTS["experience"]
+                + ss * ASSIGN_WEIGHTS["speed"]
+                + ps * ASSIGN_WEIGHTS["priority_match"]
+                + rfs * ASSIGN_WEIGHTS["role_fit"]
+                + rls * ASSIGN_WEIGHTS["reliability"]
+            )
+            total = round(total, 1)
+
+            factors = {
+                "workload": {"score": ws, "confidence": wc, "weight": ASSIGN_WEIGHTS["workload"]},
+                "experience": {"score": es, "confidence": ec, "weight": ASSIGN_WEIGHTS["experience"]},
+                "speed": {"score": ss, "confidence": sc, "weight": ASSIGN_WEIGHTS["speed"]},
+                "priority_match": {"score": ps, "confidence": pc, "weight": ASSIGN_WEIGHTS["priority_match"]},
+                "role_fit": {"score": rfs, "confidence": rfc, "weight": ASSIGN_WEIGHTS["role_fit"]},
+                "reliability": {"score": rls, "confidence": rlc, "weight": ASSIGN_WEIGHTS["reliability"]},
+            }
+            name = u.name or u.email
+            reason = self._generate_reason(u, factors, total)
+
+            candidates.append(CandidateScore(
+                user_id=uid,
+                name=name,
+                email=u.email,
+                role=u.role.value if hasattr(u.role, "value") else str(u.role),
+                total_score=total,
+                factors=factors,
+                reason=reason,
+            ))
+
+        candidates.sort(key=lambda c: c.total_score, reverse=True)
+        logger.debug("Assignment recommendation: %d candidates evaluated", len(candidates))
+        return candidates

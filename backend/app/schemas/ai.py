@@ -100,6 +100,36 @@ class DelayRiskOut(BaseModel):
     items: list[DelayRiskItem] = []
 
 
+class AssignmentRecommendRequest(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    priority: Optional[str] = None
+    exclude_user_id: Optional[int] = None
+
+
+class AssignmentFactorDetail(BaseModel):
+    score: float
+    confidence: float
+
+
+class AssignmentCandidateItem(BaseModel):
+    user_id: int
+    name: str
+    email: str
+    role: str
+    score: float
+    factors: dict[str, AssignmentFactorDetail]
+    reason: str
+
+
+class AssignmentRecommendOut(BaseModel):
+    recommended_user: Optional[dict] = None
+    score: float = 0
+    reason: str = ""
+    total_candidates: int = 0
+    candidates: list[AssignmentCandidateItem] = []
+
+
 class HighPriorityTaskItem(BaseModel):
     id: int
     title: str

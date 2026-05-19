@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Optional
 
 from sqlalchemy.orm import Session, joinedload
 from app.models.task import Task
@@ -8,7 +9,7 @@ from app.core.log import get_logger
 from app.core.config import settings
 from app.core.cache import cached
 from app.ai.rules import RulesEngine
-from app.ai.analyzers import TaskAnalyzer, ApprovalAnalyzer, WorkloadAnalyzer, DelayRiskAnalyzer
+from app.ai.analyzers import TaskAnalyzer, ApprovalAnalyzer, WorkloadAnalyzer, DelayRiskAnalyzer, AssignmentRecommender
 from app.ai.insights import InsightGenerator
 from app.schemas.ai import AIRequest
 
@@ -202,6 +203,35 @@ class AIService:
             "suggestion": suggestion,
             "model_used": "ai-engine",
             "tokens_used": analysis.tokens_used,
+        }
+
+    def recommend_assignment(self, priority: Optional[str] = None, exclude_user_id: Optional[int] = None) -> dict:
+        logger.info("Recommending assignment (priority=%s)", priority or "any")
+        recommender = AssignmentRecommender(self.db, self.rules)
+        candidates = recommender.recommend(priority=priority, exclude_user_id=exclude_user_id)
+        top = candidates[0] if candidates else None
+        return {
+            "recommended_user": {
+                "id": top.user_id,
+                "name": top.name,
+                "email": top.email,
+                "role": top.role,
+            } if top else None,
+            "score": top.total_score if top else 0,
+            "reason": top.reason if top else "No suitable candidates found",
+            "total_candidates": len(candidates),
+            "candidates": [
+                {
+                    "user_id": c.user_id,
+                    "name": c.name,
+                    "email": c.email,
+                    "role": c.role,
+                    "score": c.total_score,
+                    "factors": {k: {"score": v["score"], "confidence": v["confidence"]} for k, v in c.factors.items()},
+                    "reason": c.reason,
+                }
+                for c in candidates[:10]
+            ],
         }
 
     def get_delay_risks(self, current_user) -> list[dict]:

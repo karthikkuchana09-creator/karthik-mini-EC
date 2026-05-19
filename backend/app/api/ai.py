@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
-from app.schemas.ai import AIRequest, AIResponse, AIOut, AISummaryOut, HighPriorityTasksOut, DelayRiskOut
+from app.schemas.ai import AIRequest, AIResponse, AIOut, AISummaryOut, HighPriorityTasksOut, DelayRiskOut, AssignmentRecommendRequest, AssignmentRecommendOut
 from app.api.deps import get_db
 from app.core.rbac import require_permission, Permissions
 from app.ai import AIService
@@ -45,6 +45,18 @@ def high_priority_tasks_endpoint(
         "low": counts.get("low", 0),
         "tasks": tasks,
     }
+
+
+@router.post("/recommend-assignment", response_model=AssignmentRecommendOut)
+def recommend_assignment_endpoint(
+    request: AssignmentRecommendRequest,
+    db: Session = Depends(get_db),
+    user=Depends(require_permission(Permissions.ai_use)),
+):
+    return AIService(db).recommend_assignment(
+        priority=request.priority,
+        exclude_user_id=request.exclude_user_id,
+    )
 
 
 @router.get("/delay-risks", response_model=DelayRiskOut)
