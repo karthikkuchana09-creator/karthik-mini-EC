@@ -1095,6 +1095,216 @@ class WorkloadAnalysisResult:
     distribution: dict[str, int] = field(default_factory=dict)
 
 
+@dataclass
+class Recommendation:
+    type: str
+    priority: str
+    confidence: float
+    title: str
+    description: str
+    action: str
+    entity_id: Optional[int] = None
+    entity_name: Optional[str] = None
+    impact: Optional[str] = None
+    metric_value: Optional[float] = None
+    source: str = ""
+
+
+class RecommendationEngine:
+    """Centralized recommendation engine that aggregates all analyzers
+    into unified, priority-ordered recommendations with confidence scoring."""
+
+    def __init__(self, db: Session, rules_engine):
+        self.db = db
+        self.rules = rules_engine
+        self.now = datetime.utcnow()
+
+    def _prioritize_by_type(self, rec: Recommendation) -> int:
+        priority_map = {"critical": 0, "high": 1, "medium": 2, "low": 3}
+        type_map = {"escalation": 0, "prioritization": 1, "redistribution": 2, "assignment": 3}
+        return (priority_map.get(rec.priority, 3), type_map.get(rec.type, 3))
+
+    def _get_prioritization_recs(self) -> list[Recommendation]:
+        recs = []
+
+        # from delay risk: critical tasks needing immediate attention
+        delay = DelayRiskAnalyzer(self.db, self.rules)
+        items = delay.analyze()
+
+        critical_items = [i for i in items if i.risk_level == "high"]
+        for item in critical_items[:5]:
+            priority = "critical" if item.risk_score >= 7.5 else "high"
+            title = f"Prioritize: {item.title}"
+            desc = f"Risk score {item.risk_score} — {', '.join(item.warnings[:2])}" if item.warnings else \
+                   f"Predicted delay of {item.predicted_delay_days}d with {item.confidence_score:.0%} confidence"
+            recs.append(Recommendation(
+                type="prioritization",
+                priority=priority,
+                confidence=item.confidence_score,
+                title=title,
+                description=desc,
+                action=f"Review and expedite task #{item.task_id}",
+                entity_id=item.task_id,
+                entity_name=item.title,
+                impact=f"Reduce delay risk by ~{min(80, int(item.risk_score * 10))}%",
+                metric_value=item.risk_score,
+                source="DelayRiskAnalyzer",
+            ))
+
+        if not critical_items:
+            # if no critical risks, check high priority pending
+            task_q = self.db.query(Task).filter(
+                Task.priority == "high",
+                Task.status.in_(["todo", "in_progress"]),
+            ).options(joinedload(Task.assignee)).order_by(Task.due_date.asc()).limit(5).all()
+
+            for t in task_q:
+                days_left = (t.due_date - self.now).days if t.due_date else None
+                urgency = "critical" if days_left is not None and days_left <= 1 else "high"
+                recs.append(Recommendation(
+                    type="prioritization",
+                    priority=urgency,
+                    confidence=0.75,
+                    title=f"Complete: {t.title}",
+                    description=f"High-priority task with {days_left}d remaining" if days_left else "High-priority task needs attention",
+                    action=f"Focus on task #{t.id} next",
+                    entity_id=t.id,
+                    entity_name=t.title,
+                    impact="Prevents scheduling bottlenecks",
+                    metric_value=days_left or 0,
+                    source="TaskAnalyzer",
+                ))
+
+        return recs
+
+    def _get_escalation_recs(self) -> list[Recommendation]:
+        recs = []
+        approval = ApprovalAnalyzer(self.db, self.rules)
+        result = approval.analyze()
+
+        for a in result.delayed_approvals[:5]:
+            urgency = "critical" if a["wait_hours"] >= 72 else "high"
+            recs.append(Recommendation(
+                type="escalation",
+                priority=urgency,
+                confidence=min(0.95, 0.5 + a["wait_hours"] / 200),
+                title=f"Escalate approval: {a['title']}",
+                description=f"Waiting {a['wait_hours']}h for approval from {a['requester'] or 'unknown'}",
+                action=f"Send reminder or escalate approval #{a['id']}",
+                entity_id=a["id"],
+                entity_name=a["title"],
+                impact=f"Reduce approval wait by ~{min(80, int(a['wait_hours'] * 0.4))}%",
+                metric_value=a["wait_hours"],
+                source="ApprovalAnalyzer",
+            ))
+
+        if not result.delayed_approvals and result.pending > 0:
+            recs.append(Recommendation(
+                type="escalation",
+                priority="low",
+                confidence=0.5,
+                title="No delayed approvals",
+                description=f"{result.pending} pending approvals are within acceptable timeframe",
+                action="Monitor approval queue regularly",
+                impact="Maintain current approval velocity",
+                source="ApprovalAnalyzer",
+            ))
+
+        return recs
+
+    def _get_redistribution_recs(self) -> list[Recommendation]:
+        recs = []
+        engine = WorkloadAnalysisEngine(self.db, self.rules)
+        result = engine.analyze()
+
+        tb = result.team_balance
+        if not tb or tb.total_employees == 0:
+            return recs
+
+        if tb.health_score < 50:
+            recs.append(Recommendation(
+                type="redistribution",
+                priority="critical",
+                confidence=min(0.95, (100 - tb.health_score) / 100 + 0.3),
+                title="Critical workload imbalance detected",
+                description=f"Health score {tb.health_score}/100 — {tb.overloaded_count} overloaded, {tb.underutilized_count} underutilized, std dev {tb.std_dev_workload}",
+                action="Redistribute tasks immediately to balance the team",
+                impact=f"Reduce overload by ~{min(80, tb.overloaded_pct)}%",
+                metric_value=tb.std_dev_workload,
+                source="WorkloadAnalysisEngine",
+            ))
+        elif tb.health_score < 70:
+            recs.append(Recommendation(
+                type="redistribution",
+                priority="high",
+                confidence=0.75,
+                title="Workload distribution could be improved",
+                description=f"Health score {tb.health_score}/100 — {tb.overloaded_count} overloaded employees need relief",
+                action="Consider reassigning tasks from overloaded team members",
+                impact=f"Improve team health by ~{min(40, 100 - tb.health_score)} points",
+                metric_value=tb.health_score,
+                source="WorkloadAnalysisEngine",
+            ))
+
+        if tb.recommendations:
+            for r in tb.recommendations:
+                if "balanced" not in r.lower():
+                    recs.append(Recommendation(
+                        type="redistribution",
+                        priority="high" if "Redistribute" in r else "medium",
+                        confidence=0.7,
+                        title=f"Reassign tasks: {r[:60]}",
+                        description=r,
+                        action=r,
+                        impact="Improves team productivity and prevents burnout",
+                        source="WorkloadAnalysisEngine",
+                    ))
+
+        return recs
+
+    def _get_assignment_recs(self) -> list[Recommendation]:
+        recs = []
+        skip = True
+        # find tasks without assignee or high-priority unassigned
+        unassigned_high = self.db.query(Task).filter(
+            Task.assigned_to_id.is_(None),
+            Task.status.in_(["todo", "in_progress"]),
+        ).order_by(Task.priority.desc(), Task.due_date.asc()).limit(5).all()
+
+        for t in unassigned_high:
+            recommender = AssignmentRecommender(self.db, self.rules)
+            candidates = recommender.recommend(priority=t.priority)
+            if candidates:
+                top = candidates[0]
+                recs.append(Recommendation(
+                    type="assignment",
+                    priority="high" if t.priority == "high" else "medium",
+                    confidence=top.total_score / 100,
+                    title=f"Assign {t.title} to {top.name}",
+                    description=f"Best candidate scored {top.total_score}/100 — {top.reason}",
+                    action=f"Assign task #{t.id} to {top.name} ({top.email})",
+                    entity_id=t.id,
+                    entity_name=t.title,
+                    impact=f"Expected completion ~{max(1, 5 - int(top.total_score / 25))}d faster",
+                    metric_value=top.total_score,
+                    source="AssignmentRecommender",
+                ))
+
+        return recs
+
+    def generate(self) -> list[Recommendation]:
+        logger.info("Generating unified recommendations from all analyzers")
+        all_recs = []
+        all_recs.extend(self._get_prioritization_recs())
+        all_recs.extend(self._get_escalation_recs())
+        all_recs.extend(self._get_redistribution_recs())
+        all_recs.extend(self._get_assignment_recs())
+
+        all_recs.sort(key=self._prioritize_by_type)
+        logger.info("Generated %d recommendations", len(all_recs))
+        return all_recs
+
+
 class WorkloadAnalysisEngine:
     def __init__(self, db: Session, rules_engine):
         self.db = db

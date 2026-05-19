@@ -222,6 +222,25 @@ class HighPriorityTaskItem(BaseModel):
     assignee_name: Optional[str] = None
 
 
+class UnifiedRecommendationItem(BaseModel):
+    type: str
+    priority: str
+    confidence: float
+    title: str
+    description: str
+    action: str
+    entity_id: Optional[int] = None
+    entity_name: Optional[str] = None
+    impact: Optional[str] = None
+    metric_value: Optional[float] = None
+    source: str = ""
+
+
+class RecommendationsOut(BaseModel):
+    total: int = 0
+    recommendations: list[UnifiedRecommendationItem] = []
+
+
 class HighPriorityTasksOut(BaseModel):
     total: int = 0
     critical: int = 0

@@ -9,7 +9,7 @@ from app.core.log import get_logger
 from app.core.config import settings
 from app.core.cache import cached
 from app.ai.rules import RulesEngine
-from app.ai.analyzers import TaskAnalyzer, ApprovalAnalyzer, WorkloadAnalyzer, DelayRiskAnalyzer, AssignmentRecommender, WorkloadAnalysisEngine, PerformanceAnalyzer
+from app.ai.analyzers import TaskAnalyzer, ApprovalAnalyzer, WorkloadAnalyzer, DelayRiskAnalyzer, AssignmentRecommender, WorkloadAnalysisEngine, PerformanceAnalyzer, RecommendationEngine
 from app.ai.insights import InsightGenerator
 from app.schemas.ai import AIRequest
 
@@ -203,6 +203,30 @@ class AIService:
             "suggestion": suggestion,
             "model_used": "ai-engine",
             "tokens_used": analysis.tokens_used,
+        }
+
+    def get_recommendations(self) -> dict:
+        logger.info("Running unified recommendation engine")
+        engine = RecommendationEngine(self.db, self.rules)
+        recs = engine.generate()
+        return {
+            "total": len(recs),
+            "recommendations": [
+                {
+                    "type": r.type,
+                    "priority": r.priority,
+                    "confidence": r.confidence,
+                    "title": r.title,
+                    "description": r.description,
+                    "action": r.action,
+                    "entity_id": r.entity_id,
+                    "entity_name": r.entity_name,
+                    "impact": r.impact,
+                    "metric_value": r.metric_value,
+                    "source": r.source,
+                }
+                for r in recs
+            ],
         }
 
     def get_performance_analytics(self) -> dict:

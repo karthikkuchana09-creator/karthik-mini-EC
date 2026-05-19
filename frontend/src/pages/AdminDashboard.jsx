@@ -13,6 +13,7 @@ import DelayRiskCard from '../components/DelayRiskCard';
 import AssignmentCard from '../components/AssignmentCard';
 import WorkloadAnalysisCard from '../components/WorkloadAnalysisCard';
 import PerformanceCard from '../components/PerformanceCard';
+import RecommendationsCard from '../components/RecommendationsCard';
 import { getErrorMessage } from '../utils/errorHandler';
 import { timeAgo, formatDate, formatTimestamp } from '../utils/format';
 
@@ -372,6 +373,10 @@ function AdminDashboard() {
 
       <div className="mb-8">
         <PerformanceCard />
+      </div>
+
+      <div className="mb-8">
+        <RecommendationsCard />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">

@@ -29,3 +29,8 @@ export const getPerformanceAnalytics = async () => {
   const response = await api.get('/ai/performance-analytics');
   return response.data;
 };
+
+export const getRecommendations = async () => {
+  const response = await api.get('/ai/recommendations');
+  return response.data;
+};

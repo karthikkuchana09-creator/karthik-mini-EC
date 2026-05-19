@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
-from app.schemas.ai import AIRequest, AIResponse, AIOut, AISummaryOut, HighPriorityTasksOut, DelayRiskOut, AssignmentRecommendRequest, AssignmentRecommendOut, WorkloadAnalysisOut, PerformanceAnalyticsOut
+from app.schemas.ai import AIRequest, AIResponse, AIOut, AISummaryOut, HighPriorityTasksOut, DelayRiskOut, AssignmentRecommendRequest, AssignmentRecommendOut, WorkloadAnalysisOut, PerformanceAnalyticsOut, RecommendationsOut
 from app.api.deps import get_db
 from app.core.rbac import require_permission, Permissions
 from app.ai import AIService
@@ -25,6 +25,14 @@ def summary_endpoint(
     user=Depends(require_permission(Permissions.ai_use)),
 ):
     return AIService(db).generate_summary(user)
+
+
+@router.get("/recommendations", response_model=RecommendationsOut)
+def recommendations_endpoint(
+    db: Session = Depends(get_db),
+    user=Depends(require_permission(Permissions.ai_use)),
+):
+    return AIService(db).get_recommendations()
 
 
 @router.get("/high-priority-tasks", response_model=HighPriorityTasksOut)
