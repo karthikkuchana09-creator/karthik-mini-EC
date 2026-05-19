@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from app.schemas.ai import AIRequest, AIResponse, AIOut, AISummaryOut, HighPriorityTasksOut, DelayRiskOut, AssignmentRecommendRequest, AssignmentRecommendOut, WorkloadAnalysisOut, PerformanceAnalyticsOut, RecommendationsOut
+from app.services.dashboard_service import get_enterprise_ai_summary
 from app.api.deps import get_db
 from app.core.rbac import require_permission, Permissions
 from app.ai import AIService
@@ -8,6 +9,72 @@ from app.core.log import get_logger
 
 logger = get_logger("ai_api")
 router = APIRouter(prefix="/ai", tags=["AI"])
+
+
+@router.get("/analytics-dashboard")
+def analytics_dashboard_endpoint(
+    db: Session = Depends(get_db),
+    user=Depends(require_permission(Permissions.ai_use)),
+):
+    svc = AIService(db)
+    summary = get_enterprise_ai_summary(db)
+    high_priority = svc.get_high_priority_tasks(user)
+    delay_risks = svc.get_delay_risks(user)
+    workload = svc.get_workload_analysis()
+    performance = svc.get_performance_analytics()
+    recommendations = svc.get_recommendations()
+    return {
+        "summary": summary["summary"],
+        "high_priority_tasks": {
+            "total": len(high_priority),
+            "critical": sum(1 for t in high_priority if t["urgency_level"] == "critical"),
+            "high": sum(1 for t in high_priority if t["urgency_level"] == "high"),
+            "medium": sum(1 for t in high_priority if t["urgency_level"] == "medium"),
+            "tasks": high_priority[:8],
+        },
+        "delay_risks": {
+            "total": len(delay_risks),
+            "high_risk": sum(1 for r in delay_risks if r["risk_level"] == "high"),
+            "medium_risk": sum(1 for r in delay_risks if r["risk_level"] == "medium"),
+            "items": delay_risks[:6],
+        },
+        "workload": {
+            "team_balance": workload["team_balance"],
+            "distribution": workload["distribution"],
+            "employees": workload["employees"][:10],
+        },
+        "performance": {
+            "team_avg_completion_days": performance["team_avg_completion_days"],
+            "team_delay_pct": performance["team_delay_pct"],
+            "team_avg_performance": performance["team_avg_performance"],
+            "team_avg_reliability": performance["team_avg_reliability"],
+            "top_performers": performance["top_performers"],
+            "monthly_trends": _build_monthly_trends(performance.get("users", [])),
+        },
+        "recommendations": recommendations["recommendations"][:8],
+    }
+
+
+def _build_monthly_trends(users: list) -> dict:
+    agg = {}
+    for u in users:
+        for t in u.get("monthly_trends", []):
+            m = t["month"]
+            if m not in agg:
+                agg[m] = {"completed": 0, "total_days": 0.0, "count": 0}
+            agg[m]["completed"] += t.get("completed", 0)
+            if t.get("avg_completion_days"):
+                agg[m]["total_days"] += t["avg_completion_days"]
+                agg[m]["count"] += 1
+    months = sorted(agg.keys())
+    return [
+        {
+            "month": m,
+            "completed": agg[m]["completed"],
+            "avg_completion_days": round(agg[m]["total_days"] / agg[m]["count"], 1) if agg[m]["count"] else None,
+        }
+        for m in months
+    ]
 
 
 @router.post("/suggest", response_model=AIResponse)
