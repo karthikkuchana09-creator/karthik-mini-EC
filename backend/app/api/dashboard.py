@@ -6,9 +6,9 @@ from app.services.dashboard_service import (
     get_summary,
     get_task_distribution,
     get_approval_stats,
-    get_performance
+    get_performance,
+    get_enterprise_ai_summary,
 )
-from app.ai import AIService
 
 router = APIRouter(prefix="/dashboard")
 
@@ -50,4 +50,4 @@ def ai_summary_endpoint(
     db: Session = Depends(get_db),
     user=Depends(require_permission(Permissions.dashboard_ai_summary)),
 ):
-    return AIService(db).generate_summary(user)
+    return get_enterprise_ai_summary(db)

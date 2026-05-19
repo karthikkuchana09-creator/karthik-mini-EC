@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta
+
 from sqlalchemy.orm import Session
 from sqlalchemy import func, case
 from app.models.task import Task
@@ -80,3 +82,140 @@ def get_performance(db: Session):
     performance = [{"user": name, "tasks": count} for name, count in data]
     logger.debug("Performance data: %s", performance)
     return performance
+
+
+@cached(prefix="dashboard:ai_summary", ttl=lambda: settings.CACHE_TTL_DASHBOARD, exclude_args=[0])
+def get_enterprise_ai_summary(db: Session) -> dict:
+    """Optimized enterprise AI dashboard summary with 5 aggregate queries."""
+    now = datetime.utcnow()
+    delay_threshold_hours = 48
+    workload_high = 5
+    at_risk_days = 2
+
+    # ── 1. Task risk metrics (single query) ──
+    task_row = db.query(
+        func.count(Task.id).filter(
+            Task.priority == "high",
+            Task.status.in_(["todo", "in_progress"]),
+        ).label("high_priority_pending"),
+        func.count(Task.id).filter(
+            Task.due_date < now,
+            Task.status != "done",
+        ).label("overdue"),
+        func.count(Task.id).filter(
+            Task.due_date.isnot(None),
+            Task.due_date <= now + timedelta(days=at_risk_days),
+            Task.due_date >= now,
+            Task.status.in_(["todo", "in_progress"]),
+        ).label("at_risk"),
+        func.count(Task.id).filter(
+            Task.status == "in_progress",
+            Task.updated_at <= now - timedelta(hours=24),
+        ).label("blocked"),
+        func.count(Task.id).filter(
+            func.date(Task.due_date) == func.date(now),
+            Task.status != "done",
+        ).label("due_today"),
+        func.count(Task.id).filter(
+            Task.status == "done",
+            Task.updated_at >= now - timedelta(days=7),
+        ).label("completed_week"),
+    ).one()
+
+    # ── 2. Delayed approvals ──
+    delayed_approvals = db.query(func.count(Approval.id)).filter(
+        Approval.status == "pending",
+        Approval.created_at < now - timedelta(hours=delay_threshold_hours),
+    ).scalar() or 0
+
+    pending_approvals = db.query(func.count(Approval.id)).filter(
+        Approval.status == "pending",
+    ).scalar() or 0
+
+    # ── 3. Overloaded employees ──
+    overloaded_row = db.query(
+        Task.assigned_to_id,
+        func.count(Task.id).label("task_count"),
+    ).filter(
+        Task.assigned_to_id.isnot(None),
+        Task.status != "done",
+    ).group_by(Task.assigned_to_id).having(
+        func.count(Task.id) >= workload_high,
+    ).all()
+    overloaded_count = len(overloaded_row)
+    critical_count = sum(1 for _, cnt in overloaded_row if cnt >= 10)
+
+    underutilized_count = 0
+    underutilized_subq = db.query(
+        Task.assigned_to_id,
+        func.count(Task.id).label("task_count"),
+    ).filter(
+        Task.assigned_to_id.isnot(None),
+        Task.status != "done",
+    ).group_by(Task.assigned_to_id).having(
+        func.count(Task.id) == 0,
+    ).subquery()
+    total_users = db.query(func.count(User.id)).filter(
+        User.is_active == True,
+    ).scalar() or 0
+    users_with_tasks = len(overloaded_row)
+    underutilized_count = max(0, total_users - users_with_tasks)
+
+    # ── 4. Team performance avg ──
+    perf_row = db.query(
+        func.avg(
+            func.extract("epoch", Task.updated_at - Task.created_at) / 86400
+        ).filter(
+            Task.status == "done",
+            Task.updated_at.isnot(None),
+            Task.created_at.isnot(None),
+        ).label("avg_completion_days"),
+    ).one()
+    avg_completion = round(perf_row.avg_completion_days, 1) if perf_row.avg_completion_days else None
+
+    # ── 5. Build summary strings ──
+    summary = []
+
+    H = task_row
+    if H.high_priority_pending > 0:
+        summary.append(f"{H.high_priority_pending} high priority task{'s' if H.high_priority_pending != 1 else ''} pending")
+    if H.overdue > 0:
+        summary.append(f"{H.overdue} task{'s' if H.overdue != 1 else ''} overdue")
+    if H.at_risk > 0:
+        summary.append(f"{H.at_risk} task{'s' if H.at_risk != 1 else ''} at risk of delay")
+    if H.blocked > 0:
+        summary.append(f"{H.blocked} task{'s' if H.blocked != 1 else ''} blocked — no progress in 24+ hours")
+    if H.due_today > 0:
+        summary.append(f"{H.due_today} task{'s' if H.due_today != 1 else ''} due today")
+
+    if delayed_approvals > 0:
+        summary.append(f"{delayed_approvals} delayed approval{'s' if delayed_approvals != 1 else ''} pending escalation")
+    elif pending_approvals > 0:
+        summary.append(f"{pending_approvals} approval{'s' if pending_approvals != 1 else ''} pending review")
+
+    if critical_count > 0:
+        summary.append(f"{critical_count} employee{'s' if critical_count != 1 else ''} critically overloaded")
+    elif overloaded_count > 0:
+        summary.append(f"{overloaded_count} employee{'s' if overloaded_count != 1 else ''} overloaded")
+    if underutilized_count > 0:
+        summary.append(f"{underutilized_count} employee{'s' if underutilized_count != 1 else ''} available for assignments")
+
+    if H.completed_week > 0:
+        summary.append(f"{H.completed_week} task{'s' if H.completed_week != 1 else ''} completed this week")
+    if avg_completion is not None:
+        if avg_completion <= 2:
+            summary.append("Team completion speed is strong (avg < 2 days)")
+        elif avg_completion <= 5:
+            summary.append(f"Average completion time {avg_completion} days — on track")
+        else:
+            summary.append(f"Average completion time {avg_completion}d — consider process improvements")
+
+    if not summary:
+        summary.append("All metrics healthy — no action items")
+
+    logger.info(
+        "Enterprise AI summary: %d items (hp=%d overdue=%d at_risk=%d blocked=%d approvals=%d overloaded=%d)",
+        len(summary), H.high_priority_pending, H.overdue, H.at_risk, H.blocked,
+        delayed_approvals, overloaded_count,
+    )
+    return {"summary": summary}
