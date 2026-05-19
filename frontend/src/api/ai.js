@@ -19,3 +19,8 @@ export const recommendAssignment = async (params = {}) => {
   const response = await api.post('/ai/recommend-assignment', params);
   return response.data;
 };
+
+export const getWorkloadAnalysis = async () => {
+  const response = await api.get('/ai/workload-analysis');
+  return response.data;
+};

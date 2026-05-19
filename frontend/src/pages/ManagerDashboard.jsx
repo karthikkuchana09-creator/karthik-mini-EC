@@ -13,6 +13,7 @@ import ErrorState from '../components/ui/ErrorState';
 import HighPriorityTasksCard from '../components/HighPriorityTasksCard';
 import DelayRiskCard from '../components/DelayRiskCard';
 import AssignmentCard from '../components/AssignmentCard';
+import WorkloadAnalysisCard from '../components/WorkloadAnalysisCard';
 import { getErrorMessage } from '../utils/errorHandler';
 import { timeAgo, formatDate } from '../utils/format';
 import ActivityFeed from '../components/ActivityFeed';
@@ -518,6 +519,10 @@ function ManagerDashboard() {
 
       <div className="mb-8">
         <AssignmentCard />
+      </div>
+
+      <div className="mb-8">
+        <WorkloadAnalysisCard />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">

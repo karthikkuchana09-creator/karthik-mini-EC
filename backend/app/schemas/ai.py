@@ -130,6 +130,43 @@ class AssignmentRecommendOut(BaseModel):
     candidates: list[AssignmentCandidateItem] = []
 
 
+class WorkloadEmployeeItem(BaseModel):
+    user_id: int
+    name: str
+    email: str
+    role: str
+    active_tasks: int
+    pending_approvals: int
+    overdue_tasks: int
+    completed_tasks: int
+    total_assignments: int
+    workload_score: float
+    efficiency_score: float
+    status: str
+    active_task_details: list[dict] = []
+
+
+class TeamBalanceOut(BaseModel):
+    total_employees: int
+    total_active_tasks: int
+    mean_workload: float
+    std_dev_workload: float
+    overloaded_count: int
+    balanced_count: int
+    underutilized_count: int
+    overloaded_pct: float
+    underutilized_pct: float
+    balanced_pct: float
+    health_score: float
+    recommendations: list[str] = []
+
+
+class WorkloadAnalysisOut(BaseModel):
+    team_balance: TeamBalanceOut
+    distribution: dict[str, int]
+    employees: list[WorkloadEmployeeItem] = []
+
+
 class HighPriorityTaskItem(BaseModel):
     id: int
     title: str

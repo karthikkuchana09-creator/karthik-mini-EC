@@ -9,7 +9,7 @@ from app.core.log import get_logger
 from app.core.config import settings
 from app.core.cache import cached
 from app.ai.rules import RulesEngine
-from app.ai.analyzers import TaskAnalyzer, ApprovalAnalyzer, WorkloadAnalyzer, DelayRiskAnalyzer, AssignmentRecommender
+from app.ai.analyzers import TaskAnalyzer, ApprovalAnalyzer, WorkloadAnalyzer, DelayRiskAnalyzer, AssignmentRecommender, WorkloadAnalysisEngine
 from app.ai.insights import InsightGenerator
 from app.schemas.ai import AIRequest
 
@@ -203,6 +203,46 @@ class AIService:
             "suggestion": suggestion,
             "model_used": "ai-engine",
             "tokens_used": analysis.tokens_used,
+        }
+
+    def get_workload_analysis(self) -> dict:
+        logger.info("Running workload analysis")
+        engine = WorkloadAnalysisEngine(self.db, self.rules)
+        result = engine.analyze()
+        return {
+            "team_balance": {
+                "total_employees": result.team_balance.total_employees,
+                "total_active_tasks": result.team_balance.total_active_tasks,
+                "mean_workload": result.team_balance.mean_workload,
+                "std_dev_workload": result.team_balance.std_dev_workload,
+                "overloaded_count": result.team_balance.overloaded_count,
+                "balanced_count": result.team_balance.balanced_count,
+                "underutilized_count": result.team_balance.underutilized_count,
+                "overloaded_pct": result.team_balance.overloaded_pct,
+                "underutilized_pct": result.team_balance.underutilized_pct,
+                "balanced_pct": result.team_balance.balanced_pct,
+                "health_score": result.team_balance.health_score,
+                "recommendations": result.team_balance.recommendations,
+            },
+            "distribution": result.distribution,
+            "employees": [
+                {
+                    "user_id": e.user_id,
+                    "name": e.name,
+                    "email": e.email,
+                    "role": e.role,
+                    "active_tasks": e.active_tasks,
+                    "pending_approvals": e.pending_approvals,
+                    "overdue_tasks": e.overdue_tasks,
+                    "completed_tasks": e.completed_tasks,
+                    "total_assignments": e.total_assignments,
+                    "workload_score": e.workload_score,
+                    "efficiency_score": e.efficiency_score,
+                    "status": e.status,
+                    "active_task_details": e.active_task_details,
+                }
+                for e in result.employees
+            ],
         }
 
     def recommend_assignment(self, priority: Optional[str] = None, exclude_user_id: Optional[int] = None) -> dict:

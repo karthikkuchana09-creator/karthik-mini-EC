@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Optional, Any
+from math import sqrt
 
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
@@ -769,3 +770,240 @@ class AssignmentRecommender:
         candidates.sort(key=lambda c: c.total_score, reverse=True)
         logger.debug("Assignment recommendation: %d candidates evaluated", len(candidates))
         return candidates
+
+
+@dataclass
+class EmployeeWorkload:
+    user_id: int
+    name: str
+    email: str
+    role: str
+    active_tasks: int
+    pending_approvals: int
+    overdue_tasks: int
+    completed_tasks: int
+    total_assignments: int
+    workload_score: float
+    efficiency_score: float
+    status: str
+    active_task_details: list[dict] = field(default_factory=list)
+
+
+@dataclass
+class TeamBalanceMetrics:
+    total_employees: int
+    total_active_tasks: int
+    mean_workload: float
+    std_dev_workload: float
+    overloaded_count: int
+    balanced_count: int
+    underutilized_count: int
+    overloaded_pct: float
+    underutilized_pct: float
+    balanced_pct: float
+    health_score: float
+    recommendations: list[str]
+
+
+@dataclass
+class WorkloadAnalysisResult:
+    employees: list[EmployeeWorkload] = field(default_factory=list)
+    team_balance: Optional[TeamBalanceMetrics] = None
+    distribution: dict[str, int] = field(default_factory=dict)
+
+
+class WorkloadAnalysisEngine:
+    def __init__(self, db: Session, rules_engine):
+        self.db = db
+        self.rules = rules_engine
+        self.now = datetime.utcnow()
+        self._overload_threshold = rules_engine.workload_high
+        self._critical_threshold = rules_engine.workload_critical
+
+    def _active_tasks(self, user_id: int) -> tuple[int, list]:
+        q = self.db.query(Task).filter(
+            Task.assigned_to_id == user_id,
+            Task.status != "done",
+        ).order_by(Task.due_date.asc()).all()
+        details = []
+        for t in q:
+            details.append({
+                "id": t.id,
+                "title": t.title,
+                "status": t.status,
+                "priority": t.priority,
+                "due_date": t.due_date.isoformat() if t.due_date else None,
+            })
+        return len(q), details
+
+    def _pending_approvals(self, user_id: int) -> int:
+        return self.db.query(Approval).filter(
+            Approval.requested_by == user_id,
+            Approval.status == "pending",
+        ).count()
+
+    def _overdue_tasks(self, user_id: int) -> int:
+        return self.db.query(Task).filter(
+            Task.assigned_to_id == user_id,
+            Task.status != "done",
+            Task.due_date < self.now,
+        ).count()
+
+    def _completed_tasks(self, user_id: int) -> int:
+        return self.db.query(Task).filter(
+            Task.assigned_to_id == user_id,
+            Task.status == "done",
+        ).count()
+
+    def _total_assignments(self, user_id: int) -> int:
+        return self.db.query(Task).filter(
+            Task.assigned_to_id == user_id,
+        ).count()
+
+    def _workload_score(self, active: int, overdue: int, pending: int) -> float:
+        raw = active + (overdue * 2) + (pending * 0.5)
+        if raw >= self._critical_threshold * 2:
+            return 10.0
+        elif raw >= self._critical_threshold:
+            return 8.0
+        elif raw >= self._overload_threshold:
+            return 6.0
+        elif raw >= 3:
+            return 4.0
+        elif raw >= 1:
+            return 2.0
+        return 0.0
+
+    def _efficiency_score(self, user_id: int, active: int) -> float:
+        completed_30d = self.db.query(Task).filter(
+            Task.assigned_to_id == user_id,
+            Task.status == "done",
+            Task.updated_at >= self.now - timedelta(days=30),
+        ).count()
+        if active == 0 and completed_30d == 0:
+            return 0.0
+        if active == 0:
+            return 10.0
+        ratio = completed_30d / max(1, active)
+        return min(10.0, ratio * 5)
+
+    def _determine_status(self, workload: float, efficiency: float, active: int) -> str:
+        if active >= self._critical_threshold or workload >= 8.0:
+            return "overloaded"
+        if active >= self._overload_threshold or workload >= 6.0:
+            return "overloaded"
+        if active == 0 and efficiency < 2.0:
+            return "underutilized"
+        if active <= 1 and workload <= 2.0:
+            return "underutilized"
+        return "balanced"
+
+    def _compute_team_balance(self, employees: list[EmployeeWorkload]) -> TeamBalanceMetrics:
+        n = len(employees)
+        if n == 0:
+            return TeamBalanceMetrics(
+                total_employees=0, total_active_tasks=0, mean_workload=0,
+                std_dev_workload=0, overloaded_count=0, balanced_count=0,
+                underutilized_count=0, overloaded_pct=0, underutilized_pct=0,
+                balanced_pct=0, health_score=0, recommendations=[],
+            )
+        total_active = sum(e.active_tasks for e in employees)
+        mean = total_active / n if n else 0
+        variance = sum((e.active_tasks - mean) ** 2 for e in employees) / n if n else 0
+        std_dev = sqrt(variance)
+
+        overloaded = [e for e in employees if e.status == "overloaded"]
+        balanced = [e for e in employees if e.status == "balanced"]
+        underutilized = [e for e in employees if e.status == "underutilized"]
+
+        overload_pct = len(overloaded) / n * 100
+        under_pct = len(underutilized) / n * 100
+        bal_pct = len(balanced) / n * 100
+
+        overload_factor = max(0, 100 - overload_pct * 1.5)
+        under_factor = max(0, 100 - under_pct)
+        std_factor = max(0, 100 - std_dev * 15)
+        health_score = round((overload_factor * 0.4 + under_factor * 0.3 + std_factor * 0.3), 1)
+
+        recommendations = []
+        if overloaded:
+            names = ", ".join(e.name for e in overloaded[:3])
+            recommendations.append(
+                f"Redistribute tasks from {names}" + (" and others" if len(overloaded) > 3 else "")
+            )
+        if underutilized:
+            names = ", ".join(e.name for e in underutilized[:3])
+            recommendations.append(
+                f"Assign more tasks to {names}" + (" and others" if len(underutilized) > 3 else "")
+            )
+        if std_dev > 3:
+            recommendations.append("Team workload distribution is uneven — consider load balancing")
+        if not recommendations:
+            recommendations.append("Team workload is well balanced")
+
+        return TeamBalanceMetrics(
+            total_employees=n,
+            total_active_tasks=total_active,
+            mean_workload=round(mean, 1),
+            std_dev_workload=round(std_dev, 2),
+            overloaded_count=len(overloaded),
+            balanced_count=len(balanced),
+            underutilized_count=len(underutilized),
+            overloaded_pct=round(overload_pct, 1),
+            underutilized_pct=round(under_pct, 1),
+            balanced_pct=round(bal_pct, 1),
+            health_score=health_score,
+            recommendations=recommendations,
+        )
+
+    def analyze(self) -> WorkloadAnalysisResult:
+        logger.debug("Starting workload analysis")
+        users = self.db.query(User).filter(
+            User.is_active == True,
+            User.role.in_(["admin", "manager", "employee"]),
+        ).all()
+
+        distribution = {"overloaded": 0, "balanced": 0, "underutilized": 0}
+        employees = []
+
+        for u in users:
+            uid = u.id
+            active, details = self._active_tasks(uid)
+            pending = self._pending_approvals(uid)
+            overdue = self._overdue_tasks(uid)
+            completed = self._completed_tasks(uid)
+            total = self._total_assignments(uid)
+            ws = self._workload_score(active, overdue, pending)
+            es = self._efficiency_score(uid, active)
+            status = self._determine_status(ws, es, active)
+
+            distribution[status] = distribution.get(status, 0) + 1
+
+            employees.append(EmployeeWorkload(
+                user_id=uid,
+                name=u.name or u.email,
+                email=u.email,
+                role=u.role.value if hasattr(u.role, "value") else str(u.role),
+                active_tasks=active,
+                pending_approvals=pending,
+                overdue_tasks=overdue,
+                completed_tasks=completed,
+                total_assignments=total,
+                workload_score=round(ws, 1),
+                efficiency_score=round(es, 1),
+                status=status,
+                active_task_details=details,
+            ))
+
+        employees.sort(key=lambda e: e.workload_score, reverse=True)
+        team_balance = self._compute_team_balance(employees)
+
+        logger.debug(
+            "Workload analysis complete: %d employees, %d overloaded, %d underutilized",
+            len(employees), distribution.get("overloaded", 0), distribution.get("underutilized", 0),
+        )
+        return WorkloadAnalysisResult(
+            employees=employees,
+            team_balance=team_balance,
+            distribution=distribution,
+        )
