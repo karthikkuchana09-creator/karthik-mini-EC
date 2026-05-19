@@ -1,7 +1,8 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
 from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import func
 from app.models.task import Task
 from app.models.approval import Approval
 from app.models.ai import AIAnalysis
@@ -480,6 +481,162 @@ class AIService:
             "team_avg_completion_days": round(perf.team_avg_completion_days, 1) if perf.team_avg_completion_days else None,
             "team_delay_pct": round(perf.team_delay_pct, 1),
             "employees": employees,
+        }
+
+    def get_team_intelligence(self) -> dict:
+        logger.info("Running team intelligence analysis")
+        now = datetime.utcnow()
+
+        workload = WorkloadAnalysisEngine(self.db, self.rules).analyze()
+        perf = PerformanceAnalyzer(self.db).analyze()
+
+        perf_by_user = {u.user_id: u for u in perf.users}
+        wl_by_user = {e.user_id: e for e in workload.employees}
+        all_ids = sorted(set(perf_by_user.keys()) | set(wl_by_user.keys()))
+
+        team_workload = []
+        productivity_rankings = []
+        for uid in all_ids:
+            p = perf_by_user.get(uid)
+            w = wl_by_user.get(uid)
+            name = p.name if p else (w.name if w else "Unknown")
+            email = p.email if p else (w.email if w else "")
+            role = p.role if p else (w.role if w else "")
+            perf_score = p.performance_score if p else 0
+            wl_score = w.workload_score if w else 0
+
+            team_workload.append({
+                "user_id": uid, "name": name, "email": email, "role": role,
+                "workload_score": round(wl_score, 2),
+                "active_tasks": w.active_tasks if w else 0,
+                "overdue_tasks": w.overdue_tasks if w else 0,
+                "efficiency_score": round(w.efficiency_score, 2) if w else 0,
+                "status": w.status if w else "unknown",
+            })
+            perf_score_normalized = perf_score / 10.0 if perf_score > 10 else perf_score
+            productivity_rankings.append({
+                "user_id": uid, "name": name, "email": email, "role": role,
+                "performance_score": round(perf_score, 2),
+                "completed_tasks": p.total_completed if p else 0,
+                "delayed_tasks": p.total_delayed if p else 0,
+                "delay_pct": round(p.delay_pct, 1) if p else 0,
+                "avg_completion_days": round(p.avg_completion_days, 1) if p and p.avg_completion_days else None,
+                "speed_score": round(p.speed_score, 1) if p else 0,
+                "reliability_score": round(p.reliability_score, 1) if p else 0,
+            })
+
+        team_workload.sort(key=lambda x: x["workload_score"], reverse=True)
+        productivity_rankings.sort(key=lambda x: x["performance_score"], reverse=True)
+
+        delayed_tasks_by_user = []
+        for uid in all_ids:
+            overdue = self.db.query(Task).filter(
+                Task.assigned_to_id == uid,
+                Task.due_date < now,
+                Task.status != "done",
+            ).all()
+            completed_late = self.db.query(Task).filter(
+                Task.assigned_to_id == uid,
+                Task.status == "done",
+                Task.due_date.isnot(None),
+                Task.updated_at > Task.due_date,
+            ).count()
+            p = perf_by_user.get(uid)
+            name = p.name if p else "Unknown"
+            delayed_tasks_by_user.append({
+                "user_id": uid, "name": name,
+                "overdue_count": len(overdue),
+                "completed_late_count": completed_late,
+                "total_delayed": len(overdue) + completed_late,
+                "overdue_tasks": [
+                    {"id": t.id, "title": t.title, "due_date": t.due_date.isoformat() if t.due_date else None,
+                     "days_late": (now - t.due_date).days if t.due_date else 0, "priority": t.priority}
+                    for t in sorted(overdue, key=lambda x: x.due_date or now)[:5]
+                ],
+            })
+        delayed_tasks_by_user.sort(key=lambda x: x["total_delayed"], reverse=True)
+
+        approval_efficiency = []
+        for uid in all_ids:
+            p = perf_by_user.get(uid)
+            name = p.name if p else "Unknown"
+            total_reqs = self.db.query(Approval).filter(Approval.requested_by == uid).count()
+            pending = self.db.query(Approval).filter(Approval.requested_by == uid, Approval.status == "pending").count()
+            approved = self.db.query(Approval).filter(Approval.requested_by == uid, Approval.status == "approved").count()
+            rejected = self.db.query(Approval).filter(Approval.requested_by == uid, Approval.status == "rejected").count()
+            delayed_count = self.db.query(Approval).filter(
+                Approval.requested_by == uid,
+                Approval.status == "pending",
+                Approval.created_at < now - timedelta(hours=self.rules.approval_delay_hours),
+            ).count()
+            approval_rate = round(approved / total_reqs * 100, 1) if total_reqs > 0 else 0
+            avg_wait = self.db.query(
+                func.avg(func.extract("epoch", Approval.updated_at - Approval.created_at) / 3600)
+            ).filter(
+                Approval.requested_by == uid,
+                Approval.status.in_(["approved", "rejected"]),
+                Approval.updated_at.isnot(None),
+            ).scalar()
+            avg_wait_hours = round(float(avg_wait), 1) if avg_wait else None
+            approval_efficiency.append({
+                "user_id": uid, "name": name,
+                "total_requests": total_reqs,
+                "pending": pending,
+                "approved": approved,
+                "rejected": rejected,
+                "delayed": delayed_count if total_reqs > 0 else 0,
+                "approval_rate": approval_rate,
+                "avg_wait_hours": avg_wait_hours,
+            })
+        approval_efficiency.sort(key=lambda x: x["approval_rate"])
+
+        recommendations = RecommendationEngine(self.db, self.rules).generate()
+        recs_data = [
+            {"type": r.type, "priority": r.priority, "confidence": r.confidence,
+             "title": r.title, "description": r.description, "action": r.action,
+             "entity_id": r.entity_id, "entity_name": r.entity_name, "impact": r.impact,
+             "metric_value": r.metric_value, "source": r.source}
+            for r in recommendations
+        ]
+
+        team_avg_wl = round(
+            sum(e["workload_score"] for e in team_workload) / len(team_workload), 2
+        ) if team_workload else 0.0
+
+        delayed_total = sum(d["total_delayed"] for d in delayed_tasks_by_user)
+        all_overdue_tasks = sum(d["overdue_count"] for d in delayed_tasks_by_user)
+
+        return {
+            "team_workload": {
+                "total_employees": len(team_workload),
+                "avg_workload": team_avg_wl,
+                "avg_efficiency": round(
+                    sum(e["efficiency_score"] for e in team_workload) / len(team_workload), 2
+                ) if team_workload else 0,
+                "employees": team_workload,
+            },
+            "productivity_rankings": {
+                "total_employees": len(productivity_rankings),
+                "avg_performance": round(
+                    sum(r["performance_score"] for r in productivity_rankings) / len(productivity_rankings), 2
+                ) if productivity_rankings else 0,
+                "rankings": productivity_rankings,
+            },
+            "delayed_task_analysis": {
+                "total_delayed": delayed_total,
+                "overdue_active": all_overdue_tasks,
+                "completed_late": delayed_total - all_overdue_tasks,
+                "by_user": delayed_tasks_by_user,
+            },
+            "approval_efficiency": {
+                "total_pending": sum(a["pending"] for a in approval_efficiency),
+                "avg_approval_rate": round(
+                    sum(a["approval_rate"] for a in approval_efficiency) / len(approval_efficiency), 1
+                ) if approval_efficiency else 0,
+                "delayed_approvals": sum(a["delayed"] for a in approval_efficiency),
+                "by_user": approval_efficiency,
+            },
+            "recommendations": recs_data[:12],
         }
 
     def get_history(self, current_user, skip: int = 0, limit: int = 50):

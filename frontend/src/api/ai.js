@@ -44,3 +44,8 @@ export const getEmployeeProductivity = async () => {
   const response = await api.get('/ai/employee-productivity');
   return response.data;
 };
+
+export const getTeamIntelligence = async () => {
+  const response = await api.get('/ai/team-intelligence');
+  return response.data;
+};

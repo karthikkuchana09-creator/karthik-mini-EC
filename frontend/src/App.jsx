@@ -27,6 +27,7 @@ const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 const AIAnalyticsDashboard = lazy(() => import('./pages/AIAnalyticsDashboard'));
 const DelayRiskMonitor = lazy(() => import('./pages/DelayRiskMonitor'));
 const EmployeeProductivity = lazy(() => import('./pages/EmployeeProductivity'));
+const TeamIntelligence = lazy(() => import('./pages/TeamIntelligence'));
 const Unauthorized = lazy(() => import('./pages/Unauthorized'));
 
 function PageLoader() {
@@ -95,6 +96,7 @@ function AppContent() {
         <Route path="/ai-analytics" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><ErrorBoundary><Suspense fallback={<SkeletonPage />}><AIAnalyticsDashboard /></Suspense></ErrorBoundary></ProtectedRoute>} />
         <Route path="/delay-risk-monitor" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><ErrorBoundary><Suspense fallback={<SkeletonPage />}><DelayRiskMonitor /></Suspense></ErrorBoundary></ProtectedRoute>} />
         <Route path="/employee-productivity" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><ErrorBoundary><Suspense fallback={<SkeletonPage />}><EmployeeProductivity /></Suspense></ErrorBoundary></ProtectedRoute>} />
+        <Route path="/team-intelligence" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><ErrorBoundary><Suspense fallback={<SkeletonPage />}><TeamIntelligence /></Suspense></ErrorBoundary></ProtectedRoute>} />
         <Route path="/leave-application" element={<ProtectedRoute allowedRoles={['admin', 'manager', 'employee']}><ErrorBoundary><Suspense fallback={<SkeletonPage />}><LeaveApplication /></Suspense></ErrorBoundary></ProtectedRoute>} />
         <Route path="/leave-status" element={<ProtectedRoute allowedRoles={['admin', 'manager', 'employee']}><ErrorBoundary><Suspense fallback={<SkeletonPage />}><LeaveStatus /></Suspense></ErrorBoundary></ProtectedRoute>} />
       </Route>

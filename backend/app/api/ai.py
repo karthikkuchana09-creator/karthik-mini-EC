@@ -177,6 +177,14 @@ def employee_productivity_endpoint(
     return AIService(db).get_employee_productivity()
 
 
+@router.get("/team-intelligence")
+def team_intelligence_endpoint(
+    db: Session = Depends(get_db),
+    user=Depends(require_permission(Permissions.ai_use)),
+):
+    return AIService(db).get_team_intelligence()
+
+
 @router.get("/history", response_model=list[AIOut])
 def history_endpoint(
     skip: int = Query(0, ge=0),
