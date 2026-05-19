@@ -47,6 +47,11 @@ class Settings(BaseSettings):
     CACHE_TTL_AI: int = 600
     CACHE_TTL_NOTIFICATION: int = 30
 
+    AI_SCHEDULER_ENABLED: bool = True
+    AI_CACHE_WARM_INTERVAL_HOURS: int = 1
+    AI_FULL_REFRESH_AT: str = "03:00"
+    AI_CACHE_CLEANUP_AT: str = "04:30"
+
     class Config:
         env_file = os.path.join(BASE_DIR, ".env")
         extra = "ignore"

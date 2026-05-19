@@ -817,95 +817,134 @@ class PerformanceAnalyzer:
         self.db = db
         self.now = datetime.utcnow()
 
-    def _avg_completion_days(self, user_id: int) -> tuple[Optional[float], int]:
-        result = self.db.query(
-            func.avg(
-                func.extract("epoch", Task.updated_at - Task.created_at) / 86400
-            )
+    def _batch_completion_days(self, user_ids: list[int]) -> dict[int, tuple[Optional[float], int]]:
+        rows = self.db.query(
+            Task.assigned_to_id,
+            func.avg(func.extract("epoch", Task.updated_at - Task.created_at) / 86400),
+            func.count(Task.id),
         ).filter(
-            Task.assigned_to_id == user_id,
+            Task.assigned_to_id.in_(user_ids),
             Task.status == "done",
             Task.updated_at.isnot(None),
             Task.created_at.isnot(None),
-        ).scalar()
-        if result is None:
-            return None, 0
-        return round(float(result), 1), 1
+        ).group_by(Task.assigned_to_id).all()
+        result = {}
+        for uid, avg, cnt in rows:
+            result[uid] = (round(float(avg), 1), cnt) if avg else (None, 0)
+        return result
 
-    def _delay_stats(self, user_id: int) -> tuple[int, int, float]:
-        done = self.db.query(Task).filter(
-            Task.assigned_to_id == user_id,
+    def _batch_delay_stats(self, user_ids: list[int]) -> dict[int, tuple[int, int, float]]:
+        done_rows = self.db.query(
+            Task.assigned_to_id,
+            func.count(Task.id),
+        ).filter(
+            Task.assigned_to_id.in_(user_ids),
             Task.status == "done",
-        ).count()
-        if done == 0:
-            return 0, 0, 0.0
-        delayed = self.db.query(Task).filter(
-            Task.assigned_to_id == user_id,
+        ).group_by(Task.assigned_to_id).all()
+        done_map = {uid: cnt for uid, cnt in done_rows}
+
+        delayed_rows = self.db.query(
+            Task.assigned_to_id,
+            func.count(Task.id),
+        ).filter(
+            Task.assigned_to_id.in_(user_ids),
             Task.status == "done",
             Task.due_date.isnot(None),
             Task.updated_at > Task.due_date,
-        ).count()
-        return done, delayed, round(delayed / done * 100, 1)
+        ).group_by(Task.assigned_to_id).all()
+        delayed_map = {uid: cnt for uid, cnt in delayed_rows}
 
-    def _approval_stats(self, user_id: int) -> tuple[float, Optional[float]]:
-        total = self.db.query(Approval).filter(
-            Approval.requested_by == user_id,
-        ).count()
-        if total == 0:
-            return 0.0, None
-        approved = self.db.query(Approval).filter(
-            Approval.requested_by == user_id,
-            Approval.status == "approved",
-        ).count()
-        rate = round(approved / total * 100, 1)
-        avg_time = self.db.query(
-            func.avg(
-                func.extract("epoch", Approval.updated_at - Approval.created_at) / 3600
-            )
+        result = {}
+        for uid in user_ids:
+            done = done_map.get(uid, 0)
+            delayed = delayed_map.get(uid, 0)
+            delay_pct = round(delayed / done * 100, 1) if done > 0 else 0.0
+            result[uid] = (done, delayed, delay_pct)
+        return result
+
+    def _batch_approval_stats(self, user_ids: list[int]) -> dict[int, tuple[float, Optional[float]]]:
+        total_rows = self.db.query(
+            Approval.requested_by,
+            func.count(Approval.id),
         ).filter(
-            Approval.requested_by == user_id,
+            Approval.requested_by.in_(user_ids),
+        ).group_by(Approval.requested_by).all()
+        total_map = {uid: cnt for uid, cnt in total_rows}
+
+        approved_rows = self.db.query(
+            Approval.requested_by,
+            func.count(Approval.id),
+        ).filter(
+            Approval.requested_by.in_(user_ids),
+            Approval.status == "approved",
+        ).group_by(Approval.requested_by).all()
+        approved_map = {uid: cnt for uid, cnt in approved_rows}
+
+        avg_time_rows = self.db.query(
+            Approval.requested_by,
+            func.avg(func.extract("epoch", Approval.updated_at - Approval.created_at) / 3600),
+        ).filter(
+            Approval.requested_by.in_(user_ids),
             Approval.status == "approved",
             Approval.updated_at.isnot(None),
-        ).scalar()
-        avg_hours = round(float(avg_time), 1) if avg_time else None
-        return rate, avg_hours
+        ).group_by(Approval.requested_by).all()
+        avg_time_map = {uid: round(float(avg), 1) for uid, avg in avg_time_rows if avg}
 
-    def _comment_count(self, user_id: int) -> int:
-        return self.db.query(Comment).filter(
-            Comment.user_id == user_id,
-        ).count()
+        result = {}
+        for uid in user_ids:
+            total = total_map.get(uid, 0)
+            approved = approved_map.get(uid, 0)
+            rate = round(approved / total * 100, 1) if total > 0 else 0.0
+            avg_hours = avg_time_map.get(uid, None)
+            result[uid] = (rate, avg_hours)
+        return result
 
-    def _monthly_trends(self, user_id: int) -> list[MonthlyTrendData]:
+    def _batch_comment_counts(self, user_ids: list[int]) -> dict[int, int]:
+        rows = self.db.query(
+            Comment.user_id,
+            func.count(Comment.id),
+        ).filter(
+            Comment.user_id.in_(user_ids),
+        ).group_by(Comment.user_id).all()
+        return {uid: cnt for uid, cnt in rows}
+
+    def _batch_monthly_trends(self, user_ids: list[int]) -> dict[int, list[MonthlyTrendData]]:
         six_months_ago = self.now - timedelta(days=180)
         tasks = self.db.query(Task).filter(
-            Task.assigned_to_id == user_id,
+            Task.assigned_to_id.in_(user_ids),
             Task.status == "done",
             Task.updated_at >= six_months_ago,
         ).all()
-        monthly = {}
+        groups: dict[int, dict] = {}
         for t in tasks:
+            uid = t.assigned_to_id
+            if uid not in groups:
+                groups[uid] = {}
             key = t.updated_at.strftime("%Y-%m")
-            if key not in monthly:
-                monthly[key] = {"completed": 0, "delayed": 0, "total_days": 0.0, "count_days": 0}
-            monthly[key]["completed"] += 1
+            if key not in groups[uid]:
+                groups[uid][key] = {"completed": 0, "delayed": 0, "total_days": 0.0, "count_days": 0}
+            m = groups[uid][key]
+            m["completed"] += 1
             if t.due_date and t.updated_at > t.due_date:
-                monthly[key]["delayed"] += 1
+                m["delayed"] += 1
             if t.created_at and t.updated_at:
                 days = (t.updated_at - t.created_at).total_seconds() / 86400
-                monthly[key]["total_days"] += days
-                monthly[key]["count_days"] += 1
-        trends = []
-        for month in sorted(monthly.keys()):
-            m = monthly[month]
-            avg_days = round(m["total_days"] / m["count_days"], 1) if m["count_days"] > 0 else None
-            delay_pct = round(m["delayed"] / m["completed"] * 100, 1) if m["completed"] > 0 else 0.0
-            trends.append(MonthlyTrendData(
-                month=month,
-                completed=m["completed"],
-                avg_completion_days=avg_days,
-                delay_pct=delay_pct,
-            ))
-        return trends
+                m["total_days"] += days
+                m["count_days"] += 1
+        result = {}
+        for uid in user_ids:
+            trends = []
+            monthly = groups.get(uid, {})
+            for month in sorted(monthly.keys()):
+                m = monthly[month]
+                avg_days = round(m["total_days"] / m["count_days"], 1) if m["count_days"] > 0 else None
+                delay_pct = round(m["delayed"] / m["completed"] * 100, 1) if m["completed"] > 0 else 0.0
+                trends.append(MonthlyTrendData(
+                    month=month, completed=m["completed"],
+                    avg_completion_days=avg_days, delay_pct=delay_pct,
+                ))
+            result[uid] = trends
+        return result
 
     def _compute_scores(self, avg_days: Optional[float], delay_pct: float, approval_rate: float,
                         comment_count: int, trends: list[MonthlyTrendData]) -> tuple[float, float, float]:
@@ -986,14 +1025,26 @@ class PerformanceAnalyzer:
             User.role.in_(["admin", "manager", "employee"]),
         ).all()
 
+        user_ids = [u.id for u in users]
+        if not user_ids:
+            return PerformanceResult(users=[], top_performers=[], low_performers=[],
+                                     team_avg_completion_days=None, team_delay_pct=0,
+                                     team_avg_performance=0, team_avg_reliability=0)
+
+        batch_avg_days = self._batch_completion_days(user_ids)
+        batch_delays = self._batch_delay_stats(user_ids)
+        batch_approval = self._batch_approval_stats(user_ids)
+        batch_comments = self._batch_comment_counts(user_ids)
+        batch_trends = self._batch_monthly_trends(user_ids)
+
         perf_users = []
         for u in users:
             uid = u.id
-            avg_days, _ = self._avg_completion_days(uid)
-            done, delayed, delay_pct = self._delay_stats(uid)
-            appr_rate, appr_hours = self._approval_stats(uid)
-            comments = self._comment_count(uid)
-            trends = self._monthly_trends(uid)
+            avg_days, _ = batch_avg_days.get(uid, (None, 0))
+            done, delayed, delay_pct = batch_delays.get(uid, (0, 0, 0.0))
+            appr_rate, appr_hours = batch_approval.get(uid, (0.0, None))
+            comments = batch_comments.get(uid, 0)
+            trends = batch_trends.get(uid, [])
             perf_score, rel_score, spd_score = self._compute_scores(
                 avg_days, delay_pct, appr_rate, comments, trends,
             )

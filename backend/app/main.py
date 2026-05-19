@@ -6,6 +6,8 @@ from app.api import auth, tasks, users, comments, approvals, dashboard, document
 from app.websocket.routes import router as ws_router
 from app.websocket.manager import manager
 from app.services.ai_notification_service import start_ai_notification_daemon
+from app.ai.scheduler import start_ai_scheduler, stop_ai_scheduler
+from app.core.config import settings
 from app.db.session import engine
 from app.db.base import Base
 from fastapi.middleware.cors import CORSMiddleware
@@ -23,6 +25,13 @@ app = FastAPI()
 async def startup():
     manager.start_heartbeat()
     start_ai_notification_daemon()
+    if settings.AI_SCHEDULER_ENABLED:
+        start_ai_scheduler()
+
+
+@app.on_event("shutdown")
+async def shutdown():
+    stop_ai_scheduler()
 
 
 @app.exception_handler(StarletteHTTPException)
