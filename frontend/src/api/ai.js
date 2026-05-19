@@ -39,3 +39,8 @@ export const getRecommendations = async () => {
   const response = await api.get('/ai/recommendations');
   return response.data;
 };
+
+export const getEmployeeProductivity = async () => {
+  const response = await api.get('/ai/employee-productivity');
+  return response.data;
+};

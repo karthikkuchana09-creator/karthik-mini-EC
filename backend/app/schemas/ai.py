@@ -248,3 +248,32 @@ class HighPriorityTasksOut(BaseModel):
     medium: int = 0
     low: int = 0
     tasks: list[HighPriorityTaskItem] = []
+
+
+class EmployeeProductivityItem(BaseModel):
+    user_id: int
+    name: str
+    email: str
+    role: str
+    completed_tasks: int
+    delayed_tasks: int
+    delay_pct: float
+    performance_score: float
+    workload_score: float
+    efficiency_score: float
+    workload_status: str
+    avg_completion_days: Optional[float] = None
+    approval_rate: float = 0
+    monthly_trends: list[MonthlyTrendItem] = []
+    suggestions: list[str] = []
+    insights: list[InsightItem] = []
+    improvement_tips: list[str] = []
+
+
+class EmployeeProductivityOut(BaseModel):
+    total_employees: int
+    team_avg_performance: float
+    team_avg_workload: float
+    team_avg_completion_days: Optional[float] = None
+    team_delay_pct: float = 0
+    employees: list[EmployeeProductivityItem] = []

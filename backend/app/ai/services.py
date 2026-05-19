@@ -393,6 +393,95 @@ class AIService:
         logger.info("Found %d high priority pending tasks", len(results))
         return results
 
+    def get_employee_productivity(self) -> dict:
+        logger.info("Running employee productivity analysis")
+        perf = PerformanceAnalyzer(self.db).analyze()
+        workload = WorkloadAnalysisEngine(self.db, self.rules).analyze()
+
+        perf_by_user = {u.user_id: u for u in perf.users}
+        wl_by_user = {e.user_id: e for e in workload.employees}
+        all_ids = sorted(set(perf_by_user.keys()) | set(wl_by_user.keys()))
+
+        employees = []
+        for uid in all_ids:
+            p = perf_by_user.get(uid)
+            w = wl_by_user.get(uid)
+            if not p:
+                continue
+
+            insights = []
+            tips = []
+
+            if p.monthly_trends and len(p.monthly_trends) >= 2:
+                recent = p.monthly_trends[-1]
+                prev = p.monthly_trends[-2]
+                if recent.delay_pct > prev.delay_pct + 10:
+                    insights.append({"type": "warning", "severity": "high", "text": f"Delay rate increased {recent.delay_pct:.0f}% (was {prev.delay_pct:.0f}%) — review workload"})
+                if recent.completed > prev.completed:
+                    insights.append({"type": "positive", "severity": "low", "text": f"Completion count up from {prev.completed} to {recent.completed} tasks"})
+
+            if p.performance_score >= 8:
+                insights.append({"type": "positive", "severity": "low", "text": "Strong performer — maintaining high quality output"})
+            elif p.performance_score < 5:
+                insights.append({"type": "warning", "severity": "medium", "text": "Performance needs attention — review task load and skill fit"})
+
+            if w:
+                if w.workload_score > 7:
+                    insights.append({"type": "warning", "severity": "high", "text": f"Workload critical ({w.workload_score:.1f}/10) — {w.active_tasks} active tasks, {w.overdue_tasks} overdue"})
+                if w.efficiency_score > 8:
+                    insights.append({"type": "positive", "severity": "low", "text": "Highly efficient — completing tasks well above average pace"})
+            else:
+                ws = max(0.0, min(10.0, p.total_completed / max(1, perf.team_avg_completion_days or 1) * 2))
+                wl_by_user[uid] = type('obj', (object,), {'workload_score': ws, 'efficiency_score': 5.0, 'status': 'balanced', 'active_tasks': 0, 'overdue_tasks': 0})()
+
+            if p.delay_pct > 40:
+                tips.append("Focus on deadline adherence — consider breaking down large tasks")
+            if p.avg_completion_days and p.avg_completion_days > (perf.team_avg_completion_days or 5) * 1.3:
+                tips.append("Completion time is above team average — try time-boxing or pair programming")
+            if p.approval_rate < 0.5 and p.total_completed > 0:
+                tips.append("Approval rate is low — clarify requirements before starting work")
+            if w and w.overdue_tasks >= 3:
+                tips.append(f"{w.overdue_tasks} overdue tasks — prioritize clearing backlog")
+            if not tips and p.performance_score >= 7:
+                tips.append("Maintain current momentum — consider mentoring other team members")
+
+            employees.append({
+                "user_id": uid,
+                "name": p.name,
+                "email": p.email,
+                "role": p.role,
+                "completed_tasks": p.total_completed,
+                "delayed_tasks": p.total_delayed,
+                "delay_pct": p.delay_pct,
+                "performance_score": round(p.performance_score, 2),
+                "workload_score": round(w.workload_score, 2) if w else 0.0,
+                "efficiency_score": round(w.efficiency_score, 2) if w else 0.0,
+                "workload_status": w.status if w else "unknown",
+                "avg_completion_days": round(p.avg_completion_days, 1) if p.avg_completion_days else None,
+                "approval_rate": round(p.approval_rate, 2),
+                "monthly_trends": [
+                    {"month": t.month, "completed": t.completed,
+                     "avg_completion_days": t.avg_completion_days, "delay_pct": t.delay_pct}
+                    for t in p.monthly_trends
+                ],
+                "suggestions": p.suggestions[:3],
+                "insights": insights,
+                "improvement_tips": tips[:3],
+            })
+
+        team_avg_workload = round(
+            sum(e["workload_score"] for e in employees) / len(employees), 2
+        ) if employees else 0.0
+
+        return {
+            "total_employees": len(employees),
+            "team_avg_performance": round(perf.team_avg_performance, 2),
+            "team_avg_workload": team_avg_workload,
+            "team_avg_completion_days": round(perf.team_avg_completion_days, 1) if perf.team_avg_completion_days else None,
+            "team_delay_pct": round(perf.team_delay_pct, 1),
+            "employees": employees,
+        }
+
     def get_history(self, current_user, skip: int = 0, limit: int = 50):
         return (
             self.db.query(AIAnalysis)

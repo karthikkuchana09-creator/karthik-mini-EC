@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
-from app.schemas.ai import AIRequest, AIResponse, AIOut, AISummaryOut, HighPriorityTasksOut, DelayRiskOut, AssignmentRecommendRequest, AssignmentRecommendOut, WorkloadAnalysisOut, PerformanceAnalyticsOut, RecommendationsOut
+from app.schemas.ai import AIRequest, AIResponse, AIOut, AISummaryOut, HighPriorityTasksOut, DelayRiskOut, AssignmentRecommendRequest, AssignmentRecommendOut, WorkloadAnalysisOut, PerformanceAnalyticsOut, RecommendationsOut, EmployeeProductivityOut
 from app.services.dashboard_service import get_enterprise_ai_summary
 from app.api.deps import get_db
 from app.core.rbac import require_permission, Permissions
@@ -167,6 +167,14 @@ def delay_risks_endpoint(
         "low_risk": counts["low_risk"],
         "items": items,
     }
+
+
+@router.get("/employee-productivity", response_model=EmployeeProductivityOut)
+def employee_productivity_endpoint(
+    db: Session = Depends(get_db),
+    user=Depends(require_permission(Permissions.ai_use)),
+):
+    return AIService(db).get_employee_productivity()
 
 
 @router.get("/history", response_model=list[AIOut])
