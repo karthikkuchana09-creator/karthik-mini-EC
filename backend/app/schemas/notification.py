@@ -2,7 +2,6 @@ from enum import Enum
 from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime
-from app.models.notification import NotificationType
 
 
 class NotificationCategory(str, Enum):
@@ -13,6 +12,7 @@ class NotificationCategory(str, Enum):
     comment = "comment"
     document_upload = "document_upload"
     system = "system"
+    ai_alert = "ai_alert"
 
 
 class NotificationCreate(BaseModel):

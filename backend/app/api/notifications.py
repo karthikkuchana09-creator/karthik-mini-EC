@@ -19,15 +19,13 @@ from app.services.notification_service import (
     mark_all_as_read,
     delete_notification,
 )
-from app.models.notification import NotificationType
-
 router = APIRouter(prefix="/notifications", tags=["Notifications"])
 
 
 @router.get("/", response_model=NotificationList)
 def list_notifications_endpoint(
     unread_only: bool = Query(False),
-    category: NotificationType | None = Query(None),
+    category: str | None = Query(None),
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),

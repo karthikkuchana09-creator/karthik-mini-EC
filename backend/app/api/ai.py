@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.schemas.ai import AIRequest, AIResponse, AIOut, AISummaryOut, HighPriorityTasksOut, DelayRiskOut, AssignmentRecommendRequest, AssignmentRecommendOut, WorkloadAnalysisOut, PerformanceAnalyticsOut, RecommendationsOut, EmployeeProductivityOut
 from app.services.dashboard_service import get_enterprise_ai_summary
 from app.api.deps import get_db
-from app.core.rbac import require_permission, Permissions
+from app.core.rbac import require_permission, require_role, Permissions
 from app.ai import AIService
 from app.core.log import get_logger
 from app.ai.cache import AICacheService
@@ -220,7 +220,7 @@ def history_endpoint(
 
 @router.get("/cache/status")
 def cache_status_endpoint(
-    user=Depends(require_permission(Permissions.admin)),
+    user=Depends(require_role(['admin'])),
 ):
     import asyncio
     loop = asyncio.new_event_loop()
@@ -233,7 +233,7 @@ def cache_status_endpoint(
 @router.post("/cache/warm")
 def cache_warm_endpoint(
     db: Session = Depends(get_db),
-    user=Depends(require_permission(Permissions.admin)),
+    user=Depends(require_role(['admin'])),
 ):
     import asyncio
     loop = asyncio.new_event_loop()
@@ -245,7 +245,7 @@ def cache_warm_endpoint(
 
 @router.post("/cache/invalidate")
 def cache_invalidate_endpoint(
-    user=Depends(require_permission(Permissions.admin)),
+    user=Depends(require_role(['admin'])),
 ):
     import asyncio
     loop = asyncio.new_event_loop()
@@ -257,7 +257,7 @@ def cache_invalidate_endpoint(
 
 @router.get("/jobs/status")
 def jobs_status_endpoint(
-    user=Depends(require_permission(Permissions.admin)),
+    user=Depends(require_role(['admin'])),
 ):
     import asyncio
     loop = asyncio.new_event_loop()
@@ -271,7 +271,7 @@ def jobs_status_endpoint(
 def jobs_run_endpoint(
     full: bool = Query(False, description="Run full daily job"),
     db: Session = Depends(get_db),
-    user=Depends(require_permission(Permissions.admin)),
+    user=Depends(require_role(['admin'])),
 ):
     import asyncio
     loop = asyncio.new_event_loop()
