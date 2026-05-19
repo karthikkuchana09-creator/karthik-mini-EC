@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 
 import { getUsers, createTask } from '../api/tasks';
 import { useRolePermissions } from '../hooks/useRolePermissions';
+import SmartAssignmentCard from '../components/SmartAssignmentCard';
 
 function CreateTask() {
   const navigate = useNavigate();
@@ -180,29 +181,43 @@ function CreateTask() {
           </div>
 
           <div>
-            <label htmlFor="assigned_to_id" className="block text-sm font-medium text-gray-700 mb-1.5">
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
               Assign To <span className="text-red-500">*</span>
             </label>
-            <select
-              id="assigned_to_id"
-              value={form.assigned_to_id}
-              onChange={(e) => handleChange('assigned_to_id', e.target.value)}
-              className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors bg-white ${
-                errors.assigned_to_id ? 'border-red-300 bg-red-50' : 'border-gray-300 hover:border-gray-400'
-              }`}
-            >
-              <option value="">Select a user...</option>
-              {fetchingUsers ? (
-                <option disabled>Loading users...</option>
-              ) : (
-                users.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.name || u.email} ({u.role})
-                  </option>
-                ))
-              )}
-            </select>
+            <SmartAssignmentCard
+              title={form.title}
+              priority={form.priority}
+              selectedUserId={parseInt(form.assigned_to_id, 10) || null}
+              onAssign={(userId) => handleChange('assigned_to_id', String(userId))}
+              disabled={loading}
+            />
             {errors.assigned_to_id && <p className="mt-1 text-xs text-red-600">{errors.assigned_to_id}</p>}
+            <div className="mt-2">
+              <details className="group">
+                <summary className="text-[11px] text-gray-400 cursor-pointer hover:text-gray-600 transition-colors select-none">
+                  Or choose manually
+                </summary>
+                <select
+                  id="assigned_to_id"
+                  value={form.assigned_to_id}
+                  onChange={(e) => handleChange('assigned_to_id', e.target.value)}
+                  className={`mt-2 w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors bg-white ${
+                    errors.assigned_to_id ? 'border-red-300 bg-red-50' : 'border-gray-300 hover:border-gray-400'
+                  }`}
+                >
+                  <option value="">Select a user...</option>
+                  {fetchingUsers ? (
+                    <option disabled>Loading users...</option>
+                  ) : (
+                    users.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name || u.email} ({u.role})
+                      </option>
+                    ))
+                  )}
+                </select>
+              </details>
+            </div>
           </div>
 
           <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4 border-t border-gray-100">
