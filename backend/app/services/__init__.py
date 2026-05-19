@@ -41,4 +41,7 @@ from app.services.notification_service import (
     mark_all_as_read,
     delete_notification,
 )
-from app.services.ai_service import generate_suggestion, generate_ai_summary, get_ai_history
+from app.ai import AIService
+generate_suggestion = lambda db, req, user: AIService(db).generate_suggestion(req, user)
+generate_ai_summary = lambda db, user: AIService(db).generate_summary(user)
+get_ai_history = lambda db, user, skip=0, limit=50: AIService(db).get_history(user, skip, limit)

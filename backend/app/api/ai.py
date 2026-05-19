@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from app.schemas.ai import AIRequest, AIResponse, AIOut, AISummaryOut
 from app.api.deps import get_db
 from app.core.rbac import require_permission, Permissions
-from app.services.ai_service import generate_suggestion, generate_ai_summary, get_ai_history
+from app.ai import AIService
 from app.core.log import get_logger
 
 logger = get_logger("ai_api")
@@ -16,7 +16,7 @@ def suggest_endpoint(
     db: Session = Depends(get_db),
     user=Depends(require_permission(Permissions.ai_use)),
 ):
-    return generate_suggestion(db, request, user)
+    return AIService(db).generate_suggestion(request, user)
 
 
 @router.get("/summary", response_model=AISummaryOut)
@@ -24,7 +24,7 @@ def summary_endpoint(
     db: Session = Depends(get_db),
     user=Depends(require_permission(Permissions.ai_use)),
 ):
-    return generate_ai_summary(db, user)
+    return AIService(db).generate_summary(user)
 
 
 @router.get("/history", response_model=list[AIOut])
@@ -34,4 +34,4 @@ def history_endpoint(
     db: Session = Depends(get_db),
     user=Depends(require_permission(Permissions.ai_use)),
 ):
-    return get_ai_history(db, user, skip, limit)
+    return AIService(db).get_history(user, skip, limit)
