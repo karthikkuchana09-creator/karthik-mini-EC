@@ -12,6 +12,7 @@ class NotificationType(str, enum.Enum):
     comment = "comment"
     document_upload = "document_upload"
     system = "system"
+    ai_alert = "ai_alert"
 
 
 class Notification(Base):

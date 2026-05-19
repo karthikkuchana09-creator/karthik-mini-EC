@@ -5,6 +5,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.api import auth, tasks, users, comments, approvals, dashboard, documents, audit_logs, notifications, ai, leaves
 from app.websocket.routes import router as ws_router
 from app.websocket.manager import manager
+from app.services.ai_notification_service import start_ai_notification_daemon
 from app.db.session import engine
 from app.db.base import Base
 from fastapi.middleware.cors import CORSMiddleware
@@ -21,6 +22,7 @@ app = FastAPI()
 @app.on_event("startup")
 async def startup():
     manager.start_heartbeat()
+    start_ai_notification_daemon()
 
 
 @app.exception_handler(StarletteHTTPException)
