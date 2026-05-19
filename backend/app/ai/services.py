@@ -8,7 +8,7 @@ from app.core.log import get_logger
 from app.core.config import settings
 from app.core.cache import cached
 from app.ai.rules import RulesEngine
-from app.ai.analyzers import TaskAnalyzer, ApprovalAnalyzer, WorkloadAnalyzer
+from app.ai.analyzers import TaskAnalyzer, ApprovalAnalyzer, WorkloadAnalyzer, DelayRiskAnalyzer
 from app.ai.insights import InsightGenerator
 from app.schemas.ai import AIRequest
 
@@ -203,6 +203,30 @@ class AIService:
             "model_used": "ai-engine",
             "tokens_used": analysis.tokens_used,
         }
+
+    def get_delay_risks(self, current_user) -> list[dict]:
+        logger.info("Running delay risk analysis for user_id=%d", current_user.id)
+        analyzer = DelayRiskAnalyzer(self.db, self.rules)
+        items = analyzer.analyze(_task_base_query(self.db, current_user))
+        return [
+            {
+                "task_id": i.task_id,
+                "title": i.title,
+                "status": i.status,
+                "priority": i.priority,
+                "due_date": i.due_date,
+                "days_remaining": i.days_remaining,
+                "assignee_name": i.assignee_name,
+                "assignee_email": i.assignee_email,
+                "risk_score": i.risk_score,
+                "risk_level": i.risk_level,
+                "confidence_score": i.confidence_score,
+                "predicted_delay_days": i.predicted_delay_days,
+                "factors": i.factors,
+                "warnings": i.warnings,
+            }
+            for i in items
+        ]
 
     def get_high_priority_tasks(self, current_user) -> list[dict]:
         logger.info("Fetching high priority pending tasks for user_id=%d", current_user.id)

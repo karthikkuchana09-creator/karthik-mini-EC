@@ -11,6 +11,7 @@ import toast from 'react-hot-toast';
 import { SkeletonCard, SkeletonChart } from '../components/ui/Skeleton';
 import ErrorState from '../components/ui/ErrorState';
 import HighPriorityTasksCard from '../components/HighPriorityTasksCard';
+import DelayRiskCard from '../components/DelayRiskCard';
 import { getErrorMessage } from '../utils/errorHandler';
 import { timeAgo, formatDate } from '../utils/format';
 import ActivityFeed from '../components/ActivityFeed';
@@ -508,6 +509,10 @@ function ManagerDashboard() {
 
       <div className="mb-8">
         <HighPriorityTasksCard />
+      </div>
+
+      <div className="mb-8">
+        <DelayRiskCard />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">

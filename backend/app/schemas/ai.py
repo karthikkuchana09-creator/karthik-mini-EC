@@ -69,6 +69,37 @@ class AISummaryOut(BaseModel):
     recommendations: list[RecommendationItem] = []
 
 
+class DelayRiskFactorDetail(BaseModel):
+    score: float
+    confidence: float
+    weight: float
+
+
+class DelayRiskItem(BaseModel):
+    task_id: int
+    title: str
+    status: str
+    priority: str
+    due_date: Optional[str] = None
+    days_remaining: Optional[int] = None
+    assignee_name: Optional[str] = None
+    assignee_email: Optional[str] = None
+    risk_score: float
+    risk_level: str
+    confidence_score: float
+    predicted_delay_days: Optional[int] = None
+    factors: dict[str, DelayRiskFactorDetail]
+    warnings: list[str] = []
+
+
+class DelayRiskOut(BaseModel):
+    total: int = 0
+    high_risk: int = 0
+    medium_risk: int = 0
+    low_risk: int = 0
+    items: list[DelayRiskItem] = []
+
+
 class HighPriorityTaskItem(BaseModel):
     id: int
     title: str

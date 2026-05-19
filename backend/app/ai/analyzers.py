@@ -8,6 +8,7 @@ from sqlalchemy import func
 from app.models.task import Task
 from app.models.approval import Approval
 from app.models.user import User
+from app.models.audit_log import AuditLog
 from app.core.log import get_logger
 
 logger = get_logger("ai.analyzers")
@@ -282,3 +283,264 @@ class WorkloadAnalyzer:
             len(result.assignments), len(result.overloaded), len(result.critical),
         )
         return result
+
+
+DELAY_WEIGHTS = {
+    "due_date": 0.30,
+    "workload": 0.15,
+    "stagnation": 0.20,
+    "history": 0.20,
+    "approval": 0.15,
+}
+
+
+@dataclass
+class DelayRiskItemData:
+    task_id: int
+    title: str
+    status: str
+    priority: str
+    due_date: Optional[str]
+    days_remaining: Optional[int]
+    assignee_name: Optional[str]
+    assignee_email: Optional[str]
+    assignee_id: Optional[int]
+    risk_score: float
+    risk_level: str
+    confidence_score: float
+    predicted_delay_days: Optional[int]
+    factors: dict
+    warnings: list[str]
+
+
+class DelayRiskAnalyzer:
+    def __init__(self, db: Session, rules_engine):
+        self.db = db
+        self.rules = rules_engine
+        self.now = datetime.utcnow()
+        self._workload_cache: dict[int, int] = {}
+        self._history_cache: dict[int, Optional[float]] = {}
+
+    def _score_due_date(self, task) -> tuple[float, float]:
+        if task.due_date is None:
+            return 2.0, 0.5
+        delta = (task.due_date - self.now).days
+        if delta < 0:
+            return 10.0, 1.0
+        elif delta <= 1:
+            return 9.0, 1.0
+        elif delta <= 3:
+            return 7.0, 1.0
+        elif delta <= 7:
+            return 5.0, 0.9
+        elif delta <= 14:
+            return 3.0, 0.7
+        else:
+            return 1.0, 0.6
+
+    def _score_workload(self, assigned_to_id: Optional[int]) -> tuple[float, float]:
+        if assigned_to_id is None:
+            return 0.0, 0.3
+        if assigned_to_id not in self._workload_cache:
+            count = self.db.query(Task).filter(
+                Task.assigned_to_id == assigned_to_id,
+                Task.status != "done",
+            ).count()
+            self._workload_cache[assigned_to_id] = count
+        cnt = self._workload_cache[assigned_to_id]
+        if cnt >= 10:
+            return 10.0, 0.9
+        elif cnt >= 7:
+            return 7.5, 0.85
+        elif cnt >= 5:
+            return 5.0, 0.8
+        elif cnt >= 3:
+            return 3.0, 0.7
+        else:
+            return 0.0, 0.6
+
+    def _score_stagnation(self, task) -> tuple[float, float]:
+        if task.status == "done":
+            return 0.0, 1.0
+        stalled_hours = (self.now - task.updated_at).total_seconds() / 3600
+        if stalled_hours < 4:
+            return 0.0, 0.6
+        elif stalled_hours < 24:
+            return 3.0, 0.7
+        elif stalled_hours < 48:
+            return 5.0, 0.85
+        elif stalled_hours < 72:
+            return 7.0, 0.9
+        else:
+            return 10.0, 0.95
+
+    def _score_history(self, assigned_to_id: Optional[int]) -> tuple[float, float]:
+        if assigned_to_id is None:
+            return 5.0, 0.4
+        if assigned_to_id in self._history_cache:
+            val = self._history_cache[assigned_to_id]
+            if val is None:
+                return 5.0, 0.4
+            return val
+        result = self.db.query(
+            func.avg(
+                func.extract("epoch", Task.updated_at - Task.created_at) / 86400
+            )
+        ).filter(
+            Task.assigned_to_id == assigned_to_id,
+            Task.status == "done",
+            Task.updated_at.isnot(None),
+            Task.created_at.isnot(None),
+        ).scalar()
+        if result is None:
+            self._history_cache[assigned_to_id] = None
+            return 5.0, 0.4
+        avg_days = float(result)
+        self._history_cache[assigned_to_id] = avg_days
+        if avg_days <= 1:
+            return 0.0, 0.8
+        elif avg_days <= 3:
+            return 2.0, 0.8
+        elif avg_days <= 7:
+            return 5.0, 0.75
+        elif avg_days <= 14:
+            return 7.0, 0.7
+        else:
+            return 9.0, 0.65
+
+    def _score_approval(self, user_id: Optional[int]) -> tuple[float, float]:
+        if user_id is None:
+            return 0.0, 0.3
+        pending = self.db.query(Approval).filter(
+            Approval.requested_by == user_id,
+            Approval.status == "pending",
+        ).count()
+        if pending == 0:
+            return 0.0, 0.5
+        max_wait = self.db.query(
+            func.min(Approval.created_at)
+        ).filter(
+            Approval.requested_by == user_id,
+            Approval.status == "pending",
+        ).scalar()
+        if max_wait is None:
+            return 3.0, 0.6
+        wait_hours = (self.now - max_wait).total_seconds() / 3600
+        if wait_hours < 24:
+            return 3.0, 0.7
+        elif wait_hours < 48:
+            return 5.0, 0.8
+        elif wait_hours < 72:
+            return 7.0, 0.85
+        else:
+            return 9.0, 0.9
+
+    def _compute_predicted_delay(self, risk_score: float, days_remaining: Optional[int]) -> Optional[int]:
+        if days_remaining is None:
+            if risk_score >= 7:
+                return 3
+            return None
+        if days_remaining < 0:
+            return abs(days_remaining) + max(1, int(risk_score / 2))
+        at_risk_threshold = self.rules.at_risk_days
+        if days_remaining <= at_risk_threshold and risk_score >= 5:
+            return int((at_risk_threshold - days_remaining + 1) * (risk_score / 5))
+        return None
+
+    def _generate_warnings(self, task, factors: dict) -> list[str]:
+        warnings = []
+        if factors.get("due_date", {}).get("score", 0) >= 8:
+            warnings.append("Task is overdue or due within 24 hours")
+        if factors.get("stagnation", {}).get("score", 0) >= 7:
+            hours = int((self.now - task.updated_at).total_seconds() / 3600)
+            warnings.append(f"No progress in {hours}+ hours")
+        if factors.get("workload", {}).get("score", 0) >= 7:
+            warnings.append("Assignee has excessive workload")
+        if factors.get("history", {}).get("score", 0) >= 7:
+            warnings.append("Assignee's historical completion is slow")
+        if factors.get("approval", {}).get("score", 0) >= 7:
+            warnings.append("Pending approvals may be blocking progress")
+        return warnings
+
+    def analyze(self, base_query=None) -> list[DelayRiskItemData]:
+        logger.debug("Starting delay risk analysis")
+        q = base_query if base_query is not None else self.db.query(Task)
+        tasks = q.filter(
+            Task.status != "done",
+        ).options(
+            joinedload(Task.assignee)
+        ).order_by(Task.due_date.asc().nullslast()).all()
+
+        results = []
+        for t in tasks:
+            uid = t.assigned_to_id
+
+            ds, dc = self._score_due_date(t)
+            ws, wc = self._score_workload(uid)
+            ss, sc = self._score_stagnation(t)
+            hs, hc = self._score_history(uid)
+            aps, apc = self._score_approval(t.created_by_id)
+
+            raw_score = (
+                ds * DELAY_WEIGHTS["due_date"]
+                + ws * DELAY_WEIGHTS["workload"]
+                + ss * DELAY_WEIGHTS["stagnation"]
+                + hs * DELAY_WEIGHTS["history"]
+                + aps * DELAY_WEIGHTS["approval"]
+            )
+            risk_score = round(raw_score, 2)
+
+            if risk_score >= 6.5:
+                risk_level = "high"
+            elif risk_score >= 3.5:
+                risk_level = "medium"
+            else:
+                risk_level = "low"
+
+            effective_confidence = (
+                dc * DELAY_WEIGHTS["due_date"]
+                + wc * DELAY_WEIGHTS["workload"]
+                + sc * DELAY_WEIGHTS["stagnation"]
+                + hc * DELAY_WEIGHTS["history"]
+                + apc * DELAY_WEIGHTS["approval"]
+            )
+            confidence = round(min(1.0, effective_confidence + 0.15), 2)
+
+            days_remaining = (t.due_date - self.now).days if t.due_date else None
+            predicted_delay = self._compute_predicted_delay(risk_score, days_remaining)
+
+            factors = {
+                "due_date": {"score": ds, "confidence": dc, "weight": DELAY_WEIGHTS["due_date"]},
+                "workload": {"score": ws, "confidence": wc, "weight": DELAY_WEIGHTS["workload"]},
+                "stagnation": {"score": ss, "confidence": sc, "weight": DELAY_WEIGHTS["stagnation"]},
+                "history": {"score": hs, "confidence": hc, "weight": DELAY_WEIGHTS["history"]},
+                "approval": {"score": aps, "confidence": apc, "weight": DELAY_WEIGHTS["approval"]},
+            }
+            warnings = self._generate_warnings(t, factors)
+
+            results.append(DelayRiskItemData(
+                task_id=t.id,
+                title=t.title,
+                status=t.status,
+                priority=t.priority,
+                due_date=t.due_date.isoformat() if t.due_date else None,
+                days_remaining=days_remaining,
+                assignee_name=t.assignee.name if t.assignee else None,
+                assignee_email=t.assignee.email if t.assignee else None,
+                assignee_id=uid,
+                risk_score=risk_score,
+                risk_level=risk_level,
+                confidence_score=confidence,
+                predicted_delay_days=predicted_delay,
+                factors=factors,
+                warnings=warnings,
+            ))
+
+        results.sort(key=lambda x: x.risk_score, reverse=True)
+        logger.debug(
+            "Delay risk analysis: %d tasks analyzed, %d high risk, %d medium risk",
+            len(results),
+            sum(1 for r in results if r.risk_level == "high"),
+            sum(1 for r in results if r.risk_level == "medium"),
+        )
+        return results

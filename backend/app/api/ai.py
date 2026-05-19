@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
-from app.schemas.ai import AIRequest, AIResponse, AIOut, AISummaryOut, HighPriorityTasksOut
+from app.schemas.ai import AIRequest, AIResponse, AIOut, AISummaryOut, HighPriorityTasksOut, DelayRiskOut
 from app.api.deps import get_db
 from app.core.rbac import require_permission, Permissions
 from app.ai import AIService
@@ -44,6 +44,25 @@ def high_priority_tasks_endpoint(
         "medium": counts.get("medium", 0),
         "low": counts.get("low", 0),
         "tasks": tasks,
+    }
+
+
+@router.get("/delay-risks", response_model=DelayRiskOut)
+def delay_risks_endpoint(
+    db: Session = Depends(get_db),
+    user=Depends(require_permission(Permissions.ai_use)),
+):
+    items = AIService(db).get_delay_risks(user)
+    counts = {"high_risk": 0, "medium_risk": 0, "low_risk": 0}
+    for it in items:
+        key = f"{it['risk_level']}_risk"
+        counts[key] = counts.get(key, 0) + 1
+    return {
+        "total": len(items),
+        "high_risk": counts["high_risk"],
+        "medium_risk": counts["medium_risk"],
+        "low_risk": counts["low_risk"],
+        "items": items,
     }
 
 
