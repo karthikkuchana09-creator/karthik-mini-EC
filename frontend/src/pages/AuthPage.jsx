@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { login, register } from '../api/auth';
+import { login, register, forgotPassword } from '../api/auth';
 import GoogleLoginButton from '../components/GoogleLoginButton';
 
 function AuthPage() {
@@ -12,6 +12,10 @@ function AuthPage() {
   const [role, setRole] = useState('employee');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showForgot, setShowForgot] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotSent, setForgotSent] = useState(false);
+  const [forgotLoading, setForgotLoading] = useState(false);
   const { login: authLogin } = useAuth();
   const navigate = useNavigate();
 
@@ -34,6 +38,20 @@ function AuthPage() {
       setError(err.response?.data?.detail || err.response?.data?.message || 'Something went wrong');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleForgot = async (e) => {
+    e.preventDefault();
+    setForgotLoading(true);
+    setError('');
+    try {
+      await forgotPassword(forgotEmail);
+      setForgotSent(true);
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Something went wrong');
+    } finally {
+      setForgotLoading(false);
     }
   };
 
@@ -65,6 +83,59 @@ function AuthPage() {
             </div>
           )}
 
+          {showForgot ? (
+            <form onSubmit={handleForgot} className="space-y-4">
+              {forgotSent ? (
+                <div className="text-center py-6 space-y-3">
+                  <div className="w-12 h-12 mx-auto bg-green-500/20 rounded-full flex items-center justify-center">
+                    <svg className="w-6 h-6 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <p className="text-white font-medium">Check your email</p>
+                  <p className="text-sm text-indigo-300">If an account exists with that email, a reset link has been sent.</p>
+                  <button
+                    type="button"
+                    onClick={() => { setShowForgot(false); setForgotSent(false); setForgotEmail(''); }}
+                    className="text-sm text-indigo-300 hover:text-white transition mt-2"
+                  >
+                    Back to login
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <label htmlFor="forgotEmail" className="block text-sm font-medium text-indigo-200 mb-1.5">Email</label>
+                    <input
+                      id="forgotEmail"
+                      type="email"
+                      className="w-full px-4 py-2.5 bg-white/10 border border-white/20 rounded-lg text-white placeholder-indigo-300/60 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition text-sm"
+                      value={forgotEmail}
+                      onChange={(e) => setForgotEmail(e.target.value)}
+                      placeholder="you@example.com"
+                      required
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={forgotLoading}
+                    className="w-full py-2.5 px-4 bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-semibold rounded-lg hover:from-indigo-700 hover:to-violet-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 focus:ring-offset-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg text-sm"
+                  >
+                    {forgotLoading ? 'Sending...' : 'Send Reset Link'}
+                  </button>
+                  <div className="text-center">
+                    <button
+                      type="button"
+                      onClick={() => { setShowForgot(false); setError(''); }}
+                      className="text-sm text-indigo-300 hover:text-white transition"
+                    >
+                      Back to login
+                    </button>
+                  </div>
+                </>
+              )}
+            </form>
+          ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             {!isLogin && (
               <div>
@@ -105,6 +176,17 @@ function AuthPage() {
                 placeholder="••••••••"
                 required
               />
+              {isLogin && (
+                <div className="mt-1.5 text-right">
+                  <button
+                    type="button"
+                    onClick={() => { setShowForgot(true); setError(''); }}
+                    className="text-xs text-indigo-300 hover:text-white transition"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
+              )}
             </div>
 
             {!isLogin && (
@@ -141,6 +223,7 @@ function AuthPage() {
               )}
             </button>
           </form>
+          )}
 
           <div className="relative my-6">
             <div className="absolute inset-0 flex items-center">

@@ -109,3 +109,20 @@ class KanbanResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class KanbanReorderItem(BaseModel):
+    id: int
+    status: TaskStatus
+    index: int
+    updated_at: Optional[str] = None
+
+
+class KanbanReorderRequest(BaseModel):
+    items: list[KanbanReorderItem]
+
+
+class TaskStatusChangeRequest(BaseModel):
+    status: TaskStatus
+    previous_status: Optional[str] = None
+    client_updated_at: Optional[str] = None

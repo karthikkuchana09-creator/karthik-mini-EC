@@ -5,12 +5,19 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.models.ai import AIAnalysis
 from app.models.task import Task
+from app.models.approval import Approval
+from app.models.user import User
 from app.core.log import get_logger
 from app.core.config import settings
 from app.core.cache import cached
 from app.schemas.ai import AIRequest
 
 logger = get_logger("ai_service")
+
+OVERDUE_THRESHOLD_HOURS = 2
+APPROVAL_DELAY_HOURS = 48
+WORKLOAD_HIGH_THRESHOLD = 5
+WORKLOAD_CRITICAL_THRESHOLD = 10
 
 
 def _task_base_query(db: Session, current_user):
@@ -75,6 +82,7 @@ def generate_suggestion(db: Session, request: AIRequest, current_user):
 def generate_ai_summary(db: Session, current_user):
     logger.info("Generating AI summary for user_id=%d role=%s", current_user.id, current_user.role)
     now = datetime.utcnow()
+    role = current_user.role.value if hasattr(current_user.role, "value") else str(current_user.role)
 
     base = _task_base_query(db, current_user)
 
@@ -110,31 +118,199 @@ def generate_ai_summary(db: Session, current_user):
         "completed_this_week": completed_week,
     }
 
-    lines = []
-    if total == 0:
-        lines.append("No tasks found.")
+    insights = []
+    recommendations = []
+
+    if overdue > 0:
+        insights.append({"type": "warning", "severity": "high"
+                         if overdue > 3 else "medium",
+                         "text": f"{overdue} task{'s' if overdue != 1 else ''} overdue."})
+        overdue_tasks = base.filter(
+            Task.due_date < now,
+            Task.status != "done",
+        ).order_by(Task.due_date.asc()).limit(5).all()
+        for t in overdue_tasks:
+            days_late = (now - t.due_date).days
+            assignee = t.assignee.email if t.assignee else "unassigned"
+            recommendations.append({
+                "severity": "high" if days_late > 7 else "medium",
+                "message": f"\"{t.title}\" is {days_late} day{'s' if days_late != 1 else ''} overdue, assigned to {assignee}.",
+                "action": f"Reassign or reprioritize task #{t.id}",
+            })
+
+    if high_priority > 0:
+        insights.append({"type": "warning", "severity": "high"
+                         if high_priority > 5 else "medium",
+                         "text": f"{high_priority} high priority task{'s' if high_priority != 1 else ''} pending."})
+        hp_tasks = base.filter(
+            Task.priority == "high",
+            Task.status.in_(["todo", "in_progress"]),
+        ).order_by(Task.due_date.asc()).limit(3).all()
+        for t in hp_tasks:
+            recommendations.append({
+                "severity": "high",
+                "message": f"High priority task \"{t.title}\" is {t.status.replace('_', ' ')}.",
+                "action": f"Assign and prioritize task #{t.id}",
+            })
+
+    if due_today > 0:
+        insights.append({"type": "info", "severity": "medium",
+                         "text": f"{due_today} task{'s' if due_today != 1 else ''} due today."})
+
+    if completed_week > 0:
+        insights.append({"type": "positive", "severity": "low",
+                         "text": f"{completed_week} task{'s' if completed_week != 1 else ''} completed this week."})
+
+    approval_query = db.query(Approval)
+    if role == "manager":
+        approval_query = approval_query.filter(Approval.current_level == "manager")
+
+    total_approvals = approval_query.count()
+    pending_approvals = approval_query.filter(Approval.status == "pending").count()
+    approved_count = approval_query.filter(Approval.status == "approved").count()
+    rejected_count = approval_query.filter(Approval.status == "rejected").count()
+
+    stats["total_approvals"] = total_approvals
+    stats["pending_approvals"] = pending_approvals
+    stats["approved_approvals"] = approved_count
+    stats["rejected_approvals"] = rejected_count
+
+    if pending_approvals > 0:
+        delayed_approvals = approval_query.filter(
+            Approval.status == "pending",
+            Approval.created_at < now - timedelta(hours=APPROVAL_DELAY_HOURS),
+        ).count()
+
+        if delayed_approvals > 0:
+            insights.append({"type": "warning", "severity": "high"
+                             if delayed_approvals > 3 else "medium",
+                             "text": f"{delayed_approvals} approval{'s' if delayed_approvals != 1 else ''} delayed beyond {APPROVAL_DELAY_HOURS}h."})
+            old_approvals = approval_query.filter(
+                Approval.status == "pending",
+                Approval.created_at < now - timedelta(hours=APPROVAL_DELAY_HOURS),
+            ).order_by(Approval.created_at.asc()).limit(3).all()
+            for a in old_approvals:
+                wait_hours = int((now - a.created_at).total_seconds() / 3600)
+                requester = a.requester.email if a.requester else "unknown"
+                recommendations.append({
+                    "severity": "high" if wait_hours > 72 else "medium",
+                    "message": f"Approval \"{a.title}\" requested by {requester} has been waiting {wait_hours}h.",
+                    "action": f"Review approval request #{a.id}",
+                })
+        else:
+            insights.append({"type": "info", "severity": "low",
+                             "text": f"{pending_approvals} approval{'s' if pending_approvals != 1 else ''} pending."})
+
+    assignee_task_counts = {}
+    if role == "admin":
+        assignee_data = db.query(
+            Task.assigned_to_id,
+            func.count(Task.id),
+        ).filter(
+            Task.assigned_to_id.isnot(None),
+            Task.status != "done",
+        ).group_by(Task.assigned_to_id).all()
     else:
-        lines.append(f"You have {total} total task{'s' if total != 1 else ''}.")
+        assignee_data = base.filter(
+            Task.assigned_to_id.isnot(None),
+            Task.status != "done",
+        ).with_entities(
+            Task.assigned_to_id,
+            func.count(Task.id),
+        ).group_by(Task.assigned_to_id).all()
 
-        if pending > 0:
-            lines.append(f"{pending} task{'s' if pending != 1 else ''} pending (todo or in progress).")
-        if in_review > 0:
-            lines.append(f"{in_review} task{'s' if in_review != 1 else ''} in review.")
+    for assignee_id, task_count in assignee_data:
+        assignee_task_counts[assignee_id] = task_count
+
+    if assignee_task_counts:
+        overloaded = {uid: cnt for uid, cnt in assignee_task_counts.items()
+                      if cnt >= WORKLOAD_HIGH_THRESHOLD}
+        critical = {uid: cnt for uid, cnt in assignee_task_counts.items()
+                    if cnt >= WORKLOAD_CRITICAL_THRESHOLD}
+
+        if critical:
+            user_ids = list(critical.keys())
+            users_map = {
+                u.id: u for u in db.query(User).filter(User.id.in_(user_ids)).all()
+            }
+            for uid, cnt in list(critical.items())[:3]:
+                u = users_map.get(uid)
+                name = u.email if u else f"User #{uid}"
+                insights.append({
+                    "type": "warning",
+                    "severity": "high",
+                    "text": f"{name} has {cnt} active tasks \u2014 workload is critical.",
+                })
+                recommendations.append({
+                    "severity": "high",
+                    "message": f"{name} is overloaded with {cnt} active tasks.",
+                    "action": f"Redistribute tasks from user #{uid}",
+                })
+
+        if overloaded and not critical:
+            user_ids = list(overloaded.keys())
+            users_map = {
+                u.id: u for u in db.query(User).filter(User.id.in_(user_ids)).all()
+            }
+            for uid, cnt in list(overloaded.items())[:2]:
+                u = users_map.get(uid)
+                name = u.email if u else f"User #{uid}"
+                insights.append({
+                    "type": "info",
+                    "severity": "medium",
+                    "text": f"{name} has {cnt} active tasks \u2014 workload is high.",
+                })
+                recommendations.append({
+                    "severity": "medium",
+                    "message": f"{name} workload is high with {cnt} active tasks.",
+                    "action": f"Consider reassigning some tasks from user #{uid}",
+                })
+
+        lightly_loaded = {uid: cnt for uid, cnt in assignee_task_counts.items()
+                          if cnt <= 2}
+        if lightly_loaded and total > 5:
+            user_ids = list(lightly_loaded.keys())
+            users_map = {
+                u.id: u for u in db.query(User).filter(User.id.in_(user_ids)).all()
+            }
+            for uid, cnt in list(lightly_loaded.items())[:2]:
+                u = users_map.get(uid)
+                name = u.email if u else f"User #{uid}"
+                insights.append({
+                    "type": "positive",
+                    "severity": "low",
+                    "text": f"{name} has only {cnt} active task{'s' if cnt != 1 else ''} \u2014 available for assignments.",
+                })
+
+    summary_parts = []
+    if total == 0:
+        summary_parts.append("No tasks found.")
+    else:
+        summary_parts.append(f"You have {total} total task{'s' if total != 1 else ''} "
+                             f"({done} completed, {pending} pending).")
         if high_priority > 0:
-            lines.append(f"{high_priority} high priority task{'s' if high_priority != 1 else ''} pending \u2014 needs attention.")
+            summary_parts.append(f"{high_priority} high priority task{'s' if high_priority != 1 else ''} "
+                                 f"need{'s' if high_priority == 1 else ''} immediate attention.")
         if overdue > 0:
-            lines.append(f"{overdue} task{'s' if overdue != 1 else ''} overdue.")
+            summary_parts.append(f"{overdue} task{'s' if overdue != 1 else ''} are overdue.")
         if due_today > 0:
-            lines.append(f"{due_today} task{'s' if due_today != 1 else ''} due today.")
+            summary_parts.append(f"{due_today} task{'s' if due_today != 1 else ''} due today.")
         if completed_week > 0:
-            lines.append(f"{completed_week} task{'s' if completed_week != 1 else ''} completed this week.")
-        if done > 0 and completed_week == 0:
-            lines.append(f"{done} task{'s' if done != 1 else ''} completed overall.")
+            summary_parts.append(f"{completed_week} completed this week.")
+        if pending_approvals > 0:
+            summary_parts.append(f"{pending_approvals} approval{'s' if pending_approvals != 1 else ''} pending review.")
 
-    summary = " ".join(lines)
+    summary = " ".join(summary_parts)
 
-    logger.info("AI summary generated for user_id=%d: %s", current_user.id, summary[:80])
-    return {"summary": summary, "stats": stats}
+    logger.info("AI summary generated for user_id=%d: %d insights, %d recommendations",
+                current_user.id, len(insights), len(recommendations))
+
+    return {
+        "summary": summary,
+        "stats": stats,
+        "insights": insights,
+        "recommendations": recommendations,
+    }
 
 
 def get_ai_history(

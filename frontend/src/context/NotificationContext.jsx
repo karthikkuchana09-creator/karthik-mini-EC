@@ -32,7 +32,7 @@ export function NotificationProvider({ children }) {
     }
   }, [refreshNotifications]);
 
-  useWebSocket({ onMessage: handleWsMessage });
+  useWebSocket({ onMessage: handleWsMessage, types: ['notification'] });
 
   useEffect(() => {
     refreshNotifications();

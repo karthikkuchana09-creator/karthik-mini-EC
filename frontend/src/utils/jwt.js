@@ -1,30 +1,20 @@
 import { jwtDecode } from 'jwt-decode';
 
-export function isTokenExpired(token) {
-  if (!token) return true;
-  try {
-    const decoded = jwtDecode(token);
-    const now = Math.floor(Date.now() / 1000);
-    return decoded.exp < now;
-  } catch {
-    return true;
-  }
-}
-
-export function getTokenExpiry(token) {
-  if (!token) return 0;
-  try {
-    return jwtDecode(token).exp;
-  } catch {
-    return 0;
-  }
-}
-
-export function getUserFromToken(token) {
-  if (!token) return null;
+export function decodeToken(token) {
   try {
     return jwtDecode(token);
   } catch {
     return null;
   }
+}
+
+export function getTokenExpiry(token) {
+  const decoded = decodeToken(token);
+  return decoded?.exp || null;
+}
+
+export function isTokenExpired(token) {
+  const exp = getTokenExpiry(token);
+  if (!exp) return true;
+  return Date.now() >= exp * 1000;
 }

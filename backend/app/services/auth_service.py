@@ -13,6 +13,7 @@ from app.core.security import hash_password, verify_password, create_access_toke
 from app.core.config import settings
 from app.core.log import get_logger
 from app.services.email_service import send_reset_password_email
+from app.services.audit_log_service import log_action
 
 logger = get_logger("auth_service")
 
@@ -87,6 +88,7 @@ def login_user(db: Session, email: str, password: str):
     refresh_token = _issue_refresh_token(db, user.id)
 
     logger.info("Login success: user_id=%d email=%s role=%s", user.id, user.email, user.role)
+    log_action(db, user.id, "login", "auth", user.id, new_value={"email": user.email})
     return {
         "access_token": access_token,
         "refresh_token": refresh_token,
@@ -327,6 +329,7 @@ def google_oauth_callback(db: Session, code: str, state: Optional[str] = None):
 
     refresh_token = _issue_refresh_token(db, user.id)
 
+    log_action(db, user.id, "login", "auth", user.id, new_value={"email": email, "provider": "google"})
     return {
         "access_token": access_token,
         "refresh_token": refresh_token,

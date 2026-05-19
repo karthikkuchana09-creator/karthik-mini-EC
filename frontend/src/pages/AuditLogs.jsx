@@ -149,9 +149,9 @@ function AuditLogs() {
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2.5">
                           <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 text-xs font-semibold ring-2 ring-white shrink-0">
-                            {(log.user?.email || log.user_email || log.user || 'U').charAt(0).toUpperCase()}
+                            {(log.user?.email || log.user_email || log.user?.name || 'U').charAt(0).toUpperCase()}
                           </div>
-                          <span className="text-sm text-gray-900">{log.user?.email || log.user_email || log.user || 'Unknown'}</span>
+                          <span className="text-sm text-gray-900">{log.user?.email || log.user_email || log.user?.name || 'Unknown'}</span>
                         </div>
                       </td>
                       <td className="px-6 py-4">

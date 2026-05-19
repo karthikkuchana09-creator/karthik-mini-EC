@@ -6,6 +6,7 @@ from app.schemas.user import UserUpdate
 from app.core.log import get_logger
 from app.utils.pagination import paginate_query
 from fastapi.encoders import jsonable_encoder
+from app.services.audit_log_service import log_action
 
 logger = get_logger("user_service")
 
@@ -60,12 +61,24 @@ def update_user(db: Session, user_id: int, data: UserUpdate):
     if existing:
         raise HTTPException(status_code=400, detail="Email already in use")
 
+    old_role = user.role.value if hasattr(user.role, "value") else user.role
+    old_active = user.is_active
+
     user.name = data.name
     user.email = data.email
     user.role = data.role
     user.is_active = data.is_active
     db.commit()
     db.refresh(user)
+
+    new_role = user.role.value if hasattr(user.role, "value") else user.role
+    if old_role != new_role or old_active != user.is_active:
+        log_action(
+            db, user_id, "role_update", "user", user_id,
+            old_value={"role": old_role, "is_active": old_active},
+            new_value={"role": new_role, "is_active": user.is_active},
+        )
+
     return {
         "id": user.id,
         "name": user.name,

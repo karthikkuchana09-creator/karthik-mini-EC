@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useRolePermissions } from '../hooks/useRolePermissions';
+import { useWebSocket } from '../hooks/useWebSocket';
 import { getDashboardSummary, getTaskDistribution } from '../api/dashboard';
 import { getNotifications } from '../api/notifications';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
@@ -166,24 +167,31 @@ function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [summaryData, distData] = await Promise.all([
-          getDashboardSummary(),
-          getTaskDistribution(),
-        ]);
-        setSummary(summaryData);
-        setDistribution(Array.isArray(distData) ? distData : []);
-      } catch (err) {
-        setError(err.response?.data?.detail || err.response?.data?.message || err.message || 'Failed to load dashboard data');
-        setDistribution([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
+  const fetchData = useCallback(async () => {
+    try {
+      const [summaryData, distData] = await Promise.all([
+        getDashboardSummary(),
+        getTaskDistribution(),
+      ]);
+      setSummary(summaryData);
+      setDistribution(Array.isArray(distData) ? distData : []);
+    } catch (err) {
+      setError(err.response?.data?.detail || err.response?.data?.message || err.message || 'Failed to load dashboard data');
+      setDistribution([]);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  const handleWsMessage = useCallback((data) => {
+    if (data.type === 'kanban' || data.type === 'task' || data.type === 'approval') {
+      fetchData();
+    }
+  }, [fetchData]);
+
+  useWebSocket({ onMessage: handleWsMessage });
 
   if (loading) {
     return (

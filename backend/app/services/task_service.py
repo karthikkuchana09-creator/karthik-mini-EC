@@ -9,11 +9,30 @@ from app.core.workflow import validate_transition
 from app.core.log import get_logger
 from app.core.cache import cache_delete_pattern
 from app.services.audit_log_service import log_action
-from app.services.notification_service import create_notification
+from app.services.notification_service import (
+    create_task_assignment_notification,
+    create_task_status_notification,
+)
 from app.utils.pagination import paginate_query
 from fastapi.encoders import jsonable_encoder
+from app.websocket.manager import manager
+from app.websocket.kanban import build_kanban_task_data, KanbanAction, detect_conflict
 
 logger = get_logger("task_service")
+
+
+def _emit_kanban(action: KanbanAction, task, previous_status: str | None = None):
+    import asyncio
+    task_data = build_kanban_task_data(task).model_dump()
+    event = {
+        "action": action.value,
+        "task": task_data,
+        "source_column": previous_status,
+        "destination_column": task.status if hasattr(task, "status") else None,
+        "previous_status": previous_status,
+        "timestamp": __import__("datetime").datetime.utcnow().isoformat(),
+    }
+    asyncio.ensure_future(manager.notify_kanban(event))
 
 
 def _invalidate_task_caches():
@@ -50,8 +69,12 @@ def create_task(db: Session, task_data: TaskCreate, current_user):
     db.commit()
     db.refresh(new_task)
 
-    log_action(db, current_user.id, "create", "task", new_task.id)
-    create_notification(db, task_data.assigned_to_id, f"You have been assigned Task #{new_task.id}")
+    log_action(
+        db, current_user.id, "create", "task", new_task.id,
+        new_value={"title": new_task.title, "status": "todo", "priority": new_task.priority, "assigned_to_id": new_task.assigned_to_id},
+    )
+    create_task_assignment_notification(db, task_data.assigned_to_id, new_task.id, new_task.title)
+    _emit_kanban(KanbanAction.TASK_CREATED, new_task)
     logger.info("Task created successfully id=%d title=%s", new_task.id, new_task.title)
     _invalidate_task_caches()
     return new_task
@@ -149,9 +172,14 @@ def update_task(db: Session, task_id: int, task_data: TaskUpdate, current_user):
     db.commit()
     db.refresh(task)
 
-    log_action(db, current_user.id, "update", "task", task_id)
+    log_action(
+        db, current_user.id, "update", "task", task_id,
+        old_value={"title": task.title, "status": task.status},
+        new_value=task_data.dict(exclude_unset=True) if not current_user.role == "employee" else {"status": task.status},
+    )
     if task.assigned_to_id:
-        create_notification(db, task.assigned_to_id, f"Task #{task_id} has been updated")
+        create_task_status_notification(db, task.assigned_to_id, task_id, task.title, task.status)
+    _emit_kanban(KanbanAction.TASK_UPDATED, task)
     logger.info("Task id=%d updated successfully", task_id)
     _invalidate_task_caches()
     return jsonable_encoder(task)
@@ -165,10 +193,12 @@ def delete_task(db: Session, task_id: int, current_user):
         logger.warning("Task delete failed: not found id=%d", task_id)
         raise HTTPException(404, "Task not found")
 
+    deleted = {"title": task.title, "status": task.status, "priority": task.priority, "assigned_to_id": task.assigned_to_id}
     db.delete(task)
     db.commit()
 
-    log_action(db, current_user.id, "delete", "task", task_id)
+    log_action(db, current_user.id, "delete", "task", task_id, old_value=deleted)
+    _emit_kanban(KanbanAction.TASK_DELETED, task)
     logger.info("Task id=%d deleted successfully", task_id)
     _invalidate_task_caches()
     return {"message": "Task deleted"}
@@ -197,8 +227,13 @@ def assign_task(db: Session, task_id: int, assigned_to_id: int, current_user):
     db.commit()
     db.refresh(task)
 
-    log_action(db, current_user.id, "assign", "task", task_id)
-    create_notification(db, assigned_to_id, f"You have been assigned Task #{task_id}")
+    log_action(
+        db, current_user.id, "assign", "task", task_id,
+        old_value={"assigned_to_id": task.assigned_to_id},
+        new_value={"assigned_to_id": assigned_to_id},
+    )
+    create_task_assignment_notification(db, assigned_to_id, task_id, task.title)
+    _emit_kanban(KanbanAction.TASK_UPDATED, task)
     logger.info("Task id=%d assigned to user_id=%d successfully", task_id, assigned_to_id)
     _invalidate_task_caches()
     return {"message": "Task assigned successfully"}
@@ -223,15 +258,21 @@ def update_task_status(db: Session, task_id: int, new_status: str, current_user)
             f"Invalid transition: {task.status} \u2192 {new_status}"
         )
 
+    previous_status = task.status
     task.status = new_status
     task.updated_by = current_user.id
 
     db.commit()
     db.refresh(task)
 
-    log_action(db, current_user.id, "status_update", "task", task_id)
+    log_action(
+        db, current_user.id, "status_update", "task", task_id,
+        old_value={"status": previous_status},
+        new_value={"status": new_status},
+    )
     if task.assigned_to_id and task.assigned_to_id != current_user.id:
-        create_notification(db, task.assigned_to_id, f"Task #{task_id} status changed to {new_status}")
+        create_task_status_notification(db, task.assigned_to_id, task_id, task.title, new_status)
+    _emit_kanban(KanbanAction.TASK_STATUS_CHANGED, task, previous_status=previous_status)
     logger.info("Task id=%d status updated to %s successfully", task_id, new_status)
     _invalidate_task_caches()
     return {"message": "Status updated successfully"}

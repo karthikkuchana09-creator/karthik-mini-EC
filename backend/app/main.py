@@ -2,7 +2,9 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
-from app.api import auth, tasks, users, comments, approvals, dashboard, documents, audit_logs, notifications, ai, ws, leaves
+from app.api import auth, tasks, users, comments, approvals, dashboard, documents, audit_logs, notifications, ai, leaves
+from app.websocket.routes import router as ws_router
+from app.websocket.manager import manager
 from app.db.session import engine
 from app.db.base import Base
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,6 +16,11 @@ logger = get_logger("main")
 
 Base.metadata.create_all(bind=engine)
 app = FastAPI()
+
+
+@app.on_event("startup")
+async def startup():
+    manager.start_heartbeat()
 
 
 @app.exception_handler(StarletteHTTPException)
@@ -60,7 +67,7 @@ app.include_router(documents.router)
 app.include_router(audit_logs.router)
 app.include_router(notifications.router)
 app.include_router(ai.router)
-app.include_router(ws.router)
+app.include_router(ws_router)
 app.include_router(leaves.router)
 
 logger.info("Application started")

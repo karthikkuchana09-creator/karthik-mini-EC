@@ -5,7 +5,36 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
 
   return {
-    plugins: [react()],
+    plugins: [
+      react(),
+    ],
+
+    build: {
+      target: 'es2020',
+      minify: 'esbuild',
+      cssMinify: true,
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes('node_modules/react-dom') || id.includes('node_modules/react/') || id.includes('node_modules/react-router')) {
+              return 'vendor';
+            }
+            if (id.includes('node_modules/recharts') || id.includes('node_modules/@hello-pangea')) {
+              return 'ui';
+            }
+            if (id.includes('node_modules/@tanstack/react-query')) {
+              return 'data';
+            }
+            if (id.includes('node_modules/axios')) {
+              return 'axios';
+            }
+          },
+        },
+      },
+      chunkSizeWarningLimit: 500,
+      sourcemap: false,
+    },
+
     server: {
       port: 5173,
       proxy: env.VITE_API_URL

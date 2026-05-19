@@ -50,6 +50,20 @@ class AIOut(BaseModel):
         from_attributes = True
 
 
+class InsightItem(BaseModel):
+    type: str
+    severity: str
+    text: str
+
+
+class RecommendationItem(BaseModel):
+    severity: str
+    message: str
+    action: Optional[str] = None
+
+
 class AISummaryOut(BaseModel):
     summary: str
     stats: dict
+    insights: list[InsightItem] = []
+    recommendations: list[RecommendationItem] = []

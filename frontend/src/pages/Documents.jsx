@@ -227,10 +227,10 @@ function DocumentRow({ doc, expanded, onToggle, isAdminOrManager }) {
           <td className="px-6 py-4">
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 rounded-full bg-gradient-to-br from-indigo-100 to-indigo-200 flex items-center justify-center text-indigo-700 text-[10px] font-semibold ring-2 ring-white shadow-sm shrink-0">
-                {(doc.uploaded_by?.email || doc.uploaded_by || 'U').charAt(0).toUpperCase()}
+                {(doc.uploaded_by?.email || doc.uploaded_by?.name || 'U').charAt(0).toUpperCase()}
               </div>
               <span className="text-sm text-gray-600 truncate max-w-[120px]">
-                {doc.uploaded_by?.email || doc.uploaded_by || 'Unknown'}
+                {doc.uploaded_by?.email || doc.uploaded_by?.name || 'Unknown'}
               </span>
             </div>
           </td>

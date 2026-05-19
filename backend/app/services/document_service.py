@@ -5,9 +5,11 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.models.document import Document
+from app.models.task import Task
 from app.core.log import get_logger
 from app.utils.file_helpers import allowed_file, MAX_FILE_SIZE, unique_filename, safe_join
 from app.services.audit_log_service import log_action
+from app.services.notification_service import create_document_notification
 
 logger = get_logger("document_service")
 
@@ -84,7 +86,19 @@ def upload_document(
     db.commit()
     db.refresh(document)
 
-    log_action(db, current_user.id, "upload", "document", document.id)
+    log_action(
+        db, current_user.id, "upload", "document", document.id,
+        new_value={"file_name": document.file_name, "version": document.version, "task_id": task_id},
+    )
+
+    if task_id:
+        task = db.query(Task).filter(Task.id == task_id).first()
+        if task:
+            notify_ids = {task.assigned_to_id, task.created_by_id} - {current_user.id}
+            for uid in notify_ids:
+                if uid:
+                    create_document_notification(db, uid, document.id, document.file_name, task_id)
+
     logger.info(
         "Document uploaded: id=%d file_name=%s v%d",
         document.id, document.file_name, document.version
@@ -210,6 +224,9 @@ def delete_document(db: Session, document_id: int, current_user):
     db.delete(doc)
     db.commit()
 
-    log_action(db, current_user.id, "delete", "document", document_id)
+    log_action(
+        db, current_user.id, "delete", "document", document_id,
+        old_value={"file_name": doc.file_name, "version": doc.version, "task_id": doc.task_id},
+    )
     logger.info("Document id=%d deleted successfully", document_id)
     return {"message": "Document deleted"}

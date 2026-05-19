@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
 import NotificationDropdown from './NotificationDropdown';
 
-function Navbar({ onMenuClick }) {
+function Navbar({ onMenuClick, sidebarCollapsed, onToggleCollapse }) {
   const { user, logout } = useAuth();
   const { unreadCount, refreshNotifications } = useNotifications();
   const navigate = useNavigate();
@@ -40,7 +40,7 @@ function Navbar({ onMenuClick }) {
   return (
     <header className="fixed top-0 left-0 right-0 z-50 h-16 bg-white/90 backdrop-blur-xl border-b border-gray-200/60 shadow-sm">
       <div className="h-full px-4 lg:px-6 flex items-center justify-between">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1.5">
           <button
             onClick={onMenuClick}
             className="lg:hidden inline-flex items-center justify-center p-2.5 rounded-xl text-gray-500 hover:text-gray-700 hover:bg-gray-100/80 transition-all duration-200 active:scale-95"
@@ -51,11 +51,32 @@ function Navbar({ onMenuClick }) {
             </svg>
           </button>
 
-          <div className="hidden lg:flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-gradient-to-br from-indigo-600 to-violet-600 rounded-lg flex items-center justify-center shadow-md shadow-indigo-500/20">
+          <button
+            onClick={onToggleCollapse}
+            className="hidden lg:inline-flex items-center justify-center p-2.5 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100/80 transition-all duration-200 active:scale-95"
+            aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            <svg
+              className={`w-4 h-4 transition-transform duration-300 ${
+                sidebarCollapsed ? 'rotate-180' : ''
+              }`}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+            </svg>
+          </button>
+
+          <div className={`hidden lg:flex items-center gap-2.5 overflow-hidden transition-all duration-300 ${
+            sidebarCollapsed ? 'w-0 opacity-0 ml-0' : 'w-auto opacity-100 ml-1'
+          }`}>
+            <div className="w-8 h-8 bg-gradient-to-br from-indigo-600 to-violet-600 rounded-lg flex items-center justify-center shadow-md shadow-indigo-500/20 shrink-0">
               <span className="text-white font-bold text-sm">M</span>
             </div>
-            <span className="text-lg font-bold text-gray-900 tracking-tight">Mini EC</span>
+            <span className="text-lg font-bold text-gray-900 tracking-tight whitespace-nowrap">Mini EC</span>
           </div>
         </div>
 

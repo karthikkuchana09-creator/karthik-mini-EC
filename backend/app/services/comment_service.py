@@ -5,7 +5,7 @@ from app.models.task import Task
 from app.schemas.comment import CommentCreate
 from app.core.log import get_logger
 from app.services.audit_log_service import log_action
-from app.services.notification_service import create_notification
+from app.services.notification_service import create_comment_notification
 
 logger = get_logger("comment_service")
 
@@ -31,10 +31,13 @@ def add_comment(db: Session, task_id: int, comment_data: CommentCreate, current_
     db.commit()
     db.refresh(comment)
 
-    log_action(db, current_user.id, "create", "comment", comment.id)
+    log_action(
+        db, current_user.id, "create", "comment", comment.id,
+        new_value={"task_id": task_id, "is_internal": comment_data.is_internal},
+    )
     notify_user_id = task.assigned_to_id if task.assigned_to_id != current_user.id else task.created_by_id
     if notify_user_id:
-        create_notification(db, notify_user_id, f"New comment on Task #{task_id}")
+        create_comment_notification(db, notify_user_id, task_id)
     logger.info("Comment id=%d added to task id=%d successfully", comment.id, task_id)
     return comment
 
@@ -74,5 +77,5 @@ def delete_all_comments(db: Session, task_id: int, current_user):
     count = db.query(Comment).filter(Comment.task_id == task_id).delete()
     db.commit()
 
-    log_action(db, current_user.id, "delete", "comment", task_id)
+    log_action(db, current_user.id, "delete", "comment", task_id, old_value={"task_id": task_id, "count": count})
     return {"message": f"Deleted {count} comments"}

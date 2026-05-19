@@ -50,6 +50,8 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+let redirectInProgress = false;
+
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -88,12 +90,27 @@ api.interceptors.response.use(
       } catch (refreshError) {
         processQueue(refreshError, null);
         clearAuthTokens();
-        toast.error('Session expired. Please login again.');
-        window.dispatchEvent(new CustomEvent('auth:logout'));
+        if (!redirectInProgress) {
+          redirectInProgress = true;
+          toast.error('Session expired. Please login again.');
+          window.dispatchEvent(new CustomEvent('auth:logout'));
+        }
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;
       }
+    }
+
+    if (error.response?.status === 403) {
+      toast.error('You do not have permission to perform this action');
+    }
+
+    if (error.code === 'ECONNABORTED') {
+      toast.error('Request timed out. Please try again.');
+    }
+
+    if (!error.response && error.message === 'Network Error') {
+      toast.error('Network error. Please check your connection.');
     }
 
     return Promise.reject(error);
