@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
-from app.schemas.ai import AIRequest, AIResponse, AIOut, AISummaryOut
+from app.schemas.ai import AIRequest, AIResponse, AIOut, AISummaryOut, HighPriorityTasksOut
 from app.api.deps import get_db
 from app.core.rbac import require_permission, Permissions
 from app.ai import AIService
@@ -25,6 +25,26 @@ def summary_endpoint(
     user=Depends(require_permission(Permissions.ai_use)),
 ):
     return AIService(db).generate_summary(user)
+
+
+@router.get("/high-priority-tasks", response_model=HighPriorityTasksOut)
+def high_priority_tasks_endpoint(
+    db: Session = Depends(get_db),
+    user=Depends(require_permission(Permissions.ai_use)),
+):
+    tasks = AIService(db).get_high_priority_tasks(user)
+    counts = {"critical": 0, "high": 0, "medium": 0, "low": 0}
+    for t in tasks:
+        level = t["urgency_level"]
+        counts[level] = counts.get(level, 0) + 1
+    return {
+        "total": len(tasks),
+        "critical": counts.get("critical", 0),
+        "high": counts.get("high", 0),
+        "medium": counts.get("medium", 0),
+        "low": counts.get("low", 0),
+        "tasks": tasks,
+    }
 
 
 @router.get("/history", response_model=list[AIOut])

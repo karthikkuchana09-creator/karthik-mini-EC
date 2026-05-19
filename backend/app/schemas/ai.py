@@ -67,3 +67,25 @@ class AISummaryOut(BaseModel):
     stats: dict
     insights: list[InsightItem] = []
     recommendations: list[RecommendationItem] = []
+
+
+class HighPriorityTaskItem(BaseModel):
+    id: int
+    title: str
+    status: str
+    priority: str
+    due_date: Optional[str] = None
+    days_remaining: Optional[int] = None
+    urgency_score: int = 0
+    urgency_level: str = "low"
+    assignee: Optional[str] = None
+    assignee_name: Optional[str] = None
+
+
+class HighPriorityTasksOut(BaseModel):
+    total: int = 0
+    critical: int = 0
+    high: int = 0
+    medium: int = 0
+    low: int = 0
+    tasks: list[HighPriorityTaskItem] = []

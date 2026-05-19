@@ -8,6 +8,7 @@ import {
 } from 'recharts';
 import { SkeletonCard, SkeletonChart } from '../components/ui/Skeleton';
 import ErrorState from '../components/ui/ErrorState';
+import HighPriorityTasksCard from '../components/HighPriorityTasksCard';
 import { getErrorMessage } from '../utils/errorHandler';
 import { timeAgo, formatDate, formatTimestamp } from '../utils/format';
 
@@ -348,6 +349,10 @@ function AdminDashboard() {
           </div>
         </div>
       )}
+
+      <div className="mb-8">
+        <HighPriorityTasksCard />
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         <ChartCard title="Task Distribution" accentColor="from-indigo-400 to-indigo-600" subtitle="Tasks grouped by status column">

@@ -1,4 +1,6 @@
-from sqlalchemy.orm import Session
+from datetime import datetime
+
+from sqlalchemy.orm import Session, joinedload
 from app.models.task import Task
 from app.models.approval import Approval
 from app.models.ai import AIAnalysis
@@ -11,6 +13,23 @@ from app.ai.insights import InsightGenerator
 from app.schemas.ai import AIRequest
 
 logger = get_logger("ai.service")
+
+
+def _calculate_urgency(due_date, now):
+    if due_date is None:
+        return {"score": 0, "level": "low", "days_remaining": None}
+    days_remaining = (due_date - now).days
+    if days_remaining < 0:
+        score = min(20, 10 + abs(days_remaining))
+        return {"score": score, "level": "critical", "days_remaining": days_remaining}
+    elif days_remaining <= 1:
+        return {"score": 9, "level": "critical", "days_remaining": days_remaining}
+    elif days_remaining <= 3:
+        return {"score": 7, "level": "high", "days_remaining": days_remaining}
+    elif days_remaining <= 7:
+        return {"score": 4, "level": "medium", "days_remaining": days_remaining}
+    else:
+        return {"score": 2, "level": "low", "days_remaining": days_remaining}
 
 
 def _task_base_query(db: Session, current_user):
@@ -184,6 +203,33 @@ class AIService:
             "model_used": "ai-engine",
             "tokens_used": analysis.tokens_used,
         }
+
+    def get_high_priority_tasks(self, current_user) -> list[dict]:
+        logger.info("Fetching high priority pending tasks for user_id=%d", current_user.id)
+        now = datetime.utcnow()
+        q = _task_base_query(self.db, current_user).filter(
+            Task.priority == "high",
+            Task.status != "done",
+        )
+        tasks = q.options(joinedload(Task.assignee)).order_by(Task.due_date.asc()).all()
+        results = []
+        for t in tasks:
+            urgency = _calculate_urgency(t.due_date, now)
+            results.append({
+                "id": t.id,
+                "title": t.title,
+                "status": t.status,
+                "priority": t.priority,
+                "due_date": t.due_date.isoformat() if t.due_date else None,
+                "days_remaining": urgency["days_remaining"],
+                "urgency_score": urgency["score"],
+                "urgency_level": urgency["level"],
+                "assignee": t.assignee.email if t.assignee else None,
+                "assignee_name": t.assignee.name if t.assignee else None,
+            })
+        results.sort(key=lambda x: x["urgency_score"], reverse=True)
+        logger.info("Found %d high priority pending tasks", len(results))
+        return results
 
     def get_history(self, current_user, skip: int = 0, limit: int = 50):
         return (
