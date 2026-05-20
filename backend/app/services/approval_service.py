@@ -19,12 +19,16 @@ logger = get_logger("approval_service")
 
 def _invalidate_approval_caches():
     import asyncio
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
     try:
-        loop.run_until_complete(cache_delete_pattern("dashboard:*"))
-    finally:
-        loop.close()
+        loop = asyncio.get_running_loop()
+        asyncio.ensure_future(cache_delete_pattern("dashboard:*"))
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            loop.run_until_complete(cache_delete_pattern("dashboard:*"))
+        finally:
+            loop.close()
 
 
 def create_approval(db: Session, approval_data: ApprovalCreate, current_user):

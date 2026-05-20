@@ -37,13 +37,18 @@ def _emit_kanban(action: KanbanAction, task, previous_status: str | None = None)
 
 def _invalidate_task_caches():
     import asyncio
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
     try:
-        loop.run_until_complete(cache_delete_pattern("dashboard:*"))
-        loop.run_until_complete(cache_delete_pattern("ai:summary:*"))
-    finally:
-        loop.close()
+        loop = asyncio.get_running_loop()
+        asyncio.ensure_future(cache_delete_pattern("dashboard:*"))
+        asyncio.ensure_future(cache_delete_pattern("ai:summary:*"))
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            loop.run_until_complete(cache_delete_pattern("dashboard:*"))
+            loop.run_until_complete(cache_delete_pattern("ai:summary:*"))
+        finally:
+            loop.close()
 
 
 def create_task(db: Session, task_data: TaskCreate, current_user):

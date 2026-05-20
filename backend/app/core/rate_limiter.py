@@ -3,7 +3,6 @@ import threading
 from typing import Optional
 
 from fastapi import HTTPException, Request, status
-from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
 
 from app.core.config import settings
@@ -57,7 +56,12 @@ def _get_backend() -> InMemoryBackend:
 
 
 def _resolve_client_key(request: Request, prefix: str) -> str:
-    user_id = getattr(request.state, "user_id", None)
+    scope_state = request.scope.get("state", {})
+    user_id = None
+    if isinstance(scope_state, dict):
+        user_id = scope_state.get("user_id")
+    if user_id is None:
+        user_id = getattr(request.state, "user_id", None)
     if user_id:
         return f"{prefix}:user:{user_id}"
     forwarded = request.headers.get("X-Forwarded-For", "")
@@ -68,38 +72,49 @@ def _resolve_client_key(request: Request, prefix: str) -> str:
 SKIP_PATHS = {"/docs", "/redoc", "/openapi.json", "/favicon.ico", "/health"}
 
 
-class RateLimitMiddleware(BaseHTTPMiddleware):
+class RateLimitMiddleware:
     def __init__(self, app, requests: int = 0, window: int = 60):
-        super().__init__(app)
+        self.app = app
         self._max_requests = requests
         self._window = window
 
-    async def dispatch(self, request: Request, call_next):
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        if "state" not in scope:
+            scope["state"] = {}
+        request = Request(scope, receive)
         if not settings.RATE_LIMIT_ENABLED:
-            return await call_next(request)
+            await self.app(scope, receive, send)
+            return
 
         if request.method == "GET" and request.url.path in SKIP_PATHS:
-            return await call_next(request)
+            await self.app(scope, receive, send)
+            return
 
         if self._max_requests > 0:
             auth = request.headers.get("Authorization", "")
             if auth.startswith("Bearer "):
                 payload = decode_token(auth[7:])
                 if payload and payload.get("user_id"):
-                    request.state.user_id = payload["user_id"]
+                    scope["state"]["user_id"] = payload["user_id"]
 
             key = _resolve_client_key(request, "global")
             backend = _get_backend()
             allowed, retry_after = backend.check_and_increment(key, self._max_requests, self._window)
             if not allowed:
-                return Response(
+                response = Response(
                     status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                     content=f'{{"detail":"Too many requests. Try again in {retry_after} seconds."}}',
                     media_type="application/json",
                     headers={"Retry-After": str(retry_after)},
                 )
+                await response(scope, receive, send)
+                return
 
-        return await call_next(request)
+        await self.app(scope, receive, send)
 
 
 def rate_limit(requests: int, window: int, prefix: str = "default"):

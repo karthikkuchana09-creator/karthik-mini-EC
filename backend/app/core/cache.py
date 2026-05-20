@@ -188,6 +188,8 @@ def cached(prefix: str, ttl: int = 300, exclude_args: Optional[list[int]] = None
         def sync_wrapper(*args, **kwargs):
             key = _make_key(prefix, args, kwargs, exclude_args, exclude_kwargs)
             loop = _get_or_create_loop()
+            if loop.is_running():
+                return func(*args, **kwargs)
             cached_val = loop.run_until_complete(cache_get(key))
             if cached_val is not None:
                 return cached_val
@@ -216,8 +218,9 @@ def invalidate(patterns: list[str]):
         def sync_wrapper(*args, **kwargs):
             result = func(*args, **kwargs)
             loop = _get_or_create_loop()
-            for pattern in patterns:
-                loop.run_until_complete(cache_delete_pattern(pattern))
+            if not loop.is_running():
+                for pattern in patterns:
+                    loop.run_until_complete(cache_delete_pattern(pattern))
             return result
 
         if asyncio.iscoroutinefunction(func):

@@ -386,7 +386,7 @@ class DelayRiskAnalyzer:
             return val
         result = self.db.query(
             func.avg(
-                func.extract("epoch", Task.updated_at - Task.created_at) / 86400
+                (func.UNIX_TIMESTAMP(Task.updated_at) - func.UNIX_TIMESTAMP(Task.created_at)) / 86400
             )
         ).filter(
             Task.assigned_to_id == assigned_to_id,
@@ -471,7 +471,7 @@ class DelayRiskAnalyzer:
             Task.status != "done",
         ).options(
             joinedload(Task.assignee)
-        ).order_by(Task.due_date.asc().nullslast()).all()
+        ).order_by(Task.due_date.is_(None), Task.due_date.asc()).all()
 
         results = []
         for t in tasks:
@@ -614,7 +614,7 @@ class AssignmentRecommender:
     def _speed_score(self, user_id: int) -> tuple[float, float]:
         result = self.db.query(
             func.avg(
-                func.extract("epoch", Task.updated_at - Task.created_at) / 86400
+                (func.UNIX_TIMESTAMP(Task.updated_at) - func.UNIX_TIMESTAMP(Task.created_at)) / 86400
             )
         ).filter(
             Task.assigned_to_id == user_id,
@@ -820,7 +820,7 @@ class PerformanceAnalyzer:
     def _batch_completion_days(self, user_ids: list[int]) -> dict[int, tuple[Optional[float], int]]:
         rows = self.db.query(
             Task.assigned_to_id,
-            func.avg(func.extract("epoch", Task.updated_at - Task.created_at) / 86400),
+            func.avg((func.UNIX_TIMESTAMP(Task.updated_at) - func.UNIX_TIMESTAMP(Task.created_at)) / 86400),
             func.count(Task.id),
         ).filter(
             Task.assigned_to_id.in_(user_ids),
@@ -882,7 +882,7 @@ class PerformanceAnalyzer:
 
         avg_time_rows = self.db.query(
             Approval.requested_by,
-            func.avg(func.extract("epoch", Approval.updated_at - Approval.created_at) / 3600),
+            func.avg((func.UNIX_TIMESTAMP(Approval.updated_at) - func.UNIX_TIMESTAMP(Approval.created_at)) / 3600),
         ).filter(
             Approval.requested_by.in_(user_ids),
             Approval.status == "approved",
@@ -1107,6 +1107,8 @@ class PerformanceAnalyzer:
             team_avg_performance=team_avg_perf,
             team_avg_reliability=team_avg_rel,
         )
+
+@dataclass
 class EmployeeWorkload:
     user_id: int
     name: str

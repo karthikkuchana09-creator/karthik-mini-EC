@@ -15,25 +15,18 @@ router = APIRouter(prefix="/ai", tags=["AI"])
 
 
 @router.get("/analytics-dashboard")
-def analytics_dashboard_endpoint(
+async def analytics_dashboard_endpoint(
     db: Session = Depends(get_db),
     user=Depends(require_permission(Permissions.ai_use)),
     use_cache: bool = Query(True, description="Use cached response if available"),
 ):
     if use_cache:
-        import asyncio
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        cached = loop.run_until_complete(
-            AICacheService.get_or_compute(
-                AICacheService.key("dashboard", "summary"),
-                AICacheService.CACHE_TTL["dashboard"],
-                _compute_dashboard_summary,
-                db, user,
-            )
+        return await AICacheService.get_or_compute(
+            AICacheService.key("dashboard", "summary"),
+            AICacheService.CACHE_TTL["dashboard"],
+            _compute_dashboard_summary,
+            db, user,
         )
-        loop.close()
-        return cached
 
     return _compute_dashboard_summary(db, user)
 
@@ -219,63 +212,39 @@ def history_endpoint(
 
 
 @router.get("/cache/status")
-def cache_status_endpoint(
+async def cache_status_endpoint(
     user=Depends(require_role(['admin'])),
 ):
-    import asyncio
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    stats = loop.run_until_complete(AICacheService.get_cache_stats())
-    loop.close()
-    return stats
+    return await AICacheService.get_cache_stats()
 
 
 @router.post("/cache/warm")
-def cache_warm_endpoint(
+async def cache_warm_endpoint(
     db: Session = Depends(get_db),
     user=Depends(require_role(['admin'])),
 ):
-    import asyncio
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    result = loop.run_until_complete(AICacheService.warm_ai_caches(db))
-    loop.close()
-    return result
+    return await AICacheService.warm_ai_caches(db)
 
 
 @router.post("/cache/invalidate")
-def cache_invalidate_endpoint(
+async def cache_invalidate_endpoint(
     user=Depends(require_role(['admin'])),
 ):
-    import asyncio
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    count = loop.run_until_complete(AICacheService.invalidate_ai_caches())
-    loop.close()
+    count = await AICacheService.invalidate_ai_caches()
     return {"invalidated": count}
 
 
 @router.get("/jobs/status")
-def jobs_status_endpoint(
+async def jobs_status_endpoint(
     user=Depends(require_role(['admin'])),
 ):
-    import asyncio
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    status = loop.run_until_complete(get_ai_job_status())
-    loop.close()
-    return status
+    return await get_ai_job_status()
 
 
 @router.post("/jobs/run")
-def jobs_run_endpoint(
+async def jobs_run_endpoint(
     full: bool = Query(False, description="Run full daily job"),
     db: Session = Depends(get_db),
     user=Depends(require_role(['admin'])),
 ):
-    import asyncio
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    result = loop.run_until_complete(run_ai_jobs(db, full=full))
-    loop.close()
-    return result
+    return await run_ai_jobs(db, full=full)

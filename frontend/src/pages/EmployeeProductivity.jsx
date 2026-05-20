@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { getEmployeeProductivity } from '../api/ai';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -175,16 +175,21 @@ function EmployeeRow({ employee, expanded, onToggle }) {
 function EmployeeProductivity() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
   const [sortBy, setSortBy] = useState('performance');
   const [searchTerm, setSearchTerm] = useState('');
 
-  useEffect(() => {
+  const fetchData = useCallback(() => {
+    setError(false);
+    setLoading(true);
     getEmployeeProductivity()
       .then(setData)
-      .catch(() => {})
+      .catch(() => setError(true))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   const employees = useMemo(() => {
     if (!data?.employees) return [];
@@ -244,6 +249,17 @@ function EmployeeProductivity() {
     }
     return items.slice(0, 10);
   }, [data]);
+
+  if (error) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="text-center py-20">
+          <p className="text-gray-400 text-sm">Unable to load employee productivity data. Please check your connection.</p>
+          <button onClick={fetchData} className="mt-3 px-4 py-2 text-sm font-medium rounded-xl bg-indigo-600 text-white hover:bg-indigo-700">Retry</button>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (

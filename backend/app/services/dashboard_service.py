@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 
 from sqlalchemy.orm import Session
-from sqlalchemy import func, case
+from sqlalchemy import func, case, and_, text
 from app.models.task import Task
 from app.models.approval import Approval
 from app.models.user import User
@@ -94,32 +94,35 @@ def get_enterprise_ai_summary(db: Session) -> dict:
 
     # ── 1. Task risk metrics (single query) ──
     task_row = db.query(
-        func.count(Task.id).filter(
-            Task.priority == "high",
-            Task.status.in_(["todo", "in_progress"]),
-        ).label("high_priority_pending"),
-        func.count(Task.id).filter(
-            Task.due_date < now,
-            Task.status != "done",
-        ).label("overdue"),
-        func.count(Task.id).filter(
-            Task.due_date.isnot(None),
-            Task.due_date <= now + timedelta(days=at_risk_days),
-            Task.due_date >= now,
-            Task.status.in_(["todo", "in_progress"]),
-        ).label("at_risk"),
-        func.count(Task.id).filter(
-            Task.status == "in_progress",
-            Task.updated_at <= now - timedelta(hours=24),
-        ).label("blocked"),
-        func.count(Task.id).filter(
-            func.date(Task.due_date) == func.date(now),
-            Task.status != "done",
-        ).label("due_today"),
-        func.count(Task.id).filter(
-            Task.status == "done",
-            Task.updated_at >= now - timedelta(days=7),
-        ).label("completed_week"),
+        func.sum(case(
+            (and_(Task.priority == "high", Task.status.in_(["todo", "in_progress"])), 1),
+            else_=0
+        )).label("high_priority_pending"),
+        func.sum(case(
+            (and_(Task.due_date < now, Task.status != "done"), 1),
+            else_=0
+        )).label("overdue"),
+        func.sum(case(
+            (and_(
+                Task.due_date.isnot(None),
+                Task.due_date <= now + timedelta(days=at_risk_days),
+                Task.due_date >= now,
+                Task.status.in_(["todo", "in_progress"]),
+            ), 1),
+            else_=0
+        )).label("at_risk"),
+        func.sum(case(
+            (and_(Task.status == "in_progress", Task.updated_at <= now - timedelta(hours=24)), 1),
+            else_=0
+        )).label("blocked"),
+        func.sum(case(
+            (and_(func.date(Task.due_date) == func.date(now), Task.status != "done"), 1),
+            else_=0
+        )).label("due_today"),
+        func.sum(case(
+            (and_(Task.status == "done", Task.updated_at >= now - timedelta(days=7)), 1),
+            else_=0
+        )).label("completed_week"),
     ).one()
 
     # ── 2. Delayed approvals ──
@@ -163,13 +166,13 @@ def get_enterprise_ai_summary(db: Session) -> dict:
 
     # ── 4. Team performance avg ──
     perf_row = db.query(
-        func.avg(
-            func.extract("epoch", Task.updated_at - Task.created_at) / 86400
-        ).filter(
-            Task.status == "done",
-            Task.updated_at.isnot(None),
-            Task.created_at.isnot(None),
-        ).label("avg_completion_days"),
+        func.avg(case(
+            (and_(
+                Task.status == "done",
+                Task.updated_at.isnot(None),
+                Task.created_at.isnot(None),
+            ), func.TIMESTAMPDIFF(text("SECOND"), Task.created_at, Task.updated_at) / 86400),
+        )).label("avg_completion_days"),
     ).one()
     avg_completion = round(perf_row.avg_completion_days, 1) if perf_row.avg_completion_days else None
 

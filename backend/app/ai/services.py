@@ -571,7 +571,7 @@ class AIService:
             ).count()
             approval_rate = round(approved / total_reqs * 100, 1) if total_reqs > 0 else 0
             avg_wait = self.db.query(
-                func.avg(func.extract("epoch", Approval.updated_at - Approval.created_at) / 3600)
+                func.avg((func.UNIX_TIMESTAMP(Approval.updated_at) - func.UNIX_TIMESTAMP(Approval.created_at)) / 3600)
             ).filter(
                 Approval.requested_by == uid,
                 Approval.status.in_(["approved", "rejected"]),

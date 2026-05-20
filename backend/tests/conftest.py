@@ -11,9 +11,9 @@ from app.core.security import hash_password
 from datetime import datetime
 
 
-TEST_DATABASE_URL = "sqlite:///./test.db"
+TEST_DATABASE_URL = "mysql+pymysql://root:12345@localhost:3306/test_mini_ec_db"
 
-engine = create_engine(TEST_DATABASE_URL, connect_args={"check_same_thread": False})
+engine = create_engine(TEST_DATABASE_URL)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 

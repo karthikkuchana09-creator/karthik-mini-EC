@@ -1,0 +1,10 @@
+2026-05-19 14:14:48 | INFO     | karthik_ec.main                | Application started
+2026-05-19 14:14:48 | INFO     | karthik_ec.ws_manager          | Heartbeat started (interval=25s timeout=10s)
+2026-05-19 14:17:22 | WARNING  | karthik_ec.main                | HTTP 404 on GET /
+2026-05-19 14:17:22 | INFO     | karthik_ec.http                | GET / -> 404 (0.004s)
+INFO:     127.0.0.1:49415 - "GET / HTTP/1.1" 404 Not Found
+2026-05-19 14:17:23 | WARNING  | karthik_ec.main                | HTTP 404 on GET /favicon.ico
+2026-05-19 14:17:23 | INFO     | karthik_ec.http                | GET /favicon.ico -> 404 (0.002s)
+INFO:     127.0.0.1:49415 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+2026-05-19 14:27:57 | INFO     | karthik_ec.ws_manager          | WS connect  user_id=1  role=admin  connections=1
+2026-05-19 14:27:57 | INFO     | karthik_ec.ws_manager          | WS disconnect  user_id=1  remaining_for_user=0  total=0

@@ -51,6 +51,7 @@ api.interceptors.request.use(
 );
 
 let redirectInProgress = false;
+let lastNetworkErrorToast = 0;
 
 api.interceptors.response.use(
   (response) => response,
@@ -106,11 +107,19 @@ api.interceptors.response.use(
     }
 
     if (error.code === 'ECONNABORTED') {
-      toast.error('Request timed out. Please try again.');
+      const now = Date.now();
+      if (now - lastNetworkErrorToast > 10000) {
+        lastNetworkErrorToast = now;
+        toast.error('Request timed out. Please try again.');
+      }
     }
 
     if (!error.response && error.message === 'Network Error') {
-      toast.error('Network error. Please check your connection.');
+      const now = Date.now();
+      if (now - lastNetworkErrorToast > 10000) {
+        lastNetworkErrorToast = now;
+        toast.error('Network error. Please check your connection.');
+      }
     }
 
     return Promise.reject(error);

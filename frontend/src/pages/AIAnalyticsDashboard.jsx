@@ -354,14 +354,19 @@ function RecommendationsSection({ recommendations }) {
 function AIAnalyticsDashboard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
 
   const fetchData = useCallback(async () => {
+    setError(false);
+    setLoading(true);
     try {
       const d = await getAnalyticsDashboard();
       setData(d);
       setLastUpdated(new Date());
-    } catch {}
+    } catch {
+      setError(true);
+    }
     setLoading(false);
   }, []);
 
@@ -395,11 +400,11 @@ function AIAnalyticsDashboard() {
     );
   }
 
-  if (!data) {
+  if (error || !data) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="text-center py-20">
-          <p className="text-gray-400 text-sm">Unable to load analytics data</p>
+          <p className="text-gray-400 text-sm">Unable to load analytics data. Please check your connection.</p>
           <button onClick={fetchData} className="mt-3 px-4 py-2 text-sm font-medium rounded-xl bg-indigo-600 text-white hover:bg-indigo-700">Retry</button>
         </div>
       </div>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { getTeamIntelligence } from '../api/ai';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -48,14 +48,19 @@ function SectionHeader({ title, subtitle, action }) {
 function TeamIntelligence() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [recFilter, setRecFilter] = useState('all');
 
-  useEffect(() => {
+  const fetchData = useCallback(() => {
+    setError(false);
+    setLoading(true);
     getTeamIntelligence()
       .then(setData)
-      .catch(() => {})
+      .catch(() => setError(true))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   const workloadData = useMemo(() => {
     if (!data?.team_workload?.employees) return [];
@@ -118,6 +123,17 @@ function TeamIntelligence() {
       { name: 'Completed Late', value: d.completed_late || 0, color: '#f59e0b' },
     ].filter((x) => x.value > 0);
   }, [data]);
+
+  if (error) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="text-center py-20">
+          <p className="text-gray-400 text-sm">Unable to load team intelligence data. Please check your connection.</p>
+          <button onClick={fetchData} className="mt-3 px-4 py-2 text-sm font-medium rounded-xl bg-indigo-600 text-white hover:bg-indigo-700">Retry</button>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (

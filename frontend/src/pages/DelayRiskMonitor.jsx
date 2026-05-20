@@ -239,6 +239,7 @@ function DelayRiskMonitor() {
   const [rawItems, setRawItems] = useState([]);
   const [stats, setStats] = useState({ total: 0, high_risk: 0, medium_risk: 0, low_risk: 0 });
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
   const [filterLevel, setFilterLevel] = useState('all');
@@ -246,12 +247,15 @@ function DelayRiskMonitor() {
   const [sortBy, setSortBy] = useState('risk');
 
   const fetchData = useCallback(async () => {
+    setError(false);
     try {
       const d = await getDelayRisks();
       setRawItems(d?.items || []);
       setStats({ total: d?.total || 0, high_risk: d?.high_risk || 0, medium_risk: d?.medium_risk || 0, low_risk: d?.low_risk || 0 });
       setLastUpdated(new Date());
-    } catch {}
+    } catch {
+      setError(true);
+    }
     setLoading(false);
   }, []);
 
@@ -279,6 +283,17 @@ function DelayRiskMonitor() {
     const s = new Set(rawItems.map((i) => i.status));
     return ['all', ...Array.from(s)];
   }, [rawItems]);
+
+  if (error) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="text-center py-20">
+          <p className="text-gray-400 text-sm">Unable to load delay risk data. Please check your connection.</p>
+          <button onClick={fetchData} className="mt-3 px-4 py-2 text-sm font-medium rounded-xl bg-indigo-600 text-white hover:bg-indigo-700">Retry</button>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (

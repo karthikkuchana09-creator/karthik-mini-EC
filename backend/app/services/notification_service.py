@@ -13,12 +13,16 @@ logger = get_logger("notification_service")
 
 def _invalidate_notification_cache(user_id: int):
     import asyncio
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
     try:
-        loop.run_until_complete(cache_delete_pattern(f"notifications:unread:{user_id}"))
-    finally:
-        loop.close()
+        loop = asyncio.get_running_loop()
+        asyncio.ensure_future(cache_delete_pattern(f"notifications:unread:{user_id}"))
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            loop.run_until_complete(cache_delete_pattern(f"notifications:unread:{user_id}"))
+        finally:
+            loop.close()
 
 
 def create_notification(
@@ -38,7 +42,7 @@ def create_notification(
 
     logger.info(
         "Notification created: user_id=%d type=%s id=%d",
-        user_id, type.value, notification.id,
+        user_id, type, notification.id,
     )
 
     import asyncio
@@ -150,7 +154,7 @@ def get_notification_stats(db: Session, current_user):
         .group_by(Notification.type)
         .all()
     )
-    by_category = [{"type": row[0].value, "count": row[1]} for row in rows]
+    by_category = [{"type": row[0], "count": row[1]} for row in rows]
 
     return {
         "total": total,
