@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.schemas.approval import ApprovalCreate, ApprovalAction
 from app.api.deps import get_db, rate_limit
 from app.core.rbac import require_permission, Permissions
+from app.core.subscription_access import require_feature
 from app.core.config import settings
 from app.services.approval_service import (
     create_approval,
@@ -20,7 +21,8 @@ def create_approval_endpoint(
     data: ApprovalCreate,
     db: Session = Depends(get_db),
     user=Depends(require_permission(Permissions.approval_create)),
-    _=Depends(rate_limit(settings.RATE_LIMIT_DEFAULT, settings.RATE_LIMIT_DEFAULT_WINDOW, "approvals")),
+    _=Depends(require_feature("approvals")),
+    __=Depends(rate_limit(settings.RATE_LIMIT_DEFAULT, settings.RATE_LIMIT_DEFAULT_WINDOW, "approvals")),
 ):
     return create_approval(db, data, user)
 

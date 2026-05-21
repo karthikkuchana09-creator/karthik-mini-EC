@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.schemas.task import TaskCreate, TaskUpdate, KanbanReorderRequest, TaskStatusChangeRequest
 from app.api.deps import get_db
 from app.core.rbac import require_permission, Permissions
+from app.core.subscription_access import check_create_limit, enforce_usage_limits
 from app.services.task_service import (
     create_task,
     get_tasks,
@@ -25,7 +26,8 @@ router = APIRouter(prefix="/tasks", tags=["Tasks"])
 def create_task_endpoint(
     task: TaskCreate,
     db: Session = Depends(get_db),
-    user=Depends(require_permission(Permissions.task_create))
+    user=Depends(require_permission(Permissions.task_create)),
+    _=Depends(check_create_limit("tasks")),
 ):
     return create_task(db, task, user)
 

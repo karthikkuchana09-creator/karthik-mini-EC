@@ -7,7 +7,7 @@ function GoogleLoginButton() {
     setLoading(true);
     try {
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000'}/auth/google/login`
+        `${import.meta.env.VITE_API_URL || ''}/auth/google/login`
       );
       const data = await response.json();
       if (data.auth_url) {

@@ -41,9 +41,13 @@ function AuditLogs() {
     setLoading(true);
     setError(null);
     try {
-      const params = { page: p, page_size: perPage };
+      const params = { page: p, size: perPage };
+      const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+      params.date_from = threeDaysAgo.toISOString();
       if (entity) params.entity = entity;
+      console.log('[AuditLogs] Fetching with params:', params);
       const data = await getAuditLogs(params);
+      console.log('[AuditLogs] Response:', data);
       const list = Array.isArray(data) ? data : data.items || data.logs || data.results || data.audit_logs || [];
       setLogs(list);
       const totalItems = data.total || data.count || list.length;

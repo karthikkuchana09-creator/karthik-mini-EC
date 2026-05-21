@@ -67,23 +67,10 @@ class InMemoryBackend(CacheBackend):
 
 
 class RedisBackend(CacheBackend):
-    def __init__(self):
-        self._redis = None
-
-    async def _get_redis(self):
-        if self._redis is None:
-            import redis.asyncio as aioredis
-            self._redis = aioredis.from_url(
-                settings.REDIS_URL,
-                encoding="utf-8",
-                decode_responses=True,
-            )
-        return self._redis
-
     async def get(self, key: str) -> Optional[Any]:
         try:
-            r = await self._get_redis()
-            val = await r.get(key)
+            from app.core.redis_client import cache_get as redis_cache_get
+            val = await redis_cache_get(key)
             if val is None:
                 return None
             return json.loads(val)
@@ -93,24 +80,22 @@ class RedisBackend(CacheBackend):
 
     async def set(self, key: str, value: Any, ttl: int) -> None:
         try:
-            r = await self._get_redis()
-            await r.setex(key, ttl, json.dumps(value, default=str))
+            from app.core.redis_client import cache_set as redis_cache_set
+            await redis_cache_set(key, json.dumps(value, default=str), ttl)
         except Exception as e:
             logger.warning("Redis set failed: %s", e)
 
     async def delete(self, key: str) -> None:
         try:
-            r = await self._get_redis()
-            await r.delete(key)
+            from app.core.redis_client import cache_delete as redis_cache_delete
+            await redis_cache_delete(key)
         except Exception as e:
             logger.warning("Redis delete failed: %s", e)
 
     async def delete_pattern(self, pattern: str) -> None:
         try:
-            r = await self._get_redis()
-            keys = await r.keys(pattern)
-            if keys:
-                await r.delete(*keys)
+            from app.core.redis_client import cache_delete_pattern as redis_cache_del_pattern
+            await redis_cache_del_pattern(pattern)
         except Exception as e:
             logger.warning("Redis delete_pattern failed: %s", e)
 

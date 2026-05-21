@@ -7,7 +7,7 @@ import { isTokenExpired, getTokenExpiry } from '../utils/jwt';
 
 const AuthContext = createContext(null);
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+const API_URL = import.meta.env.VITE_API_URL || '';
 
 function getAutoLogoutDelay(token) {
   const exp = getTokenExpiry(token);
@@ -85,11 +85,8 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const handleForceLogout = () => {
-      const savedUser = storage.getUser();
-      if (savedUser || storage.getToken()) {
-        clearAuth();
-        navigate('/login', { replace: true });
-      }
+      clearAuth();
+      navigate('/login', { replace: true });
     };
     window.addEventListener('auth:logout', handleForceLogout);
     return () => window.removeEventListener('auth:logout', handleForceLogout);

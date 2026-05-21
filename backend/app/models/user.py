@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Enum
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Enum, ForeignKey
 from datetime import datetime
 from app.db.base import Base
 from sqlalchemy.orm import relationship
@@ -9,19 +9,27 @@ class UserRole(str, enum.Enum):
     admin = "admin"
     manager = "manager"
     employee = "employee"
-    user = "user" 
+    user = "user"
+
+class SubscriptionRole(str, enum.Enum):
+    owner = "owner"
+    admin = "admin"
+    member = "member"
+    guest = "guest"
 
 
 class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True)
 
     name = Column(String(100), nullable=False)
     email = Column(String(255), unique=True, index=True, nullable=False)
     hashed_password = Column(String(255), nullable=False)
 
     role = Column(Enum(UserRole), default=UserRole.employee, nullable=False)
+    subscription_role = Column(Enum(SubscriptionRole), default=SubscriptionRole.member, nullable=False)
 
     is_active = Column(Boolean, default=True)
 

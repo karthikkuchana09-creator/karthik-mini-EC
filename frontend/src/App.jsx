@@ -29,6 +29,11 @@ const DelayRiskMonitor = lazy(() => import('./pages/DelayRiskMonitor'));
 const EmployeeProductivity = lazy(() => import('./pages/EmployeeProductivity'));
 const TeamIntelligence = lazy(() => import('./pages/TeamIntelligence'));
 const Unauthorized = lazy(() => import('./pages/Unauthorized'));
+const SuperAdminDashboard = lazy(() => import('./pages/SuperAdminDashboard'));
+const OrganizationManagement = lazy(() => import('./pages/OrganizationManagement'));
+const PricingPage = lazy(() => import('./pages/PricingPage'));
+const CreditDashboard = lazy(() => import('./pages/CreditDashboard'));
+const AdminMonitoring = lazy(() => import('./pages/AdminMonitoring'));
 
 function PageLoader() {
   return (
@@ -93,6 +98,11 @@ function AppContent() {
         <Route path="/audit-logs" element={<ProtectedRoute allowedRoles={['admin']}><ErrorBoundary><Suspense fallback={<SkeletonPage />}><AuditLogs /></Suspense></ErrorBoundary></ProtectedRoute>} />
         <Route path="/admin" element={<ProtectedRoute allowedRoles={['admin']}><ErrorBoundary><Suspense fallback={<SkeletonPage />}><Admin /></Suspense></ErrorBoundary></ProtectedRoute>} />
         <Route path="/admin-dashboard" element={<ProtectedRoute allowedRoles={['admin']}><ErrorBoundary><Suspense fallback={<SkeletonPage />}><AdminDashboard /></Suspense></ErrorBoundary></ProtectedRoute>} />
+        <Route path="/super-admin-dashboard" element={<ProtectedRoute allowedRoles={['admin']}><ErrorBoundary><Suspense fallback={<SkeletonPage />}><SuperAdminDashboard /></Suspense></ErrorBoundary></ProtectedRoute>} />
+        <Route path="/organization" element={<ProtectedRoute><ErrorBoundary><Suspense fallback={<SkeletonPage />}><OrganizationManagement /></Suspense></ErrorBoundary></ProtectedRoute>} />
+        <Route path="/pricing" element={<ProtectedRoute><ErrorBoundary><Suspense fallback={<SkeletonPage />}><PricingPage /></Suspense></ErrorBoundary></ProtectedRoute>} />
+        <Route path="/credits" element={<ProtectedRoute><ErrorBoundary><Suspense fallback={<SkeletonPage />}><CreditDashboard /></Suspense></ErrorBoundary></ProtectedRoute>} />
+        <Route path="/admin-monitoring" element={<ProtectedRoute allowedRoles={['admin']}><ErrorBoundary><Suspense fallback={<SkeletonPage />}><AdminMonitoring /></Suspense></ErrorBoundary></ProtectedRoute>} />
         <Route path="/ai-analytics" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><ErrorBoundary><Suspense fallback={<SkeletonPage />}><AIAnalyticsDashboard /></Suspense></ErrorBoundary></ProtectedRoute>} />
         <Route path="/delay-risk-monitor" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><ErrorBoundary><Suspense fallback={<SkeletonPage />}><DelayRiskMonitor /></Suspense></ErrorBoundary></ProtectedRoute>} />
         <Route path="/employee-productivity" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><ErrorBoundary><Suspense fallback={<SkeletonPage />}><EmployeeProductivity /></Suspense></ErrorBoundary></ProtectedRoute>} />

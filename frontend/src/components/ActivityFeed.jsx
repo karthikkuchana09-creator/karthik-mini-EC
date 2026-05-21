@@ -111,7 +111,7 @@ function ActivityFeed({ limit = 10, showViewAll = true, compact = false, realtim
   useEffect(() => {
     const abort = new AbortController();
     setLoading(true);
-    getAuditLogs({ page_size: limit, signal: abort.signal })
+    getAuditLogs({ size: limit, signal: abort.signal })
       .then((data) => {
         const list = Array.isArray(data) ? data : data.items || data.logs || data.results || data.audit_logs || [];
         setActivities(list);

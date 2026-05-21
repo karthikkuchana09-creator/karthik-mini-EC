@@ -33,8 +33,11 @@ function clearAuthTokens() {
   } catch {}
 }
 
+const API_URL = import.meta.env.VITE_API_URL || '';
+console.log('[Axios] VITE_API_URL:', API_URL);
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000',
+  baseURL: API_URL,
   timeout: 30000,
   headers: { 'Content-Type': 'application/json' },
 });
@@ -45,6 +48,7 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    console.log(`[Axios] ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`, { token: token?.slice(0, 20) + '...', params: config.params });
     return config;
   },
   (error) => Promise.reject(error)
@@ -76,7 +80,7 @@ api.interceptors.response.use(
         if (!rt) throw new Error('No refresh token');
 
         const response = await axios.post(
-          `${import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000'}/auth/refresh`,
+          `${import.meta.env.VITE_API_URL || ''}/auth/refresh`,
           { refresh_token: rt }
         );
 

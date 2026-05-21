@@ -1,9 +1,10 @@
 from pydantic import BaseModel, EmailStr, field_validator
-from typing import Literal
+from typing import Literal, Optional
 from app.core.validators import validate_password_strength, validate_safe_name, NAME_MAX_LENGTH
 from app.core.sanitizer import sanitize_name, sanitize_email
 
 UserRole = Literal["admin", "manager", "employee"]
+SubscriptionRole = Literal["owner", "admin", "member", "guest"]
 
 
 class UserCreate(BaseModel):
@@ -11,6 +12,7 @@ class UserCreate(BaseModel):
     email: EmailStr
     password: str
     role: UserRole
+    tenant_id: Optional[int] = None
 
     @field_validator("name", mode="before")
     @classmethod
@@ -42,8 +44,11 @@ class UserOut(BaseModel):
     name: str
     email: str
     role: UserRole
+    tenant_id: Optional[int] = None
+    subscription_role: Optional[str] = "member"
     avatar_url: str | None = None
     auth_provider: str = "email"
+    is_active: bool = True
 
     class Config:
         from_attributes = True

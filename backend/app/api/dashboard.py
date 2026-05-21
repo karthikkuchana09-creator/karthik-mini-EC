@@ -2,6 +2,8 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from app.api.deps import get_db
 from app.core.rbac import require_permission, Permissions
+from app.core.subscription_access import require_feature
+from app.core.credit_access import require_credits, deduct_feature_credits
 from app.services.dashboard_service import (
     get_summary,
     get_task_distribution,
@@ -40,14 +42,22 @@ def approval_stats_endpoint(
 @router.get("/performance")
 def performance_endpoint(
     db: Session = Depends(get_db),
-    user=Depends(require_permission(Permissions.dashboard_performance))
+    user=Depends(require_permission(Permissions.dashboard_performance)),
+    _=Depends(require_feature("analytics")),
+    _credits=Depends(require_credits("analytics_generation")),
 ):
-    return get_performance(db)
+    result = get_performance(db)
+    deduct_feature_credits(db, user, "analytics_generation")
+    return result
 
 
 @router.get("/ai-summary")
 def ai_summary_endpoint(
     db: Session = Depends(get_db),
     user=Depends(require_permission(Permissions.dashboard_ai_summary)),
+    _=Depends(require_feature("analytics")),
+    _credits=Depends(require_credits("ai_summary")),
 ):
-    return get_enterprise_ai_summary(db)
+    result = get_enterprise_ai_summary(db)
+    deduct_feature_credits(db, user, "ai_summary")
+    return result

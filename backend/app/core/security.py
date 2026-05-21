@@ -23,6 +23,32 @@ def create_access_token(data: dict):
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 
+def create_tenant_access_token(
+    user_id: int,
+    role: str,
+    tenant_id: int | None = None,
+    tenant_slug: str | None = None,
+    subscription_role: str | None = None,
+    extra_claims: dict | None = None,
+) -> str:
+    claims = {
+        "user_id": user_id,
+        "role": role,
+        "type": "access_token",
+    }
+    if tenant_id is not None:
+        claims["tenant_id"] = tenant_id
+    if tenant_slug is not None:
+        claims["tenant_slug"] = tenant_slug
+    if subscription_role is not None:
+        claims["subscription_role"] = subscription_role
+    if extra_claims:
+        claims.update(extra_claims)
+    expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    claims["exp"] = expire
+    return jwt.encode(claims, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+
+
 def create_refresh_token():
     raw_token = secrets.token_urlsafe(64)
     token_hash = hashlib.sha256(raw_token.encode()).hexdigest()

@@ -7,6 +7,7 @@ class Comment(Base):
     __tablename__ = "comments"
 
     id = Column(Integer, primary_key=True)
+    tenant_id = Column(Integer, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True)
 
     task_id = Column(Integer, ForeignKey("tasks.id"), index=True)
     user_id = Column(Integer, ForeignKey("users.id"), index=True)

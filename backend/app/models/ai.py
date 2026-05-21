@@ -7,6 +7,7 @@ class AIAnalysis(Base):
     __tablename__ = "ai_analyses"
 
     id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     task_id = Column(Integer, ForeignKey("tasks.id"), nullable=True, index=True)
     prompt = Column(Text, nullable=False)

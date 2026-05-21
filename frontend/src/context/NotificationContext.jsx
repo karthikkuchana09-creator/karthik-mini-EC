@@ -17,7 +17,10 @@ export function NotificationProvider({ children }) {
       const list = Array.isArray(data) ? data : data.items || data.notifications || data.results || [];
       setNotifications(list);
       setUnreadCount(list.filter((n) => !n.is_read).length);
-    } catch {}
+    } catch (err) {
+      if (err.response?.status === 401) throw err;
+      console.error('[Notifications] refresh failed:', err);
+    }
     setLoading(false);
   }, []);
 
@@ -35,8 +38,14 @@ export function NotificationProvider({ children }) {
   useWebSocket({ onMessage: handleWsMessage, types: ['notification'] });
 
   useEffect(() => {
-    refreshNotifications();
-    const interval = setInterval(refreshNotifications, 60000);
+    refreshNotifications().catch((err) => {
+      if (err.response?.status !== 401) console.error('[Notifications] initial refresh failed:', err);
+    });
+    const interval = setInterval(() => {
+      refreshNotifications().catch((err) => {
+        if (err.response?.status !== 401) console.error('[Notifications] poll refresh failed:', err);
+      });
+    }, 60000);
     return () => clearInterval(interval);
   }, [refreshNotifications]);
 
@@ -45,7 +54,10 @@ export function NotificationProvider({ children }) {
       await markNotificationRead(id);
       setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, is_read: true } : n)));
       setUnreadCount((prev) => Math.max(0, prev - 1));
-    } catch {}
+    } catch (err) {
+      if (err.response?.status === 401) throw err;
+      console.error('[Notifications] markAsRead failed:', err);
+    }
   }, []);
 
   const markAllAsRead = useCallback(async () => {
@@ -53,7 +65,10 @@ export function NotificationProvider({ children }) {
       await markAllNotificationsRead();
       setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
       setUnreadCount(0);
-    } catch {}
+    } catch (err) {
+      if (err.response?.status === 401) throw err;
+      console.error('[Notifications] markAllAsRead failed:', err);
+    }
   }, []);
 
   return (

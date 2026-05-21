@@ -4,12 +4,17 @@ from fastapi.responses import RedirectResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from app.schemas.user import UserCreate
-from app.schemas.auth import RefreshRequest, LogoutRequest, ForgotPasswordRequest, ResetPasswordRequest
-from app.api.deps import get_db, get_current_user, rate_limit
+from app.schemas.auth import (
+    RefreshRequest, LogoutRequest, ForgotPasswordRequest, ResetPasswordRequest,
+    OrganizationLoginRequest, OrganizationRegisterRequest,
+)
+from app.api.deps import get_db, get_current_user, rate_limit, get_tenant_db
 from app.core.config import settings
 from app.services.auth_service import (
     register_user,
+    register_org_user,
     login_user,
+    login_org_user,
     refresh_access_token,
     logout_user,
     forgot_password,
@@ -18,6 +23,7 @@ from app.services.auth_service import (
     google_oauth_callback,
     get_current_user_info,
 )
+
 router = APIRouter(prefix="/auth")
 
 
@@ -30,6 +36,15 @@ def register(
     return register_user(db, user)
 
 
+@router.post("/org/register")
+def register_org(
+    data: OrganizationRegisterRequest,
+    db: Session = Depends(get_db),
+    _=Depends(rate_limit(settings.RATE_LIMIT_REGISTER, settings.RATE_LIMIT_REGISTER_WINDOW, "org_register")),
+):
+    return register_org_user(db, data)
+
+
 @router.post("/login")
 def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
@@ -37,6 +52,15 @@ def login(
     _=Depends(rate_limit(settings.RATE_LIMIT_LOGIN, settings.RATE_LIMIT_LOGIN_WINDOW, "login")),
 ):
     return login_user(db, form_data.username, form_data.password)
+
+
+@router.post("/org/login")
+def login_org(
+    body: OrganizationLoginRequest,
+    db: Session = Depends(get_db),
+    _=Depends(rate_limit(settings.RATE_LIMIT_LOGIN, settings.RATE_LIMIT_LOGIN_WINDOW, "org_login")),
+):
+    return login_org_user(db, body.email, body.password, body.tenant_slug)
 
 
 @router.post("/refresh")
@@ -98,4 +122,4 @@ def google_callback(
 
 @router.get("/me")
 def get_me(user=Depends(get_current_user)):
-    return get_current_user_info(user) 
+    return get_current_user_info(user)

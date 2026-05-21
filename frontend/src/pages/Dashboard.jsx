@@ -84,7 +84,10 @@ function NotificationsPanel() {
         const list = Array.isArray(data) ? data : data.items || data.notifications || data.results || [];
         setNotifications(list.slice(0, 5));
       })
-      .catch(() => {})
+      .catch((err) => {
+        if (err.response?.status === 401) throw err;
+        console.error('[Dashboard] NotificationsPanel error:', err);
+      })
       .finally(() => setLoading(false));
   }, []);
 

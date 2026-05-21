@@ -1,3 +1,4 @@
+import json
 import time
 import threading
 from typing import Optional
@@ -6,7 +7,11 @@ from fastapi import HTTPException, Request, status
 from starlette.responses import Response
 
 from app.core.config import settings
+from app.core.log import get_logger
 from app.core.security import decode_token
+
+logger = get_logger("rate_limiter")
+
 
 class SlidingWindowEntry:
     __slots__ = ("count", "window_start")
@@ -20,7 +25,7 @@ class InMemoryBackend:
         self._lock = threading.Lock()
         self._buckets: dict[str, SlidingWindowEntry] = {}
 
-    def check_and_increment(self, key: str, max_requests: int, window_seconds: int) -> tuple[bool, int]:
+    async def check_and_increment(self, key: str, max_requests: int, window_seconds: int) -> tuple[bool, int]:
         now = time.time()
         with self._lock:
             entry = self._buckets.get(key)
@@ -35,7 +40,7 @@ class InMemoryBackend:
 
             return True, 0
 
-    def get_remaining(self, key: str, max_requests: int, window_seconds: int) -> int:
+    async def get_remaining(self, key: str, max_requests: int, window_seconds: int) -> int:
         now = time.time()
         with self._lock:
             entry = self._buckets.get(key)
@@ -45,7 +50,57 @@ class InMemoryBackend:
             return max(remaining, 0)
 
 
+class RedisBackend:
+    def __init__(self):
+        self._local_ttl = 3600
+
+    def _make_redis_key(self, key: str) -> str:
+        return f"ratelimit:{key}"
+
+    async def _get_redis(self):
+        from app.core.redis_client import get_redis
+        return await get_redis()
+
+    async def check_and_increment(self, key: str, max_requests: int, window_seconds: int) -> tuple[bool, int]:
+        try:
+            r = await self._get_redis()
+            if r is None:
+                logger.warning("Redis unavailable, falling back to in-memory rate limit")
+                mem._check_and_increment(key, max_requests, window_seconds) if False else None
+                return True, 0
+            rkey = self._make_redis_key(key)
+            pipe = r.pipeline()
+            pipe.incr(rkey)
+            pipe.expire(rkey, window_seconds)
+            results = await pipe.execute()
+            count = results[0]
+            if count > max_requests:
+                ttl = await r.ttl(rkey)
+                return False, max(int(ttl), 1)
+            return True, 0
+        except Exception as exc:
+            logger.warning("Redis rate limit error: %s", exc)
+            return True, 0
+
+    async def get_remaining(self, key: str, max_requests: int, window_seconds: int) -> int:
+        try:
+            r = await self._get_redis()
+            if r is None:
+                return max_requests
+            rkey = self._make_redis_key(key)
+            count = await r.get(rkey)
+            if count is None:
+                return max_requests
+            remaining = max_requests - int(count)
+            return max(remaining, 0)
+        except Exception as exc:
+            logger.warning("Redis rate limit get_remaining error: %s", exc)
+            return max_requests
+
+
 _backend: Optional[InMemoryBackend] = None
+_redis_backend: Optional[RedisBackend] = None
+_use_redis = False
 
 
 def _get_backend() -> InMemoryBackend:
@@ -53,6 +108,13 @@ def _get_backend() -> InMemoryBackend:
     if _backend is None:
         _backend = InMemoryBackend()
     return _backend
+
+
+def _get_redis_backend() -> RedisBackend:
+    global _redis_backend
+    if _redis_backend is None:
+        _redis_backend = RedisBackend()
+    return _redis_backend
 
 
 def _resolve_client_key(request: Request, prefix: str) -> str:
@@ -77,6 +139,14 @@ class RateLimitMiddleware:
         self.app = app
         self._max_requests = requests
         self._window = window
+        self._use_redis = bool(settings.REDIS_URL)
+
+    async def _check_limit(self, key: str) -> tuple[bool, int]:
+        if self._use_redis:
+            backend = _get_redis_backend()
+            return await backend.check_and_increment(key, self._max_requests, self._window)
+        backend = _get_backend()
+        return await backend.check_and_increment(key, self._max_requests, self._window)
 
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http":
@@ -102,8 +172,7 @@ class RateLimitMiddleware:
                     scope["state"]["user_id"] = payload["user_id"]
 
             key = _resolve_client_key(request, "global")
-            backend = _get_backend()
-            allowed, retry_after = backend.check_and_increment(key, self._max_requests, self._window)
+            allowed, retry_after = await self._check_limit(key)
             if not allowed:
                 response = Response(
                     status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -118,11 +187,16 @@ class RateLimitMiddleware:
 
 
 def rate_limit(requests: int, window: int, prefix: str = "default"):
-    backend = _get_backend()
+    use_redis = bool(settings.REDIS_URL)
 
-    def dependency(request: Request):
+    async def dependency(request: Request):
         key = _resolve_client_key(request, prefix)
-        allowed, retry_after = backend.check_and_increment(key, requests, window)
+        if use_redis:
+            backend = _get_redis_backend()
+            allowed, retry_after = await backend.check_and_increment(key, requests, window)
+        else:
+            backend = _get_backend()
+            allowed, retry_after = await backend.check_and_increment(key, requests, window)
         if not allowed:
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,

@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style>
+  @page { margin: 20mm; size: A4; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 12px; color: #1a1a2e; line-height: 1.5; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #6366f1; }
+  .brand h1 { font-size: 24px; color: #6366f1; margin-bottom: 4px; }
+  .brand p { color: #64748b; font-size: 11px; }
+  .invoice-info { text-align: right; }
+  .invoice-info h2 { font-size: 20px; color: #1e293b; margin-bottom: 4px; }
+  .invoice-info .status { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 11px; font-weight: 600; text-transform: uppercase; }
+  .status-paid { background: #dcfce7; color: #16a34a; }
+  .status-issued { background: #dbeafe; color: #2563eb; }
+  .status-draft { background: #f1f5f9; color: #64748b; }
+  .status-cancelled { background: #fef2f2; color: #dc2626; }
+  .status-refunded { background: #fff7ed; color: #ea580c; }
+  .details { display: flex; justify-content: space-between; margin-bottom: 30px; }
+  .bill-to h3, .dates h3 { font-size: 11px; text-transform: uppercase; color: #64748b; margin-bottom: 6px; letter-spacing: 0.5px; }
+  .bill-to p, .dates p { font-size: 12px; color: #1e293b; }
+  .dates { text-align: right; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+  th { background: #f8fafc; text-align: left; padding: 10px 12px; font-size: 11px; text-transform: uppercase; color: #64748b; letter-spacing: 0.5px; border-bottom: 1px solid #e2e8f0; }
+  td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; font-size: 12px; }
+  .amount-cell { text-align: right; font-weight: 600; }
+  .totals { margin-left: auto; width: 300px; }
+  .totals table { margin-bottom: 0; }
+  .totals td { padding: 6px 12px; border: none; }
+  .totals .label { color: #64748b; }
+  .totals .grand-total td { font-size: 16px; font-weight: 700; color: #1e293b; border-top: 2px solid #6366f1; padding-top: 10px; }
+  .notes-section { margin-top: 30px; padding-top: 20px; border-top: 1px solid #e2e8f0; }
+  .notes-section h3 { font-size: 11px; text-transform: uppercase; color: #64748b; margin-bottom: 6px; }
+  .notes-section p { font-size: 11px; color: #475569; }
+  .gst-breakdown { margin-top: 6px; font-size: 11px; color: #475569; }
+  .footer { margin-top: 30px; text-align: center; font-size: 10px; color: #94a3b8; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="brand">
+    <h1>karthik-EC</h1>
+    <p>Enterprise Cloud Platform</p>
+  </div>
+  <div class="invoice-info">
+    <h2>INVOICE</h2>
+    <p style="margin-bottom:6px">{{ invoice_number }}</p>
+    <span class="status-{{ status }}">{{ status }}</span>
+  </div>
+</div>
+
+<div class="details">
+  <div class="bill-to">
+    <h3>Bill To</h3>
+    <p>{{ billing_name or 'Customer' }}</p>
+    {% if billing_address %}<p>{{ billing_address }}</p>{% endif %}
+    {% if billing_gstin %}<p>GSTIN: {{ billing_gstin }}</p>{% endif %}
+    {% if billing_email %}<p>{{ billing_email }}</p>{% endif %}
+  </div>
+  <div class="dates">
+    <h3>Invoice Details</h3>
+    <p>Issued: {{ issued_date }}</p>
+    <p>Due: {{ due_date or 'Upon Receipt' }}</p>
+    {% if billing_period_start and billing_period_end %}
+    <p style="margin-top:6px;color:#64748b;font-size:11px;">
+      Period: {{ billing_period_start }} - {{ billing_period_end }}
+    </p>
+    {% endif %}
+  </div>
+</div>
+
+<table>
+  <thead>
+    <tr>
+      <th style="width:60%">Description</th>
+      <th style="width:20%" class="amount-cell">Rate</th>
+      <th style="width:20%" class="amount-cell">Amount</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>
+        <strong>{{ description }}</strong>
+        {% if plan_tier %}<br><span style="color:#64748b;font-size:11px;">Plan: {{ plan_tier }} ({{ billing_interval or 'monthly' }})</span>{% endif %}
+        {% if credit_amount %}<br><span style="color:#64748b;font-size:11px;">Credits: {{ credit_amount }}</span>{% endif %}
+      </td>
+      <td class="amount-cell">{{ currency }} {{ amount_display }}</td>
+      <td class="amount-cell">{{ currency }} {{ amount_display }}</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="totals">
+  <table>
+    <tr><td class="label">Subtotal</td><td class="amount-cell">{{ currency }} {{ amount_display }}</td></tr>
+    <tr><td class="label">Tax ({{ tax_pct }}%)</td><td class="amount-cell">{{ currency }} {{ tax_amount_display }}</td></tr>
+    <tr class="grand-total"><td>Total</td><td class="amount-cell">{{ currency }} {{ total_amount_display }}</td></tr>
+  </table>
+  <div class="gst-breakdown">
+    {% if cgst > 0 %}CGST: {{ currency }} {{ cgst_display }}<br>{% endif %}
+    {% if sgst > 0 %}SGST: {{ currency }} {{ sgst_display }}<br>{% endif %}
+    {% if igst > 0 %}IGST: {{ currency }} {{ igst_display }}<br>{% endif %}
+  </div>
+</div>
+
+{% if notes %}
+<div class="notes-section">
+  <h3>Notes</h3>
+  <p>{{ notes }}</p>
+</div>
+{% endif %}
+
+{% if terms %}
+<div class="notes-section">
+  <h3>Terms</h3>
+  <p>{{ terms }}</p>
+</div>
+{% endif %}
+
+<div class="footer">
+  <p>karthik-EC Enterprise Cloud Platform | Thank you for your business!</p>
+  <p>Invoice #{{ invoice_number }} | Generated on {{ generated_at }}</p>
+</div>
+
+</body>
+</html>

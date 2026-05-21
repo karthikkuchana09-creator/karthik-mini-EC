@@ -45,8 +45,44 @@ class Permissions:
     leave_read = "leave:read"
     leave_update = "leave:update"
 
+    organization_read = "organization:read"
+    organization_update = "organization:update"
+    organization_delete = "organization:delete"
+    organization_manage_members = "organization:manage_members"
+    organization_manage_invitations = "organization:manage_invitations"
+
+    subscription_read = "subscription:read"
+    subscription_upgrade = "subscription:upgrade"
+    subscription_cancel = "subscription:cancel"
+    subscription_manage_plans = "subscription:manage_plans"
+
+    billing_read = "billing:read"
+    billing_manage = "billing:manage"
+    billing_analytics = "billing:analytics"
+
+    credit_read = "credit:read"
+    credit_manage = "credit:manage"
+    credit_purchase = "credit:purchase"
+
+    payment_read = "payment:read"
+    payment_create = "payment:create"
+    payment_verify = "payment:verify"
+
+    monitoring_read = "monitoring:read"
+    monitoring_manage = "monitoring:manage"
+    monitoring_scheduler = "monitoring:scheduler"
+
+    super_admin_all = "super_admin:*"
+
+
+ALL_PERMISSIONS = {
+    getattr(Permissions, attr)
+    for attr in dir(Permissions)
+    if not attr.startswith("_")
+}
 
 ROLE_PERMISSIONS = {
+    "super_admin": ALL_PERMISSIONS,
     "admin": {
         Permissions.task_create,
         Permissions.task_read,
@@ -79,6 +115,21 @@ ROLE_PERMISSIONS = {
         Permissions.leave_create,
         Permissions.leave_read,
         Permissions.leave_update,
+        Permissions.organization_read,
+        Permissions.organization_update,
+        Permissions.organization_manage_members,
+        Permissions.organization_manage_invitations,
+        Permissions.subscription_read,
+        Permissions.subscription_upgrade,
+        Permissions.subscription_cancel,
+        Permissions.billing_read,
+        Permissions.billing_analytics,
+        Permissions.credit_read,
+        Permissions.credit_purchase,
+        Permissions.payment_read,
+        Permissions.payment_create,
+        Permissions.payment_verify,
+        Permissions.monitoring_read,
     },
     "manager": {
         Permissions.task_create,

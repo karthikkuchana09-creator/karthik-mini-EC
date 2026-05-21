@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from typing import Optional
 from app.api.deps import get_db
 from app.core.rbac import require_permission, Permissions
+from app.core.subscription_access import require_feature
 from app.services.audit_log_service import (
     get_audit_logs,
     get_audit_log_detail,
@@ -20,6 +21,7 @@ router = APIRouter(prefix="/audit-logs", tags=["Audit Logs"])
 @router.get("/")
 def list_audit_logs_endpoint(
     user_id: Optional[int] = Query(None),
+    _=Depends(require_feature("audit_trail")),
     entity: Optional[str] = Query(None),
     entity_id: Optional[int] = Query(None),
     action: Optional[str] = Query(None),

@@ -8,6 +8,7 @@ class Document(Base):
     __tablename__ = "documents"
 
     id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True)
     file_name = Column(String(255), nullable=False)
     file_path = Column(Text, nullable=False)
     version = Column(Integer, default=1, nullable=False)

@@ -5,6 +5,7 @@ from typing import Optional
 from app.schemas.document import DocumentOut, TaskDocumentsOut
 from app.api.deps import get_db
 from app.core.rbac import require_permission, Permissions
+from app.core.credit_access import require_credits, deduct_feature_credits, get_credit_cost
 from app.services.document_service import (
     upload_document,
     get_documents,
@@ -25,7 +26,12 @@ def upload_document_endpoint(
     db: Session = Depends(get_db),
     user=Depends(require_permission(Permissions.document_upload)),
 ):
-    return upload_document(db, file, user, task_id)
+    result = upload_document(db, file, user, task_id)
+    cost = get_credit_cost("document_upload_per_mb")
+    if cost and file.size:
+        credits_needed = max(1, (file.size // (1024 * 1024)) * cost)
+        deduct_feature_credits(db, user, "document_upload_per_mb")
+    return result
 
 
 @router.get("/")

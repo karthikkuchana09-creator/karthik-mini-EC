@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useRef, useState, useCallback } f
 import { useAuth } from './AuthContext';
 import toast from 'react-hot-toast';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+const API_URL = import.meta.env.VITE_API_URL || '';
 const WS_URL = API_URL.replace('http', 'ws') + '/ws';
 const MAX_RECONNECT_DELAY = 30000;
 const INITIAL_DELAY = 1000;

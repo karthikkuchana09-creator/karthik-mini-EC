@@ -6,6 +6,7 @@ from typing import Any, Optional
 from fastapi import WebSocket
 from app.core.log import get_logger
 from app.websocket.events import BaseEvent, EventType
+from app.websocket.pubsub import ws_pubsub
 
 logger = get_logger("ws_manager")
 
@@ -39,6 +40,49 @@ class ConnectionManager:
     def __init__(self):
         self._connections: dict[int, list[Connection]] = {}
         self._lock = asyncio.Lock()
+
+    def register_pubsub_handlers(self):
+        """Register cross-process pub/sub handlers to forward messages to local connections."""
+        from app.websocket.pubsub import ws_pubsub
+
+        async def _on_broadcast(data: dict):
+            payload = json.dumps(data)
+            async with self._lock:
+                all_conns = [c for cs in self._connections.values() for c in cs]
+            for conn in all_conns:
+                try:
+                    await conn.ws.send_text(payload)
+                    conn.touch()
+                except Exception:
+                    await self._remove_stale(conn)
+
+        async def _on_user_message(user_id: int, data: dict):
+            payload = json.dumps(data)
+            async with self._lock:
+                conns = list(self._connections.get(user_id, []))
+            for conn in conns:
+                try:
+                    await conn.ws.send_text(payload)
+                    conn.touch()
+                except Exception:
+                    await self._remove_stale(conn)
+
+        async def _on_role_message(role: str, data: dict):
+            payload = json.dumps(data)
+            async with self._lock:
+                all_conns = [c for cs in self._connections.values()
+                             for c in cs if c.role == role]
+            for conn in all_conns:
+                try:
+                    await conn.ws.send_text(payload)
+                    conn.touch()
+                except Exception:
+                    await self._remove_stale(conn)
+
+        ws_pubsub.on_broadcast(_on_broadcast)
+        ws_pubsub.on_user_message(_on_user_message)
+        ws_pubsub.on_role_message(_on_role_message)
+        logger.info("WS pub/sub handlers registered on ConnectionManager")
 
     # ------------------------------------------------------------------
     # Public API
@@ -105,6 +149,7 @@ class ConnectionManager:
                 conn.touch()
             except Exception:
                 await self._remove_stale(conn)
+        asyncio.create_task(self._safe_publish(ws_pubsub.publish_user(user_id, event.model_dump())))
 
     async def send_raw(self, user_id: int, data: str | dict):
         if isinstance(data, dict):
@@ -117,6 +162,11 @@ class ConnectionManager:
                 conn.touch()
             except Exception:
                 await self._remove_stale(conn)
+        if isinstance(data, str):
+            try:
+                asyncio.create_task(self._safe_publish(ws_pubsub.publish_user(user_id, {"_raw": data})))
+            except Exception:
+                pass
 
     async def broadcast_event(self, event: BaseEvent):
         payload = event.model_dump_json()
@@ -128,20 +178,21 @@ class ConnectionManager:
                 conn.touch()
             except Exception:
                 await self._remove_stale(conn)
+            asyncio.create_task(self._safe_publish(ws_pubsub.publish_broadcast(event.model_dump())))
 
     async def broadcast_to_role(self, event: BaseEvent, *roles: str):
         payload = event.model_dump_json()
         async with self._lock:
-            all_conns = [
-                c for cs in self._connections.values()
-                for c in cs if c.role in roles
-            ]
+            all_conns = [c for cs in self._connections.values()
+                         for c in cs if c.role in roles]
         for conn in all_conns:
             try:
                 await conn.ws.send_text(payload)
                 conn.touch()
             except Exception:
                 await self._remove_stale(conn)
+        for role in roles:
+                asyncio.create_task(self._safe_publish(ws_pubsub.publish_role(role, event.model_dump())))
 
     async def notify_kanban(self, event_data: dict):
         payload = json.dumps({"type": "kanban", "payload": event_data})
@@ -323,8 +374,16 @@ class ConnectionManager:
                     except Exception:
                         pass
 
+    @staticmethod
+    async def _safe_publish(coro):
+        try:
+            await coro
+        except Exception as exc:
+            logger.debug("Pub/sub publish error: %s", exc)
+
     def start_heartbeat(self):
-        asyncio.ensure_future(self._ping_loop())
+        self.register_pubsub_handlers()
+        asyncio.create_task(self._ping_loop())
         logger.info("Heartbeat started (interval=%ds timeout=%ds)", PING_INTERVAL, PING_TIMEOUT)
 
 

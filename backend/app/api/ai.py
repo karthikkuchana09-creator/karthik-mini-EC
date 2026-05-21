@@ -5,6 +5,8 @@ from app.schemas.ai import AIRequest, AIResponse, AIOut, AISummaryOut, HighPrior
 from app.services.dashboard_service import get_enterprise_ai_summary
 from app.api.deps import get_db
 from app.core.rbac import require_permission, require_role, Permissions
+from app.core.subscription_access import require_feature, require_plan, require_subscription_active
+from app.core.credit_access import require_credits, deduct_feature_credits
 from app.ai import AIService
 from app.core.log import get_logger
 from app.ai.cache import AICacheService
@@ -18,17 +20,22 @@ router = APIRouter(prefix="/ai", tags=["AI"])
 async def analytics_dashboard_endpoint(
     db: Session = Depends(get_db),
     user=Depends(require_permission(Permissions.ai_use)),
+    _=Depends(require_feature("ai_intelligence")),
+    _credits=Depends(require_credits("ai_analytics_dashboard")),
     use_cache: bool = Query(True, description="Use cached response if available"),
 ):
     if use_cache:
-        return await AICacheService.get_or_compute(
+        result = await AICacheService.get_or_compute(
             AICacheService.key("dashboard", "summary"),
             AICacheService.CACHE_TTL["dashboard"],
             _compute_dashboard_summary,
             db, user,
         )
+    else:
+        result = _compute_dashboard_summary(db, user)
 
-    return _compute_dashboard_summary(db, user)
+    deduct_feature_credits(db, user, "ai_analytics_dashboard")
+    return result
 
 
 def _compute_dashboard_summary(db: Session, user) -> dict:
@@ -98,32 +105,47 @@ def suggest_endpoint(
     request: AIRequest,
     db: Session = Depends(get_db),
     user=Depends(require_permission(Permissions.ai_use)),
+    _=Depends(require_feature("ai_intelligence")),
+    _credits=Depends(require_credits("ai_suggestion")),
 ):
-    return AIService(db).generate_suggestion(request, user)
+    result = AIService(db).generate_suggestion(request, user)
+    deduct_feature_credits(db, user, "ai_suggestion")
+    return result
 
 
 @router.get("/summary", response_model=AISummaryOut)
 def summary_endpoint(
     db: Session = Depends(get_db),
     user=Depends(require_permission(Permissions.ai_use)),
+    _=Depends(require_feature("ai_intelligence")),
+    _credits=Depends(require_credits("ai_summary")),
 ):
-    return AIService(db).generate_summary(user)
+    result = AIService(db).generate_summary(user)
+    deduct_feature_credits(db, user, "ai_summary")
+    return result
 
 
 @router.get("/recommendations", response_model=RecommendationsOut)
 def recommendations_endpoint(
     db: Session = Depends(get_db),
     user=Depends(require_permission(Permissions.ai_use)),
+    _=Depends(require_feature("ai_intelligence")),
+    _credits=Depends(require_credits("ai_recommendation")),
 ):
-    return AIService(db).get_recommendations()
+    result = AIService(db).get_recommendations()
+    deduct_feature_credits(db, user, "ai_recommendation")
+    return result
 
 
 @router.get("/high-priority-tasks", response_model=HighPriorityTasksOut)
 def high_priority_tasks_endpoint(
     db: Session = Depends(get_db),
     user=Depends(require_permission(Permissions.ai_use)),
+    _=Depends(require_feature("ai_intelligence")),
+    _credits=Depends(require_credits("ai_high_priority")),
 ):
     tasks = AIService(db).get_high_priority_tasks(user)
+    deduct_feature_credits(db, user, "ai_high_priority")
     counts = {"critical": 0, "high": 0, "medium": 0, "low": 0}
     for t in tasks:
         level = t["urgency_level"]
@@ -143,35 +165,50 @@ def recommend_assignment_endpoint(
     request: AssignmentRecommendRequest,
     db: Session = Depends(get_db),
     user=Depends(require_permission(Permissions.ai_use)),
+    _=Depends(require_feature("ai_intelligence")),
+    _credits=Depends(require_credits("ai_assignment_recommend")),
 ):
-    return AIService(db).recommend_assignment(
+    result = AIService(db).recommend_assignment(
         priority=request.priority,
         exclude_user_id=request.exclude_user_id,
     )
+    deduct_feature_credits(db, user, "ai_assignment_recommend")
+    return result
 
 
 @router.get("/performance-analytics", response_model=PerformanceAnalyticsOut)
 def performance_analytics_endpoint(
     db: Session = Depends(get_db),
     user=Depends(require_permission(Permissions.ai_use)),
+    _=Depends(require_feature("ai_intelligence")),
+    _credits=Depends(require_credits("ai_performance_analytics")),
 ):
-    return AIService(db).get_performance_analytics()
+    result = AIService(db).get_performance_analytics()
+    deduct_feature_credits(db, user, "ai_performance_analytics")
+    return result
 
 
 @router.get("/workload-analysis", response_model=WorkloadAnalysisOut)
 def workload_analysis_endpoint(
     db: Session = Depends(get_db),
     user=Depends(require_permission(Permissions.ai_use)),
+    _=Depends(require_feature("ai_intelligence")),
+    _credits=Depends(require_credits("ai_workload_analysis")),
 ):
-    return AIService(db).get_workload_analysis()
+    result = AIService(db).get_workload_analysis()
+    deduct_feature_credits(db, user, "ai_workload_analysis")
+    return result
 
 
 @router.get("/delay-risks", response_model=DelayRiskOut)
 def delay_risks_endpoint(
     db: Session = Depends(get_db),
     user=Depends(require_permission(Permissions.ai_use)),
+    _=Depends(require_feature("ai_intelligence")),
+    _credits=Depends(require_credits("ai_delay_prediction")),
 ):
     items = AIService(db).get_delay_risks(user)
+    deduct_feature_credits(db, user, "ai_delay_prediction")
     counts = {"high_risk": 0, "medium_risk": 0, "low_risk": 0}
     for it in items:
         key = f"{it['risk_level']}_risk"
@@ -189,16 +226,24 @@ def delay_risks_endpoint(
 def employee_productivity_endpoint(
     db: Session = Depends(get_db),
     user=Depends(require_permission(Permissions.ai_use)),
+    _=Depends(require_feature("ai_intelligence")),
+    _credits=Depends(require_credits("ai_employee_productivity")),
 ):
-    return AIService(db).get_employee_productivity()
+    result = AIService(db).get_employee_productivity()
+    deduct_feature_credits(db, user, "ai_employee_productivity")
+    return result
 
 
 @router.get("/team-intelligence")
 def team_intelligence_endpoint(
     db: Session = Depends(get_db),
     user=Depends(require_permission(Permissions.ai_use)),
+    _=Depends(require_feature("ai_intelligence")),
+    _credits=Depends(require_credits("ai_team_intelligence")),
 ):
-    return AIService(db).get_team_intelligence()
+    result = AIService(db).get_team_intelligence()
+    deduct_feature_credits(db, user, "ai_team_intelligence")
+    return result
 
 
 @router.get("/history", response_model=list[AIOut])
@@ -207,8 +252,11 @@ def history_endpoint(
     limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
     user=Depends(require_permission(Permissions.ai_use)),
+    _credits=Depends(require_credits("ai_history")),
 ):
-    return AIService(db).get_history(user, skip, limit)
+    result = AIService(db).get_history(user, skip, limit)
+    deduct_feature_credits(db, user, "ai_history")
+    return result
 
 
 @router.get("/cache/status")

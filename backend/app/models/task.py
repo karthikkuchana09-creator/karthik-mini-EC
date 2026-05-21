@@ -8,6 +8,7 @@ class Task(Base):
     __tablename__ = "tasks"
 
     id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True)
     title = Column(String(255))
     description = Column(Text)
     status = Column(String(50), default="todo", index=True)

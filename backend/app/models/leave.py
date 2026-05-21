@@ -7,6 +7,7 @@ class Leave(Base):
     __tablename__ = "leaves"
 
     id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     leave_type = Column(String(50), nullable=False)
     start_date = Column(Date, nullable=False)

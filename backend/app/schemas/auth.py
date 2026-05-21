@@ -1,4 +1,5 @@
 from pydantic import BaseModel, EmailStr, field_validator
+from typing import Optional
 from app.core.validators import validate_password_strength, string_length
 from app.core.sanitizer import sanitize_email
 
@@ -8,6 +9,7 @@ class TokenResponse(BaseModel):
     refresh_token: str
     token_type: str = "bearer"
     user: dict
+    tenant: Optional[dict] = None
 
 
 class RefreshRequest(BaseModel):
@@ -18,6 +20,7 @@ class RefreshResponse(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
+    tenant: Optional[dict] = None
 
 
 class LogoutRequest(BaseModel):
@@ -33,6 +36,41 @@ class LoginResponse(BaseModel):
     refresh_token: str
     token_type: str = "bearer"
     user: dict
+    tenant: Optional[dict] = None
+
+
+class OrganizationLoginRequest(BaseModel):
+    email: str
+    password: str
+    tenant_slug: Optional[str] = None
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def clean_email(cls, v):
+        if isinstance(v, str):
+            return sanitize_email(v)
+        return v
+
+
+class OrganizationRegisterRequest(BaseModel):
+    name: str
+    email: EmailStr
+    password: str
+    role: str = "employee"
+    org_name: str
+    org_slug: str
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def clean_email(cls, v):
+        if isinstance(v, str):
+            return sanitize_email(v)
+        return v
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, v):
+        return validate_password_strength(v)
 
 
 class ForgotPasswordRequest(BaseModel):
