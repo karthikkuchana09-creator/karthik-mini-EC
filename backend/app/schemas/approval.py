@@ -1,5 +1,6 @@
 from pydantic import BaseModel, field_validator
 from typing import Optional
+from datetime import datetime
 from app.core.validators import string_length, TITLE_MAX_LENGTH, DESCRIPTION_MAX_LENGTH, validate_safe_text
 from app.core.sanitizer import sanitize_text
 
@@ -52,3 +53,17 @@ class ApprovalAction(BaseModel):
         if v:
             return validate_safe_text(v)
         return v
+
+
+class ApprovalOut(BaseModel):
+    id: int
+    title: str
+    description: Optional[str] = None
+    requested_by: int
+    status: str
+    current_level: str
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True

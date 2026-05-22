@@ -80,8 +80,8 @@ _register("task_comments", "basic", "Task Comments",
           "Internal and external comments on tasks")
 _register("leave_management", "basic", "Leave Management",
           "Leave requests and approval tracking")
-_register("user_management", "silver", "User Management",
-          "Bulk user operations and role management")
+_register("user_management", "basic", "User Management",
+          "User listing and management")
 _register("data_export", "silver", "Data Export",
           "Export data in CSV, JSON, and PDF formats")
 _register("performance_analytics", "gold", "Performance Analytics",

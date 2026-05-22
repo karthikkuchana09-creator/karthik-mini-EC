@@ -1,27 +1,25 @@
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
+from fastapi_pagination import Page
 from app.api.deps import get_db, get_current_user
-from app.core.tenant import require_tenant, tenant_filter
 from app.models.user import User
-from app.models.organization import Organization
 from app.schemas.organization import (
     OrganizationCreate, OrganizationUpdate, OrganizationResponse,
     OrganizationSettingsUpdate, OrganizationSettingsResponse,
     InviteCreate, InviteResponse, TenantRegisterResponse,
 )
+from app.repository.organization_repository import list_all_organizations
 from app.services import organization_service as svc
 
 router = APIRouter(prefix="/organizations", tags=["Organizations"])
 
-@router.get("/", response_model=list[OrganizationResponse])
+@router.get("", response_model=Page[OrganizationResponse])
 def list_organizations(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
     tenant_id = user.tenant_id
-    query = db.query(Organization)
-    query = tenant_filter(query, Organization, tenant_id)
-    return query.all()
+    return list_all_organizations(db, tenant_id=tenant_id)
 
 @router.post("/register", response_model=TenantRegisterResponse)
 def register_organization(

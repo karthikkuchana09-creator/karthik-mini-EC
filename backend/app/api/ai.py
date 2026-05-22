@@ -1,11 +1,11 @@
-import asyncio
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
+from fastapi_pagination import Page
 from app.schemas.ai import AIRequest, AIResponse, AIOut, AISummaryOut, HighPriorityTasksOut, DelayRiskOut, AssignmentRecommendRequest, AssignmentRecommendOut, WorkloadAnalysisOut, PerformanceAnalyticsOut, RecommendationsOut, EmployeeProductivityOut
 from app.services.dashboard_service import get_enterprise_ai_summary
 from app.api.deps import get_db
 from app.core.rbac import require_permission, require_role, Permissions
-from app.core.subscription_access import require_feature, require_plan, require_subscription_active
+from app.core.subscription_access import require_feature
 from app.core.credit_access import require_credits, deduct_feature_credits
 from app.ai import AIService
 from app.core.log import get_logger
@@ -246,15 +246,14 @@ def team_intelligence_endpoint(
     return result
 
 
-@router.get("/history", response_model=list[AIOut])
+@router.get("/history", response_model=Page[AIOut])
 def history_endpoint(
-    skip: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
     user=Depends(require_permission(Permissions.ai_use)),
     _credits=Depends(require_credits("ai_history")),
 ):
-    result = AIService(db).get_history(user, skip, limit)
+    from app.repository.ai_repository import list_ai_history
+    result = list_ai_history(db, user.id)
     deduct_feature_credits(db, user, "ai_history")
     return result
 

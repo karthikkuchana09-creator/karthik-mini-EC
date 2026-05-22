@@ -1,8 +1,11 @@
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
+from fastapi_pagination import Page
 from app.api.deps import get_db, get_current_user
 from app.core.tenant import get_current_tenant_id, require_active_tenant
 from app.models.user import User
+from app.schemas.credit import CreditTransactionOut
+from app.repository.credit_repository import list_credit_transactions
 from app.services.credit_service import CreditService, CREDIT_COSTS, PLAN_CREDIT_ALLOCATIONS
 from app.core.log import get_logger
 
@@ -25,37 +28,15 @@ def get_credit_balance(
     return summary
 
 
-@router.get("/transactions")
+@router.get("/transactions", response_model=Page[CreditTransactionOut])
 def get_credit_transactions(
     request: Request,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
-    page: int = Query(1, ge=1),
-    size: int = Query(20, ge=1, le=100),
     feature: str = Query(None),
 ):
     org_id = _get_org_id(request, user)
-    skip = (page - 1) * size
-    transactions = CreditService.get_transactions(db, org_id, skip=skip, limit=size, feature=feature)
-    return {
-        "items": [
-            {
-                "id": t.id,
-                "feature": t.feature,
-                "transaction_type": t.transaction_type,
-                "credits_used": t.credits_used,
-                "balance_before": t.balance_before,
-                "balance_after": t.balance_after,
-                "description": t.description,
-                "reference_type": t.reference_type,
-                "reference_id": t.reference_id,
-                "created_at": t.created_at.isoformat() if t.created_at else None,
-            }
-            for t in transactions
-        ],
-        "page": page,
-        "size": size,
-    }
+    return list_credit_transactions(db, org_id, feature=feature)
 
 
 @router.post("/purchase")

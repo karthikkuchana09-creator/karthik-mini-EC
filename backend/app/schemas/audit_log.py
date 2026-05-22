@@ -1,4 +1,5 @@
-from pydantic import BaseModel, Field
+import json
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 from typing import Optional, Any
 from datetime import datetime
 
@@ -10,6 +11,8 @@ class AuditLogUser(BaseModel):
 
 
 class AuditLogOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
     id: int
     user_id: Optional[int]
     user: Optional[AuditLogUser]
@@ -18,9 +21,19 @@ class AuditLogOut(BaseModel):
     entity_id: Optional[int]
     old_value: Optional[Any] = None
     new_value: Optional[Any] = None
-    metadata: Optional[dict] = None
+    metadata: Optional[dict] = Field(None, validation_alias="metadata_json")
     ip_address: Optional[str] = None
-    timestamp: str
+    timestamp: datetime
+
+    @field_validator("metadata", mode="before")
+    @classmethod
+    def parse_metadata_json(cls, v):
+        if isinstance(v, str):
+            try:
+                return json.loads(v)
+            except (json.JSONDecodeError, TypeError):
+                return None
+        return v
 
 
 class AuditLogPaginated(BaseModel):
@@ -32,6 +45,8 @@ class AuditLogPaginated(BaseModel):
 
 
 class AuditLogDetail(BaseModel):
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
     id: int
     user_id: Optional[int]
     user: Optional[AuditLogUser]
@@ -40,10 +55,20 @@ class AuditLogDetail(BaseModel):
     entity_id: Optional[int]
     old_value: Optional[Any] = None
     new_value: Optional[Any] = None
-    metadata: Optional[dict] = None
+    metadata: Optional[dict] = Field(None, validation_alias="metadata_json")
     ip_address: Optional[str] = None
-    timestamp: str
+    timestamp: datetime
     is_immutable: bool = True
+
+    @field_validator("metadata", mode="before")
+    @classmethod
+    def parse_metadata_json(cls, v):
+        if isinstance(v, str):
+            try:
+                return json.loads(v)
+            except (json.JSONDecodeError, TypeError):
+                return None
+        return v
 
 
 class ActionCount(BaseModel):

@@ -1,7 +1,14 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
+from fastapi_pagination import Page
 from app.api.deps import get_db, get_current_user
 from app.models.user import User
+from app.schemas.organization import OrganizationResponse
+from app.repository.super_admin_repository import (
+    list_all_orgs_for_admin,
+    list_all_subs_for_admin,
+    list_all_users_for_admin,
+)
 from app.services.super_admin_service import SuperAdminService
 from app.core.log import get_logger
 from fastapi import HTTPException, status
@@ -28,13 +35,13 @@ def get_dashboard(
     return SuperAdminService.get_comprehensive_dashboard(db)
 
 
-@router.get("/organizations")
+@router.get("/organizations", response_model=Page[OrganizationResponse])
 def get_org_overview(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
     _require_super_admin(user)
-    return SuperAdminService.get_org_overview(db)
+    return list_all_orgs_for_admin(db)
 
 
 @router.get("/organizations/signups")
@@ -81,7 +88,7 @@ def get_subscriptions(
     user: User = Depends(get_current_user),
 ):
     _require_super_admin(user)
-    return SuperAdminService.get_subscription_overview(db)
+    return list_all_subs_for_admin(db)
 
 
 @router.get("/users")
@@ -90,7 +97,7 @@ def get_users(
     user: User = Depends(get_current_user),
 ):
     _require_super_admin(user)
-    return SuperAdminService.get_user_overview(db)
+    return list_all_users_for_admin(db)
 
 
 @router.get("/users/trend")

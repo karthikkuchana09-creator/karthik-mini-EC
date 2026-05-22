@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
+from fastapi_pagination import Page
 from app.api.deps import get_db, get_current_user
 from app.core.tenant import get_current_tenant_id, require_active_tenant
 from app.models.user import User
@@ -7,9 +8,10 @@ from app.schemas.payment import (
     CreateOrderRequest, CreateOrderResponse,
     VerifyPaymentRequest, VerifyPaymentResponse,
     CreateSubscriptionRequest, CreateSubscriptionResponse,
-    PaymentHistoryResponse, PaymentHistoryItem,
-    InvoiceListResponse, InvoiceItem,
+    PaymentHistoryItem,
+    InvoiceItem,
 )
+from app.repository.payment_repository import list_payments, list_razorpay_invoices
 from app.services.razorpay_service import RazorpayService, PAYMENT_AMOUNTS, CREDIT_PRICES
 from app.services.subscription_service import SubscriptionService
 from app.core.log import get_logger
@@ -80,32 +82,26 @@ def create_subscription(
     return result
 
 
-@router.get("/history", response_model=PaymentHistoryResponse)
+@router.get("/history", response_model=Page[PaymentHistoryItem])
 def get_payment_history(
     request: Request,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
-    page: int = Query(1, ge=1),
-    size: int = Query(20, ge=1, le=100),
 ):
     """Get payment history for the organization."""
     org_id = _get_org_id(request, user)
-    skip = (page - 1) * size
-    return RazorpayService.get_payment_history(db, org_id, skip=skip, limit=size)
+    return list_payments(db, org_id)
 
 
-@router.get("/invoices", response_model=InvoiceListResponse)
+@router.get("/invoices", response_model=Page[InvoiceItem])
 def get_invoices(
     request: Request,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
-    page: int = Query(1, ge=1),
-    size: int = Query(20, ge=1, le=100),
 ):
     """Get invoice history for the organization."""
     org_id = _get_org_id(request, user)
-    skip = (page - 1) * size
-    return RazorpayService.get_invoices(db, org_id, skip=skip, limit=size)
+    return list_razorpay_invoices(db, org_id)
 
 
 @router.get("/pricing")

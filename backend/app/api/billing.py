@@ -2,16 +2,16 @@ import os
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import HTMLResponse, FileResponse
 from sqlalchemy.orm import Session
+from fastapi_pagination import Page
 from app.api.deps import get_db, get_current_user
 from app.core.tenant import get_current_tenant_id, require_active_tenant
 from app.models.user import User
 from app.schemas.invoice import (
-    InvoiceResponse, InvoiceListResponse,
-    FailedPaymentListResponse, FailedPaymentResponse,
+    InvoiceResponse, FailedPaymentResponse,
     BillingAnalyticsResponse, RevenueSummary,
-    RevenueByPeriodItem, RevenueByPlanItem,
     GenerateInvoiceRequest, CancelInvoiceRequest,
 )
+from app.repository.billing_repository import list_invoices as repo_list_invoices, list_failed_payments as repo_list_failed_payments
 from app.services.invoice_service import InvoiceService
 from app.services.billing_analytics_service import BillingAnalyticsService
 from app.core.log import get_logger
@@ -24,18 +24,15 @@ def _get_org_id(request: Request, user: User) -> int:
     return user.tenant_id or get_current_tenant_id(request) or require_active_tenant(request)
 
 
-@router.get("/invoices", response_model=InvoiceListResponse)
+@router.get("/invoices", response_model=Page[InvoiceResponse])
 def list_invoices(
     request: Request,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
-    page: int = Query(1, ge=1),
-    size: int = Query(20, ge=1, le=100),
     status: str = Query(None),
 ):
     org_id = _get_org_id(request, user)
-    skip = (page - 1) * size
-    return InvoiceService.list_invoices(db, org_id, skip=skip, limit=size, status=status)
+    return repo_list_invoices(db, org_id, status=status)
 
 
 @router.get("/invoices/{invoice_id}", response_model=InvoiceResponse)
@@ -176,17 +173,14 @@ def get_revenue_summary(
     return BillingAnalyticsService.get_revenue_summary(db, org_id)
 
 
-@router.get("/failed-payments", response_model=FailedPaymentListResponse)
+@router.get("/failed-payments", response_model=Page[FailedPaymentResponse])
 def get_failed_payments(
     request: Request,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
-    page: int = Query(1, ge=1),
-    size: int = Query(20, ge=1, le=100),
 ):
     org_id = _get_org_id(request, user)
-    skip = (page - 1) * size
-    return InvoiceService.get_failed_payments(db, org_id, skip=skip, limit=size)
+    return repo_list_failed_payments(db, org_id)
 
 
 @router.post("/failed-payments/{log_id}/resolve")

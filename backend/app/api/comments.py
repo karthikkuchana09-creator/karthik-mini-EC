@@ -1,11 +1,12 @@
-from typing import Optional
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
+from fastapi_pagination import Page
 from app.schemas.comment import CommentCreate, CommentOut
 from app.api.deps import get_db, rate_limit
 from app.core.rbac import require_permission, Permissions
 from app.core.config import settings
-from app.services.comment_service import add_comment, get_comments, delete_all_comments
+from app.repository.comment_repository import list_comments_by_task
+from app.services.comment_service import add_comment, delete_all_comments
 
 router = APIRouter(prefix="/tasks")
 
@@ -21,16 +22,14 @@ def add_comment_endpoint(
     return add_comment(db, task_id, data, user)
 
 
-@router.get("/{task_id}/comments", response_model=list[CommentOut])
+@router.get("/{task_id}/comments", response_model=Page[CommentOut])
 def get_comments_endpoint(
     task_id: int,
     db: Session = Depends(get_db),
     user=Depends(require_permission(Permissions.comment_read)),
     _=Depends(rate_limit(settings.RATE_LIMIT_DEFAULT, settings.RATE_LIMIT_DEFAULT_WINDOW, "comment_read")),
-    page: int = Query(1, ge=1),
-    size: int = Query(50, ge=1, le=200),
 ):
-    return get_comments(db, task_id, user, page=page, size=size)
+    return list_comments_by_task(db, task_id)
 
 
 @router.delete("/{task_id}/comments")

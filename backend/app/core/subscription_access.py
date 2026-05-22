@@ -24,7 +24,7 @@ class require_feature:
     def __init__(self, feature: str):
         self.feature = feature
 
-    async def __call__(
+    def __call__(
         self,
         request: Request,
         db: Session = Depends(get_db),

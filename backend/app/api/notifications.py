@@ -1,17 +1,16 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
+from fastapi_pagination import Page
 from app.schemas.notification import (
     NotificationOut,
-    NotificationList,
     UnreadCount,
     NotificationStats,
     BulkReadRequest,
-    NotificationCategory,
 )
 from app.api.deps import get_db
 from app.core.rbac import require_permission, Permissions
+from app.repository.notification_repository import list_notifications_for_user
 from app.services.notification_service import (
-    get_notifications,
     get_unread_count,
     get_notification_stats,
     mark_as_read,
@@ -22,16 +21,14 @@ from app.services.notification_service import (
 router = APIRouter(prefix="/notifications", tags=["Notifications"])
 
 
-@router.get("/", response_model=NotificationList)
+@router.get("", response_model=Page[NotificationOut])
 def list_notifications_endpoint(
     unread_only: bool = Query(False),
     category: str | None = Query(None),
-    page: int = Query(1, ge=1),
-    size: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
     user=Depends(require_permission(Permissions.notification_read)),
 ):
-    return get_notifications(db, user, unread_only=unread_only, category=category, page=page, size=size)
+    return list_notifications_for_user(db, user.id, unread_only=unread_only, category=category)
 
 
 @router.get("/unread-count", response_model=UnreadCount)

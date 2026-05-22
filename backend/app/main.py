@@ -3,6 +3,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from fastapi_pagination import add_pagination
 from app.api import auth, tasks, users, comments, approvals, dashboard, documents, audit_logs, notifications, ai, leaves, organizations, subscription, credits, usage, payments, webhooks, billing, super_admin, monitoring
 from app.websocket.routes import router as ws_router
 from app.websocket.manager import manager
@@ -107,4 +108,5 @@ app.include_router(billing.router)
 app.include_router(super_admin.router)
 app.include_router(monitoring.router)
 
+add_pagination(app)
 logger.info("Application started")

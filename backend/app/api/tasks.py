@@ -1,13 +1,12 @@
-from typing import Optional
-from fastapi import APIRouter, Depends, Query, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
-from app.schemas.task import TaskCreate, TaskUpdate, KanbanReorderRequest, TaskStatusChangeRequest
-from app.api.deps import get_db
+from fastapi_pagination import Page
+from app.schemas.task import TaskCreate, TaskUpdate, TaskOut, KanbanReorderRequest, TaskStatusChangeRequest
+from app.api.deps import get_db, get_current_user
 from app.core.rbac import require_permission, Permissions
-from app.core.subscription_access import check_create_limit, enforce_usage_limits
+from app.core.subscription_access import check_create_limit
 from app.services.task_service import (
     create_task,
-    get_tasks,
     get_kanban_view,
     get_task_by_id,
     update_task,
@@ -15,6 +14,7 @@ from app.services.task_service import (
     assign_task,
     update_task_status,
 )
+from app.repository.task_repository import list_all_tasks
 from app.models.task import Task
 from app.websocket.manager import manager
 from app.websocket.kanban import build_kanban_task_data, KanbanAction, detect_conflict
@@ -22,7 +22,7 @@ from app.websocket.kanban import build_kanban_task_data, KanbanAction, detect_co
 router = APIRouter(prefix="/tasks", tags=["Tasks"])
 
 
-@router.post("/")
+@router.post("")
 def create_task_endpoint(
     task: TaskCreate,
     db: Session = Depends(get_db),
@@ -32,17 +32,12 @@ def create_task_endpoint(
     return create_task(db, task, user)
 
 
-@router.get("/")
-def get_tasks_endpoint(
+@router.get("", response_model=Page[TaskOut])
+def list_tasks(
     db: Session = Depends(get_db),
-    user=Depends(require_permission(Permissions.task_read)),
-    page: int = Query(1, ge=1),
-    size: int = Query(20, ge=1, le=100),
-    sort_by: Optional[str] = Query(None),
-    sort_order: str = Query("desc"),
-    search: Optional[str] = Query(None),
+    user=Depends(get_current_user),
 ):
-    return get_tasks(db, user, page=page, size=size, sort_by=sort_by, sort_order=sort_order, search=search)
+    return list_all_tasks(db)
 
 
 @router.get("/kanban")

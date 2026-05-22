@@ -302,7 +302,15 @@ class SubscriptionService:
             "priority_support": plan.has_priority_support,
             "sla": plan.has_sla,
         }
-        return feature_map.get(feature, False)
+        result = feature_map.get(feature)
+        if result is not None:
+            return result
+        from app.core.feature_registry import FeatureRegistry, TIER_ORDER
+        current_tier = plan.tier.value if hasattr(plan.tier, "value") else plan.tier
+        feature_def = FeatureRegistry.get(feature)
+        if feature_def:
+            return TIER_ORDER.get(current_tier, 0) >= feature_def.required_level
+        return False
 
     @staticmethod
     def get_usage_counts(db: Session, org_id: int) -> dict:

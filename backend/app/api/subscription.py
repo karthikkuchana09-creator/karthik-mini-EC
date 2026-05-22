@@ -1,11 +1,11 @@
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
-from app.api.deps import get_db, get_current_user, require_tenant_access
-from app.core.tenant import get_current_tenant_id, require_active_tenant
+from fastapi_pagination import Page
+from app.api.deps import get_db, get_current_user
+from app.core.tenant import require_active_tenant
 from app.models.user import User
 from app.schemas.subscription import (
     SubscriptionPlanResponse,
-    TenantSubscriptionResponse,
     SubscriptionUpgradeRequest,
     SubscriptionUpgradeResponse,
     SubscriptionCancelRequest,
@@ -13,6 +13,7 @@ from app.schemas.subscription import (
     BillingHistoryResponse,
     FeatureAccessResponse,
 )
+from app.repository.subscription_repository import list_all_plans, list_billing_history
 from app.services.subscription_service import SubscriptionService
 from app.services.usage_analytics_service import UsageAnalyticsService
 from app.core.log import get_logger
@@ -21,12 +22,12 @@ logger = get_logger("subscription_api")
 router = APIRouter(prefix="/subscription", tags=["Subscription"])
 
 
-@router.get("/plans", response_model=list[SubscriptionPlanResponse])
+@router.get("/plans", response_model=Page[SubscriptionPlanResponse])
 def list_plans(
     db: Session = Depends(get_db),
 ):
     """List all available subscription plans with features and pricing."""
-    return SubscriptionService.list_plans(db)
+    return list_all_plans(db)
 
 
 @router.get("/plans/{tier}", response_model=SubscriptionPlanResponse)
@@ -90,18 +91,15 @@ def cancel_subscription(
     )
 
 
-@router.get("/billing", response_model=list[BillingHistoryResponse])
+@router.get("/billing", response_model=Page[BillingHistoryResponse])
 def get_billing_history(
     request: Request,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
-    page: int = Query(1, ge=1),
-    size: int = Query(20, ge=1, le=100),
 ):
     """Get billing history for the organization."""
     org_id = user.tenant_id or require_active_tenant(request)
-    skip = (page - 1) * size
-    return SubscriptionService.get_billing_history(db, org_id, skip=skip, limit=size)
+    return list_billing_history(db, org_id)
 
 
 @router.get("/features", response_model=FeatureAccessResponse)
@@ -144,7 +142,6 @@ def refresh_subscription_status(
     org_id = user.tenant_id or require_active_tenant(request)
     sub = SubscriptionService.get_or_create_subscription(db, org_id)
     if sub.is_expired and sub.status.value == "active":
-        from datetime import datetime
         sub.status = "expired"
         db.commit()
         return {"status": "expired", "message": "Subscription has expired. Please renew."}

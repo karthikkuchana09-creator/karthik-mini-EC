@@ -1,14 +1,14 @@
 from fastapi import APIRouter, Depends, UploadFile, File, Form, Query
-from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from typing import Optional
+from fastapi_pagination import Page
 from app.schemas.document import DocumentOut, TaskDocumentsOut
 from app.api.deps import get_db
 from app.core.rbac import require_permission, Permissions
-from app.core.credit_access import require_credits, deduct_feature_credits, get_credit_cost
+from app.core.credit_access import deduct_feature_credits
+from app.repository.document_repository import list_all_documents
 from app.services.document_service import (
     upload_document,
-    get_documents,
     get_document,
     get_task_documents,
     get_document_versions,
@@ -27,24 +27,18 @@ def upload_document_endpoint(
     user=Depends(require_permission(Permissions.document_upload)),
 ):
     result = upload_document(db, file, user, task_id)
-    cost = get_credit_cost("document_upload_per_mb")
-    if cost and file.size:
-        credits_needed = max(1, (file.size // (1024 * 1024)) * cost)
+    if file.size:
         deduct_feature_credits(db, user, "document_upload_per_mb")
     return result
 
 
-@router.get("/")
+@router.get("", response_model=Page[DocumentOut])
 def list_documents_endpoint(
     task_id: Optional[int] = Query(None),
-    page: int = Query(1, ge=1),
-    size: int = Query(20, ge=1, le=100),
-    sort_by: Optional[str] = Query(None),
-    sort_order: str = Query("desc"),
     db: Session = Depends(get_db),
     user=Depends(require_permission(Permissions.document_read)),
 ):
-    return get_documents(db, user, task_id, page=page, size=size, sort_by=sort_by, sort_order=sort_order)
+    return list_all_documents(db, task_id=task_id)
 
 
 @router.get("/task/{task_id}", response_model=TaskDocumentsOut)

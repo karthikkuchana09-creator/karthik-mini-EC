@@ -3,14 +3,18 @@ from fastapi import APIRouter, Depends, Query, HTTPException
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 from typing import Optional
+from fastapi_pagination import Page
 from app.api.deps import get_db
 from app.core.rbac import require_permission, Permissions
 from app.core.subscription_access import require_feature
+from app.schemas.audit_log import AuditLogOut
+from app.repository.audit_log_repository import (
+    list_all_audit_logs,
+    list_audit_logs_by_entity,
+    list_audit_logs_by_user,
+)
 from app.services.audit_log_service import (
-    get_audit_logs,
     get_audit_log_detail,
-    get_audit_logs_by_entity,
-    get_audit_logs_by_user,
     get_audit_stats,
     export_audit_logs,
 )
@@ -18,37 +22,13 @@ from app.services.audit_log_service import (
 router = APIRouter(prefix="/audit-logs", tags=["Audit Logs"])
 
 
-@router.get("/")
+@router.get("", response_model=Page[AuditLogOut])
 def list_audit_logs_endpoint(
-    user_id: Optional[int] = Query(None),
     _=Depends(require_feature("audit_trail")),
-    entity: Optional[str] = Query(None),
-    entity_id: Optional[int] = Query(None),
-    action: Optional[str] = Query(None),
-    date_from: Optional[datetime] = Query(None),
-    date_to: Optional[datetime] = Query(None),
-    search: Optional[str] = Query(None),
-    page: int = Query(1, ge=1),
-    size: int = Query(50, ge=1, le=500),
-    sort_by: Optional[str] = Query(None),
-    sort_order: str = Query("desc"),
     db: Session = Depends(get_db),
     user=Depends(require_permission(Permissions.audit_view)),
 ):
-    return get_audit_logs(
-        db, user,
-        user_id=user_id,
-        entity=entity,
-        entity_id=entity_id,
-        action=action,
-        date_from=date_from,
-        date_to=date_to,
-        search=search,
-        page=page,
-        size=size,
-        sort_by=sort_by,
-        sort_order=sort_order,
-    )
+    return list_all_audit_logs(db)
 
 
 @router.get("/export")
@@ -107,24 +87,20 @@ def audit_log_detail_endpoint(
     return log
 
 
-@router.get("/entity/{entity}/{entity_id}")
+@router.get("/entity/{entity}/{entity_id}", response_model=Page[AuditLogOut])
 def audit_logs_by_entity_endpoint(
     entity: str,
     entity_id: int,
-    page: int = Query(1, ge=1),
-    size: int = Query(50, ge=1, le=500),
     db: Session = Depends(get_db),
     user=Depends(require_permission(Permissions.audit_view)),
 ):
-    return get_audit_logs_by_entity(db, entity, entity_id, page=page, size=size)
+    return list_audit_logs_by_entity(db, entity, entity_id)
 
 
-@router.get("/user/{user_id}")
+@router.get("/user/{user_id}", response_model=Page[AuditLogOut])
 def audit_logs_by_user_endpoint(
     user_id: int,
-    page: int = Query(1, ge=1),
-    size: int = Query(50, ge=1, le=500),
     db: Session = Depends(get_db),
     user=Depends(require_permission(Permissions.audit_view)),
 ):
-    return get_audit_logs_by_user(db, user_id, page=page, size=size)
+    return list_audit_logs_by_user(db, user_id)
