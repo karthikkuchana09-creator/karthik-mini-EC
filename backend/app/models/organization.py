@@ -1,6 +1,8 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, Enum as SAEnum
+from typing import Optional
+from datetime import datetime
+from sqlalchemy import String, Integer, Boolean, DateTime, Text, Enum as SAEnum
 from sqlalchemy.sql import func
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 import enum
 from app.db.base import Base
 
@@ -15,13 +17,16 @@ SubscriptionPlan = SubscriptionPlanEnum
 class Organization(Base):
     __tablename__ = "organizations"
 
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(255), nullable=False)
-    slug = Column(String(100), unique=True, nullable=False, index=True)
-    logo = Column(String(500), nullable=True)
-    subscription_plan = Column(SAEnum(SubscriptionPlanEnum), default=SubscriptionPlanEnum.free, nullable=False)
-    is_active = Column(Boolean, default=True)
-    metadata_json = Column(Text, nullable=True)
-    suspended_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String(255))
+    slug: Mapped[str] = mapped_column(String(100), unique=True, index=True)
+    logo: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    subscription_plan: Mapped[SubscriptionPlanEnum] = mapped_column(SAEnum(SubscriptionPlanEnum), default=SubscriptionPlanEnum.free)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    metadata_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    suspended_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    settings: Mapped[Optional["OrganizationSettings"]] = relationship(back_populates="organization", uselist=False)
+    invitations: Mapped[list["OrganizationInvitation"]] = relationship(back_populates="organization")

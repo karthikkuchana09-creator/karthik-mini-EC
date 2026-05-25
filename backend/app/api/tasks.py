@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 from fastapi_pagination import Page
 from app.schemas.task import TaskCreate, TaskUpdate, TaskOut, KanbanReorderRequest, TaskStatusChangeRequest
@@ -93,9 +94,11 @@ def update_task_status_endpoint(
     db: Session = Depends(get_db),
     user=Depends(require_permission(Permissions.task_update_status))
 ):
-    task = db.query(Task).options(
-        joinedload(Task.assignee), joinedload(Task.creator)
-    ).filter(Task.id == task_id).first()
+    task = db.scalar(
+        select(Task)
+        .options(joinedload(Task.assignee), joinedload(Task.creator))
+        .where(Task.id == task_id)
+    )
 
     if not task:
         raise HTTPException(404, "Task not found")
@@ -121,7 +124,7 @@ def kanban_reorder_endpoint(
     import asyncio
     updated_tasks = []
     for item in body.items:
-        task = db.query(Task).filter(Task.id == item.id).first()
+        task = db.scalar(select(Task).where(Task.id == item.id))
         if task and task.status != item.status:
             task.status = item.status
             task.updated_at = __import__("datetime").datetime.utcnow()

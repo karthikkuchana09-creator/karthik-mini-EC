@@ -1,7 +1,7 @@
 from typing import Optional
 from datetime import datetime
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import select, func
 from fastapi import HTTPException, status
 from app.models.credit import UsageCredit, CreditTransaction, TransactionType
 from app.core.log import get_logger
@@ -38,9 +38,9 @@ class CreditService:
 
     @staticmethod
     def get_or_create_account(db: Session, org_id: int) -> UsageCredit:
-        account = db.query(UsageCredit).filter(
+        account = db.scalar(select(UsageCredit).where(
             UsageCredit.organization_id == org_id,
-        ).first()
+        ))
         if account:
             return account
 
@@ -226,12 +226,12 @@ class CreditService:
         limit: int = 50,
         feature: Optional[str] = None,
     ) -> list[CreditTransaction]:
-        q = db.query(CreditTransaction).filter(
+        q = select(CreditTransaction).where(
             CreditTransaction.organization_id == org_id,
         )
         if feature:
-            q = q.filter(CreditTransaction.feature == feature)
-        return q.order_by(CreditTransaction.created_at.desc()).offset(skip).limit(limit).all()
+            q = q.where(CreditTransaction.feature == feature)
+        return db.execute(q.order_by(CreditTransaction.created_at.desc()).offset(skip).limit(limit)).scalars().all()
 
     @staticmethod
     def check_credits(db: Session, org_id: int, feature: str) -> bool:
@@ -244,18 +244,20 @@ class CreditService:
     @staticmethod
     def get_credit_summary(db: Session, org_id: int) -> dict:
         account = CreditService.get_or_create_account(db, org_id)
-        recent = db.query(CreditTransaction).filter(
+        recent = db.execute(select(CreditTransaction).where(
             CreditTransaction.organization_id == org_id,
-        ).order_by(CreditTransaction.created_at.desc()).limit(5).all()
+        ).order_by(CreditTransaction.created_at.desc()).limit(5)).scalars().all()
 
-        feature_breakdown = db.query(
-            CreditTransaction.feature,
-            func.sum(CreditTransaction.credits_used).label("total_used"),
-            func.count(CreditTransaction.id).label("count"),
-        ).filter(
-            CreditTransaction.organization_id == org_id,
-            CreditTransaction.transaction_type == TransactionType.deduction.value,
-        ).group_by(CreditTransaction.feature).all()
+        feature_breakdown = db.execute(
+            select(
+                CreditTransaction.feature,
+                func.sum(CreditTransaction.credits_used).label("total_used"),
+                func.count(CreditTransaction.id).label("count"),
+            ).where(
+                CreditTransaction.organization_id == org_id,
+                CreditTransaction.transaction_type == TransactionType.deduction.value,
+            ).group_by(CreditTransaction.feature)
+        ).all()
 
         return {
             "total_credits": account.total_credits,

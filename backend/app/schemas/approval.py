@@ -1,4 +1,4 @@
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, Field
 from typing import Optional
 from datetime import datetime
 from app.core.validators import string_length, TITLE_MAX_LENGTH, DESCRIPTION_MAX_LENGTH, validate_safe_text
@@ -55,11 +55,16 @@ class ApprovalAction(BaseModel):
         return v
 
 
+class RequesterOut(BaseModel):
+    id: int
+    name: Optional[str] = None
+    email: str
+
 class ApprovalOut(BaseModel):
     id: int
     title: str
     description: Optional[str] = None
-    requested_by: int
+    requested_by: RequesterOut = Field(validation_alias="requester")
     status: str
     current_level: str
     created_at: datetime

@@ -1,5 +1,6 @@
 from typing import Optional, Callable
 from fastapi import Depends, HTTPException, Request, status
+from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 from app.api.deps import get_db, get_current_user
 from app.core.tenant import get_current_tenant_id, require_active_tenant
@@ -177,10 +178,10 @@ def check_create_limit(resource: str):
         if not plan:
             return True
         if resource == "users":
-            current = db.query(UserModel).filter(UserModel.tenant_id == org_id, UserModel.is_active == True).count()
+            current = db.scalar(select(func.count()).select_from(select(UserModel).where(UserModel.tenant_id == org_id, UserModel.is_active == True).subquery()))
             max_val = plan.max_users
         elif resource == "tasks":
-            current = db.query(Task).filter(Task.tenant_id == org_id).count()
+            current = db.scalar(select(func.count()).select_from(select(Task).where(Task.tenant_id == org_id).subquery()))
             max_val = plan.max_tasks
         elif resource == "teams":
             max_val = plan.max_teams

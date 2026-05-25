@@ -1,14 +1,14 @@
 import csv
 import json
 import io
+from math import ceil
 from typing import Optional, Any
 from datetime import datetime
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import func, or_
+from sqlalchemy import select, func, or_, desc, asc
 from app.models.audit_log import AuditLog
 from app.models.user import User
 from app.core.log import get_logger
-from app.utils.pagination import paginate_query
 
 logger = get_logger("audit_log_service")
 
@@ -72,7 +72,7 @@ def _export_row(log: AuditLog) -> dict:
 
 
 def _apply_filters(
-    query,
+    stmt,
     user_id: Optional[int] = None,
     entity: Optional[str] = None,
     entity_id: Optional[int] = None,
@@ -82,20 +82,20 @@ def _apply_filters(
     search: Optional[str] = None,
 ):
     if user_id is not None:
-        query = query.filter(AuditLog.user_id == user_id)
+        stmt = stmt.where(AuditLog.user_id == user_id)
     if entity:
-        query = query.filter(AuditLog.entity == entity)
+        stmt = stmt.where(AuditLog.entity == entity)
     if entity_id is not None:
-        query = query.filter(AuditLog.entity_id == entity_id)
+        stmt = stmt.where(AuditLog.entity_id == entity_id)
     if action:
-        query = query.filter(AuditLog.action == action)
+        stmt = stmt.where(AuditLog.action == action)
     if date_from:
-        query = query.filter(AuditLog.timestamp >= date_from)
+        stmt = stmt.where(AuditLog.timestamp >= date_from)
     if date_to:
-        query = query.filter(AuditLog.timestamp <= date_to)
+        stmt = stmt.where(AuditLog.timestamp <= date_to)
     if search:
         pattern = f"%{search}%"
-        query = query.filter(
+        stmt = stmt.where(
             or_(
                 AuditLog.action.ilike(pattern),
                 AuditLog.entity.ilike(pattern),
@@ -104,7 +104,7 @@ def _apply_filters(
                 AuditLog.metadata_json.ilike(pattern),
             )
         )
-    return query
+    return stmt
 
 
 def log_action(
@@ -154,30 +154,41 @@ def get_audit_logs(
     sort_by: Optional[str] = None,
     sort_order: str = "desc",
 ):
-    query = db.query(AuditLog).options(joinedload(AuditLog.user))
-    query = _apply_filters(
-        query, user_id, entity, entity_id, action, date_from, date_to, search,
+    stmt = select(AuditLog).options(joinedload(AuditLog.user))
+    stmt = _apply_filters(
+        stmt, user_id, entity, entity_id, action, date_from, date_to, search,
     )
 
     if not sort_by:
-        query = query.order_by(AuditLog.timestamp.desc())
+        stmt = stmt.order_by(AuditLog.timestamp.desc())
 
-    result = paginate_query(
-        db, query,
-        page=page, size=size,
-        sort_by=sort_by, sort_order=sort_order,
+    count_stmt = select(func.count()).select_from(AuditLog)
+    count_stmt = _apply_filters(
+        count_stmt, user_id, entity, entity_id, action, date_from, date_to, search,
     )
+    total = db.scalar(count_stmt) or 0
 
+    if sort_by:
+        try:
+            column = getattr(AuditLog, sort_by)
+            order_fn = desc if sort_order == "desc" else asc
+            stmt = stmt.order_by(order_fn(column))
+        except AttributeError:
+            pass
+
+    pages = max(ceil(total / size), 0) if total else 0
+    items = db.execute(stmt.offset((page - 1) * size).limit(size)).scalars().all()
+
+    result = {"items": items, "total": total, "page": page, "size": size, "pages": pages}
     result["items"] = [_enrich_log(log) for log in result["items"]]
     return result
 
 
 def get_audit_log_detail(db: Session, log_id: int) -> Optional[dict]:
-    log = (
-        db.query(AuditLog)
+    log = db.scalar(
+        select(AuditLog)
         .options(joinedload(AuditLog.user))
-        .filter(AuditLog.id == log_id)
-        .first()
+        .where(AuditLog.id == log_id)
     )
     if not log:
         return None
@@ -193,13 +204,19 @@ def get_audit_logs_by_entity(
     page: int = 1,
     size: int = 50,
 ):
-    query = (
-        db.query(AuditLog)
+    stmt = (
+        select(AuditLog)
         .options(joinedload(AuditLog.user))
-        .filter(AuditLog.entity == entity, AuditLog.entity_id == entity_id)
+        .where(AuditLog.entity == entity, AuditLog.entity_id == entity_id)
         .order_by(AuditLog.timestamp.desc())
     )
-    result = paginate_query(db, query, page=page, size=size)
+    total = db.scalar(
+        select(func.count()).select_from(AuditLog)
+        .where(AuditLog.entity == entity, AuditLog.entity_id == entity_id)
+    ) or 0
+    pages = max(ceil(total / size), 0) if total else 0
+    items = db.execute(stmt.offset((page - 1) * size).limit(size)).scalars().all()
+    result = {"items": items, "total": total, "page": page, "size": size, "pages": pages}
     result["items"] = [_enrich_log(log) for log in result["items"]]
     return result
 
@@ -210,13 +227,19 @@ def get_audit_logs_by_user(
     page: int = 1,
     size: int = 50,
 ):
-    query = (
-        db.query(AuditLog)
+    stmt = (
+        select(AuditLog)
         .options(joinedload(AuditLog.user))
-        .filter(AuditLog.user_id == user_id)
+        .where(AuditLog.user_id == user_id)
         .order_by(AuditLog.timestamp.desc())
     )
-    result = paginate_query(db, query, page=page, size=size)
+    total = db.scalar(
+        select(func.count()).select_from(AuditLog)
+        .where(AuditLog.user_id == user_id)
+    ) or 0
+    pages = max(ceil(total / size), 0) if total else 0
+    items = db.execute(stmt.offset((page - 1) * size).limit(size)).scalars().all()
+    result = {"items": items, "total": total, "page": page, "size": size, "pages": pages}
     result["items"] = [_enrich_log(log) for log in result["items"]]
     return result
 
@@ -234,12 +257,12 @@ def export_audit_logs(
     search: Optional[str] = None,
     limit: int = 10000,
 ) -> dict:
-    query = db.query(AuditLog).options(joinedload(AuditLog.user))
-    query = _apply_filters(
-        query, user_id, entity, entity_id, action, date_from, date_to, search,
+    stmt = select(AuditLog).options(joinedload(AuditLog.user))
+    stmt = _apply_filters(
+        stmt, user_id, entity, entity_id, action, date_from, date_to, search,
     )
-    query = query.order_by(AuditLog.timestamp.desc()).limit(limit)
-    logs = query.all()
+    stmt = stmt.order_by(AuditLog.timestamp.desc()).limit(limit)
+    logs = db.execute(stmt).scalars().all()
 
     rows = [_export_row(log) for log in logs]
 
@@ -269,40 +292,35 @@ def export_audit_logs(
 
 
 def get_audit_stats(db: Session, current_user):
-    total = db.query(func.count(AuditLog.id)).scalar() or 0
+    total = db.scalar(select(func.count(AuditLog.id))) or 0
     unique_users = (
-        db.query(func.count(func.distinct(AuditLog.user_id)))
-        .scalar() or 0
+        db.scalar(select(func.count(func.distinct(AuditLog.user_id)))) or 0
     )
     unique_actions = (
-        db.query(func.count(func.distinct(AuditLog.action)))
-        .scalar() or 0
+        db.scalar(select(func.count(func.distinct(AuditLog.action)))) or 0
     )
 
-    action_rows = (
-        db.query(AuditLog.action, func.count(AuditLog.id))
+    action_rows = db.execute(
+        select(AuditLog.action, func.count(AuditLog.id))
         .group_by(AuditLog.action)
         .order_by(func.count(AuditLog.id).desc())
         .limit(20)
-        .all()
-    )
+    ).all()
     actions_by_type = [{"action": a, "count": c} for a, c in action_rows]
 
-    entity_rows = (
-        db.query(AuditLog.entity, func.count(AuditLog.id))
+    entity_rows = db.execute(
+        select(AuditLog.entity, func.count(AuditLog.id))
         .group_by(AuditLog.entity)
         .order_by(func.count(AuditLog.id).desc())
-        .all()
-    )
+    ).all()
     entities_by_type = [{"entity": e, "count": c} for e, c in entity_rows]
 
-    recent = (
-        db.query(AuditLog)
+    recent = db.execute(
+        select(AuditLog)
         .options(joinedload(AuditLog.user))
         .order_by(AuditLog.timestamp.desc())
         .limit(10)
-        .all()
-    )
+    ).scalars().all()
 
     return {
         "total_logs": total,

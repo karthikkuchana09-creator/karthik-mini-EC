@@ -1,4 +1,5 @@
 from fastapi import HTTPException
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.models.leave import Leave
 from app.schemas.leave import LeaveCreate, LeaveUpdate
@@ -28,18 +29,19 @@ def create_leave(db: Session, current_user, data: LeaveCreate):
 
 def get_user_leaves(db: Session, current_user):
     return (
-        db.query(Leave)
-        .filter(Leave.user_id == current_user.id)
-        .order_by(Leave.created_at.desc())
-        .all()
+        db.execute(
+            select(Leave)
+            .where(Leave.user_id == current_user.id)
+            .order_by(Leave.created_at.desc())
+        ).scalars().all()
     )
 
 
 def update_leave(db: Session, leave_id: int, current_user, data: LeaveUpdate):
-    leave = db.query(Leave).filter(
+    leave = db.scalar(select(Leave).where(
         Leave.id == leave_id,
         Leave.user_id == current_user.id,
-    ).first()
+    ))
 
     if not leave:
         raise HTTPException(404, "Leave not found")

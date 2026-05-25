@@ -85,7 +85,7 @@ def sample_task(db, admin_user, employee_user):
         description="Test Description",
         status="todo",
         priority="medium",
-        due_date=datetime(2025, 12, 31),
+        due_date=datetime(2030, 12, 31),
         created_by_id=admin_user.id,
         assigned_to_id=employee_user.id,
     )

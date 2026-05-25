@@ -1,22 +1,24 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Index, Text, func, event
+from sqlalchemy import String, DateTime, ForeignKey, Index, Text, func, event
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+from typing import Optional
+from datetime import datetime
 from app.db.base import Base
-from sqlalchemy.orm import relationship
 
 
 class AuditLog(Base):
     __tablename__ = "audit_logs"
 
-    id = Column(Integer, primary_key=True, index=True)
-    tenant_id = Column(Integer, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
-    action = Column(String(50), nullable=False, index=True)
-    entity = Column(String(50), nullable=False, index=True)
-    entity_id = Column(Integer, nullable=True, index=True)
-    old_value = Column(Text, nullable=True)
-    new_value = Column(Text, nullable=True)
-    metadata_json = Column(Text, nullable=True)
-    ip_address = Column(String(45), nullable=True)
-    timestamp = Column(DateTime, default=func.now(), nullable=False, index=True)
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    tenant_id: Mapped[Optional[int]] = mapped_column(ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True)
+    user_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
+    action: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    entity: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    entity_id: Mapped[Optional[int]] = mapped_column(nullable=True, index=True)
+    old_value: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    new_value: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    metadata_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    ip_address: Mapped[Optional[str]] = mapped_column(String(45), nullable=True)
+    timestamp: Mapped[datetime] = mapped_column(DateTime, default=func.now(), nullable=False, index=True)
 
     __table_args__ = (
         Index("ix_audit_logs_entity_entity_id", "entity", "entity_id"),
@@ -25,7 +27,7 @@ class AuditLog(Base):
         Index("ix_audit_logs_entity_action", "entity", "action"),
     )
 
-    user = relationship("User", foreign_keys=[user_id])
+    user: Mapped[Optional["User"]] = relationship("User", foreign_keys=[user_id])
 
 
 @event.listens_for(AuditLog, "before_update")

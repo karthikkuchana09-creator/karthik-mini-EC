@@ -1,4 +1,6 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Index
+from sqlalchemy import String, Boolean, DateTime, ForeignKey, Index, func
+from sqlalchemy.orm import Mapped, mapped_column
+from typing import Optional
 from datetime import datetime
 from app.db.base import Base
 
@@ -22,13 +24,13 @@ class NotificationType:
 class Notification(Base):
     __tablename__ = "notifications"
 
-    id = Column(Integer, primary_key=True, index=True)
-    tenant_id = Column(Integer, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    message = Column(String(500), nullable=False)
-    type = Column(String(50), nullable=False, default=NotificationType.system, index=True)
-    is_read = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    tenant_id: Mapped[Optional[int]] = mapped_column(ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    message: Mapped[str] = mapped_column(String(500), nullable=False)
+    type: Mapped[str] = mapped_column(String(50), nullable=False, default=NotificationType.system, index=True)
+    is_read: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), index=True)
 
     __table_args__ = (
         Index("ix_notifications_user_id_is_read", "user_id", "is_read"),

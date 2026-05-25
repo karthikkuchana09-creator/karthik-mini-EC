@@ -1,9 +1,11 @@
 import os
 import mimetypes
+from typing import Optional
 from fastapi import HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
+from sqlalchemy import select, func, desc, asc
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from fastapi_pagination.ext.sqlalchemy import paginate as fastapi_paginate
 from app.models.document import Document
 from app.models.task import Task
 from app.core.log import get_logger
@@ -26,10 +28,9 @@ def _next_version(db: Session, file_name: str, task_id: int | None) -> int:
     else:
         filters.append(Document.task_id.is_(None))
 
-    max_ver = (
-        db.query(func.coalesce(func.max(Document.version), 0))
-        .filter(*filters)
-        .scalar()
+    max_ver = db.scalar(
+        select(func.coalesce(func.max(Document.version), 0))
+        .where(*filters)
     )
     return max_ver + 1
 
@@ -92,7 +93,7 @@ def upload_document(
     )
 
     if task_id:
-        task = db.query(Task).filter(Task.id == task_id).first()
+        task = db.scalar(select(Task).where(Task.id == task_id))
         if task:
             notify_ids = {task.assigned_to_id, task.created_by_id} - {current_user.id}
             for uid in notify_ids:
@@ -108,7 +109,7 @@ def upload_document(
 
 def get_document(db: Session, document_id: int, current_user):
     logger.debug("Fetching document id=%d by user_id=%d", document_id, current_user.id)
-    doc = db.query(Document).filter(Document.id == document_id).first()
+    doc = db.scalar(select(Document).where(Document.id == document_id))
 
     if not doc:
         raise HTTPException(404, "Document not found")
@@ -137,32 +138,31 @@ def download_document(db: Session, document_id: int, current_user):
     )
 
 
-from typing import Optional as _Optional
-
 def get_documents(
     db: Session,
     current_user,
-    task_id: _Optional[int] = None,
+    task_id: Optional[int] = None,
     page: int = 1,
     size: int = 20,
-    sort_by: _Optional[str] = None,
+    sort_by: Optional[str] = None,
     sort_order: str = "desc",
 ):
     logger.debug("Fetching documents for user_id=%d", current_user.id)
-    query = db.query(Document)
+    query = select(Document)
 
     if current_user.role.value != "admin":
-        query = query.filter(Document.uploaded_by == current_user.id)
+        query = query.where(Document.uploaded_by == current_user.id)
 
     if task_id is not None:
-        query = query.filter(Document.task_id == task_id)
+        query = query.where(Document.task_id == task_id)
 
-    from app.utils.pagination import paginate_query
-    return paginate_query(
-        db, query,
-        page=page, size=size,
-        sort_by=sort_by, sort_order=sort_order,
-    )
+    if sort_by:
+        column = getattr(Document, sort_by, None)
+        if column:
+            order_fn = desc if sort_order == "desc" else asc
+            query = query.order_by(order_fn(column))
+
+    return fastapi_paginate(db, query)
 
 
 def get_task_documents(db: Session, task_id: int, current_user):
@@ -173,10 +173,11 @@ def get_task_documents(db: Session, task_id: int, current_user):
         filters.append(Document.uploaded_by == current_user.id)
 
     docs = (
-        db.query(Document)
-        .filter(*filters)
-        .order_by(Document.file_name.asc(), Document.version.asc())
-        .all()
+        db.execute(
+            select(Document)
+            .where(*filters)
+            .order_by(Document.file_name.asc(), Document.version.asc())
+        ).scalars().all()
     )
 
     return {
@@ -200,17 +201,16 @@ def get_document_versions(db: Session, file_name: str, task_id: int | None, curr
     if current_user.role.value != "admin":
         filters.append(Document.uploaded_by == current_user.id)
 
-    return (
-        db.query(Document)
-        .filter(*filters)
+    return db.execute(
+        select(Document)
+        .where(*filters)
         .order_by(Document.version.asc())
-        .all()
-    )
+    ).scalars().all()
 
 
 def delete_document(db: Session, document_id: int, current_user):
     logger.info("Deleting document id=%d by user_id=%d", document_id, current_user.id)
-    doc = db.query(Document).filter(Document.id == document_id).first()
+    doc = db.scalar(select(Document).where(Document.id == document_id))
 
     if not doc:
         raise HTTPException(404, "Document not found")

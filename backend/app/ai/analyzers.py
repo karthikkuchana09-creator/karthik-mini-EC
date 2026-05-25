@@ -4,7 +4,7 @@ from typing import Optional, Any
 from math import sqrt
 
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import func
+from sqlalchemy import select, func
 
 from app.models.task import Task
 from app.models.approval import Approval
@@ -66,33 +66,33 @@ class TaskAnalyzer:
         logger.debug("Starting task analysis")
         result = TaskAnalysisResult()
 
-        q = base_query if base_query is not None else self.db.query(Task)
+        q = base_query if base_query is not None else select(Task)
 
-        result.total = q.count()
+        result.total = self.db.scalar(select(func.count()).select_from(q.subquery()))
 
-        result.status_distribution = {
-            row[0]: row[1]
-            for row in q.with_entities(Task.status, func.count(Task.id))
-            .group_by(Task.status).all()
-        }
+        status_rows = self.db.execute(
+            select(Task.status, func.count(Task.id)).group_by(Task.status)
+        ).all()
+        result.status_distribution = {row[0]: row[1] for row in status_rows}
 
-        result.priority_distribution = {
-            row[0]: row[1]
-            for row in q.with_entities(Task.priority, func.count(Task.id))
-            .group_by(Task.priority).all()
-        }
+        priority_rows = self.db.execute(
+            select(Task.priority, func.count(Task.id)).group_by(Task.priority)
+        ).all()
+        result.priority_distribution = {row[0]: row[1] for row in priority_rows}
 
-        result.pending = q.filter(Task.status.in_(["todo", "in_progress"])).count()
-        result.in_review = q.filter(Task.status == "review").count()
-        result.completed = q.filter(Task.status == "done").count()
+        result.pending = self.db.scalar(select(func.count()).select_from(q.where(Task.status.in_(["todo", "in_progress"])).subquery()))
+        result.in_review = self.db.scalar(select(func.count()).select_from(q.where(Task.status == "review").subquery()))
+        result.completed = self.db.scalar(select(func.count()).select_from(q.where(Task.status == "done").subquery()))
 
-        hp_q = q.filter(
+        hp_q = q.where(
             Task.priority == "high",
             Task.status.in_(["todo", "in_progress"]),
         )
-        result.high_priority_pending = hp_q.count()
+        result.high_priority_pending = self.db.scalar(select(func.count()).select_from(hp_q.subquery()))
 
-        hp_tasks = hp_q.options(joinedload(Task.assignee)).order_by(Task.due_date.asc()).limit(10).all()
+        hp_tasks = self.db.execute(
+            hp_q.options(joinedload(Task.assignee)).order_by(Task.due_date.asc()).limit(10)
+        ).scalars().all()
         for t in hp_tasks:
             result.high_priority_tasks.append({
                 "id": t.id,
@@ -104,15 +104,15 @@ class TaskAnalyzer:
                 "assignee_name": t.assignee.name if t.assignee else None,
             })
 
-        overdue_q = q.filter(
+        overdue_q = q.where(
             Task.due_date < self.now,
             Task.status != "done",
         )
-        result.overdue = overdue_q.count()
+        result.overdue = self.db.scalar(select(func.count()).select_from(overdue_q.subquery()))
 
-        overdue_tasks = overdue_q.options(
-            joinedload(Task.assignee)
-        ).order_by(Task.due_date.asc()).limit(10).all()
+        overdue_tasks = self.db.execute(
+            overdue_q.options(joinedload(Task.assignee)).order_by(Task.due_date.asc()).limit(10)
+        ).scalars().all()
         for t in overdue_tasks:
             days_late = (self.now - t.due_date).days
             result.overdue_tasks.append({
@@ -125,28 +125,27 @@ class TaskAnalyzer:
                 "assignee_name": t.assignee.name if t.assignee else None,
             })
 
-        due_today_q = q.filter(
+        due_today_q = q.where(
             func.date(Task.due_date) == func.date(self.now),
             Task.status != "done",
         )
-        result.due_today = due_today_q.count()
+        result.due_today = self.db.scalar(select(func.count()).select_from(due_today_q.subquery()))
 
-        result.completed_week = q.filter(
-            Task.status == "done",
-            Task.updated_at >= self.now - timedelta(days=7),
-        ).count()
+        result.completed_week = self.db.scalar(select(func.count()).select_from(
+            q.where(Task.status == "done", Task.updated_at >= self.now - timedelta(days=7)).subquery()
+        ))
 
-        at_risk_q = q.filter(
+        at_risk_q = q.where(
             Task.due_date.isnot(None),
             Task.due_date <= self.now + timedelta(days=self.rules.at_risk_days),
             Task.due_date >= self.now,
             Task.status.in_(["todo", "in_progress"]),
         )
-        result.at_risk = at_risk_q.count()
+        result.at_risk = self.db.scalar(select(func.count()).select_from(at_risk_q.subquery()))
 
-        at_risk_tasks = at_risk_q.options(
-            joinedload(Task.assignee)
-        ).order_by(Task.due_date.asc()).limit(10).all()
+        at_risk_tasks = self.db.execute(
+            at_risk_q.options(joinedload(Task.assignee)).order_by(Task.due_date.asc()).limit(10)
+        ).scalars().all()
         for t in at_risk_tasks:
             remaining = (t.due_date - self.now).days
             result.at_risk_tasks.append({
@@ -158,15 +157,15 @@ class TaskAnalyzer:
                 "assignee": t.assignee.email if t.assignee else None,
             })
 
-        blocked_q = q.filter(
+        blocked_q = q.where(
             Task.status == "in_progress",
             Task.updated_at <= self.now - timedelta(hours=self.rules.blocked_hours),
         )
-        result.blocked = blocked_q.count()
+        result.blocked = self.db.scalar(select(func.count()).select_from(blocked_q.subquery()))
 
-        blocked_tasks = blocked_q.options(
-            joinedload(Task.assignee)
-        ).order_by(Task.updated_at.asc()).limit(10).all()
+        blocked_tasks = self.db.execute(
+            blocked_q.options(joinedload(Task.assignee)).order_by(Task.updated_at.asc()).limit(10)
+        ).scalars().all()
         for t in blocked_tasks:
             stalled = int((self.now - t.updated_at).total_seconds() / 3600)
             result.blocked_tasks.append({
@@ -195,22 +194,22 @@ class ApprovalAnalyzer:
         logger.debug("Starting approval analysis")
         result = ApprovalAnalysisResult()
 
-        q = base_query if base_query is not None else self.db.query(Approval)
+        q = base_query if base_query is not None else select(Approval)
 
-        result.total = q.count()
-        result.pending = q.filter(Approval.status == "pending").count()
-        result.approved = q.filter(Approval.status == "approved").count()
-        result.rejected = q.filter(Approval.status == "rejected").count()
+        result.total = self.db.scalar(select(func.count()).select_from(q.subquery()))
+        result.pending = self.db.scalar(select(func.count()).select_from(q.where(Approval.status == "pending").subquery()))
+        result.approved = self.db.scalar(select(func.count()).select_from(q.where(Approval.status == "approved").subquery()))
+        result.rejected = self.db.scalar(select(func.count()).select_from(q.where(Approval.status == "rejected").subquery()))
 
-        delayed_q = q.filter(
+        delayed_q = q.where(
             Approval.status == "pending",
             Approval.created_at < self.now - timedelta(hours=self.rules.approval_delay_hours),
         )
-        result.delayed = delayed_q.count()
+        result.delayed = self.db.scalar(select(func.count()).select_from(delayed_q.subquery()))
 
-        delayed = delayed_q.options(
-            joinedload(Approval.requester)
-        ).order_by(Approval.created_at.asc()).limit(10).all()
+        delayed = self.db.execute(
+            delayed_q.options(joinedload(Approval.requester)).order_by(Approval.created_at.asc()).limit(10)
+        ).scalars().all()
         for a in delayed:
             wait_hours = int((self.now - a.created_at).total_seconds() / 3600)
             result.delayed_approvals.append({
@@ -220,9 +219,9 @@ class ApprovalAnalyzer:
                 "requester": a.requester.email if a.requester else None,
             })
 
-        pending_items = q.filter(Approval.status == "pending").options(
-            joinedload(Approval.requester)
-        ).order_by(Approval.created_at.asc()).limit(10).all()
+        pending_items = self.db.execute(
+            q.where(Approval.status == "pending").options(joinedload(Approval.requester)).order_by(Approval.created_at.asc()).limit(10)
+        ).scalars().all()
         for a in pending_items:
             wait_hours = int((self.now - a.created_at).total_seconds() / 3600)
             result.pending_approvals.append({
@@ -249,17 +248,14 @@ class WorkloadAnalyzer:
         logger.debug("Starting workload analysis")
         result = WorkloadAnalysisResult()
 
-        q = base_query if base_query is not None else self.db.query(Task)
+        q = base_query if base_query is not None else select(Task)
 
-        assignee_data = q.filter(
-            Task.assigned_to_id.isnot(None),
-            Task.status != "done",
-        ).with_entities(
-            Task.assigned_to_id,
-            func.count(Task.id),
-        ).group_by(Task.assigned_to_id).all()
-
-        for assignee_id, task_count in assignee_data:
+        assignee_rows = self.db.execute(
+            select(Task.assigned_to_id, func.count(Task.id))
+            .where(Task.assigned_to_id.isnot(None), Task.status != "done")
+            .group_by(Task.assigned_to_id)
+        ).all()
+        for assignee_id, task_count in assignee_rows:
             result.assignments[assignee_id] = task_count
 
         result.overloaded = {
@@ -277,7 +273,9 @@ class WorkloadAnalyzer:
 
         if result.assignments:
             user_ids = list(result.assignments.keys())
-            users = self.db.query(User).filter(User.id.in_(user_ids)).all()
+            users = self.db.execute(
+                select(User).where(User.id.in_(user_ids))
+            ).scalars().all()
             result.user_details = {u.id: {"name": u.name, "email": u.email} for u in users}
 
         logger.debug(
@@ -344,10 +342,12 @@ class DelayRiskAnalyzer:
         if assigned_to_id is None:
             return 0.0, 0.3
         if assigned_to_id not in self._workload_cache:
-            count = self.db.query(Task).filter(
-                Task.assigned_to_id == assigned_to_id,
-                Task.status != "done",
-            ).count()
+            count = self.db.scalar(select(func.count()).select_from(
+                select(Task).where(
+                    Task.assigned_to_id == assigned_to_id,
+                    Task.status != "done",
+                ).subquery()
+            ))
             self._workload_cache[assigned_to_id] = count
         cnt = self._workload_cache[assigned_to_id]
         if cnt >= 10:
@@ -384,47 +384,52 @@ class DelayRiskAnalyzer:
             if val is None:
                 return 5.0, 0.4
             return val
-        result = self.db.query(
-            func.avg(
-                (func.UNIX_TIMESTAMP(Task.updated_at) - func.UNIX_TIMESTAMP(Task.created_at)) / 86400
+        result = self.db.scalar(
+            select(
+                func.avg(
+                    (func.UNIX_TIMESTAMP(Task.updated_at) - func.UNIX_TIMESTAMP(Task.created_at)) / 86400
+                )
+            ).where(
+                Task.assigned_to_id == assigned_to_id,
+                Task.status == "done",
+                Task.updated_at.isnot(None),
+                Task.created_at.isnot(None),
             )
-        ).filter(
-            Task.assigned_to_id == assigned_to_id,
-            Task.status == "done",
-            Task.updated_at.isnot(None),
-            Task.created_at.isnot(None),
-        ).scalar()
+        )
         if result is None:
             self._history_cache[assigned_to_id] = None
             return 5.0, 0.4
         avg_days = float(result)
-        self._history_cache[assigned_to_id] = avg_days
         if avg_days <= 1:
-            return 0.0, 0.8
+            val = (0.0, 0.8)
         elif avg_days <= 3:
-            return 2.0, 0.8
+            val = (2.0, 0.8)
         elif avg_days <= 7:
-            return 5.0, 0.75
+            val = (5.0, 0.75)
         elif avg_days <= 14:
-            return 7.0, 0.7
+            val = (7.0, 0.7)
         else:
-            return 9.0, 0.65
+            val = (9.0, 0.65)
+        self._history_cache[assigned_to_id] = val
+        return val
 
     def _score_approval(self, user_id: Optional[int]) -> tuple[float, float]:
         if user_id is None:
             return 0.0, 0.3
-        pending = self.db.query(Approval).filter(
-            Approval.requested_by == user_id,
-            Approval.status == "pending",
-        ).count()
+        pending = self.db.scalar(select(func.count()).select_from(
+            select(Approval).where(
+                Approval.requested_by == user_id,
+                Approval.status == "pending",
+            ).subquery()
+        ))
         if pending == 0:
             return 0.0, 0.5
-        max_wait = self.db.query(
-            func.min(Approval.created_at)
-        ).filter(
-            Approval.requested_by == user_id,
-            Approval.status == "pending",
-        ).scalar()
+        max_wait = self.db.scalar(
+            select(func.min(Approval.created_at)).where(
+                Approval.requested_by == user_id,
+                Approval.status == "pending",
+            )
+        )
         if max_wait is None:
             return 3.0, 0.6
         wait_hours = (self.now - max_wait).total_seconds() / 3600
@@ -466,12 +471,12 @@ class DelayRiskAnalyzer:
 
     def analyze(self, base_query=None) -> list[DelayRiskItemData]:
         logger.debug("Starting delay risk analysis")
-        q = base_query if base_query is not None else self.db.query(Task)
-        tasks = q.filter(
-            Task.status != "done",
-        ).options(
-            joinedload(Task.assignee)
-        ).order_by(Task.due_date.is_(None), Task.due_date.asc()).all()
+        q = base_query if base_query is not None else select(Task)
+        tasks = self.db.execute(
+            q.where(Task.status != "done").options(
+                joinedload(Task.assignee)
+            ).order_by(Task.due_date.is_(None), Task.due_date.asc())
+        ).scalars().all()
 
         results = []
         for t in tasks:
@@ -576,10 +581,12 @@ class AssignmentRecommender:
         self.now = datetime.utcnow()
 
     def _workload_score(self, user_id: int) -> tuple[float, float]:
-        active = self.db.query(Task).filter(
-            Task.assigned_to_id == user_id,
-            Task.status != "done",
-        ).count()
+        active = self.db.scalar(select(func.count()).select_from(
+            select(Task).where(
+                Task.assigned_to_id == user_id,
+                Task.status != "done",
+            ).subquery()
+        ))
         if active == 0:
             return 100.0, 0.9
         elif active <= 2:
@@ -594,10 +601,12 @@ class AssignmentRecommender:
             return 5.0, 0.65
 
     def _experience_score(self, user_id: int) -> tuple[float, float]:
-        completed = self.db.query(Task).filter(
-            Task.assigned_to_id == user_id,
-            Task.status == "done",
-        ).count()
+        completed = self.db.scalar(select(func.count()).select_from(
+            select(Task).where(
+                Task.assigned_to_id == user_id,
+                Task.status == "done",
+            ).subquery()
+        ))
         if completed >= 50:
             return 100.0, 0.9
         elif completed >= 30:
@@ -612,16 +621,18 @@ class AssignmentRecommender:
             return 5.0, 0.4
 
     def _speed_score(self, user_id: int) -> tuple[float, float]:
-        result = self.db.query(
-            func.avg(
-                (func.UNIX_TIMESTAMP(Task.updated_at) - func.UNIX_TIMESTAMP(Task.created_at)) / 86400
+        result = self.db.scalar(
+            select(
+                func.avg(
+                    (func.UNIX_TIMESTAMP(Task.updated_at) - func.UNIX_TIMESTAMP(Task.created_at)) / 86400
+                )
+            ).where(
+                Task.assigned_to_id == user_id,
+                Task.status == "done",
+                Task.updated_at.isnot(None),
+                Task.created_at.isnot(None),
             )
-        ).filter(
-            Task.assigned_to_id == user_id,
-            Task.status == "done",
-            Task.updated_at.isnot(None),
-            Task.created_at.isnot(None),
-        ).scalar()
+        )
         if result is None:
             return 50.0, 0.5
         avg_days = float(result)
@@ -639,11 +650,13 @@ class AssignmentRecommender:
     def _priority_match_score(self, user_id: int, priority: str) -> tuple[float, float]:
         if not priority:
             return 50.0, 0.5
-        same_priority_done = self.db.query(Task).filter(
-            Task.assigned_to_id == user_id,
-            Task.priority == priority,
-            Task.status == "done",
-        ).count()
+        same_priority_done = self.db.scalar(select(func.count()).select_from(
+            select(Task).where(
+                Task.assigned_to_id == user_id,
+                Task.priority == priority,
+                Task.status == "done",
+            ).subquery()
+        ))
         if same_priority_done >= 10:
             return 100.0, 0.9
         elif same_priority_done >= 5:
@@ -669,18 +682,22 @@ class AssignmentRecommender:
         return 80.0, 0.75
 
     def _reliability_score(self, user_id: int) -> tuple[float, float]:
-        total_done = self.db.query(Task).filter(
-            Task.assigned_to_id == user_id,
-            Task.status == "done",
-        ).count()
+        total_done = self.db.scalar(select(func.count()).select_from(
+            select(Task).where(
+                Task.assigned_to_id == user_id,
+                Task.status == "done",
+            ).subquery()
+        ))
         if total_done == 0:
             return 50.0, 0.4
-        overdue_done = self.db.query(Task).filter(
-            Task.assigned_to_id == user_id,
-            Task.status == "done",
-            Task.due_date.isnot(None),
-            Task.updated_at > Task.due_date,
-        ).count()
+        overdue_done = self.db.scalar(select(func.count()).select_from(
+            select(Task).where(
+                Task.assigned_to_id == user_id,
+                Task.status == "done",
+                Task.due_date.isnot(None),
+                Task.updated_at > Task.due_date,
+            ).subquery()
+        ))
         on_time = total_done - overdue_done
         rate = on_time / total_done
         score = rate * 100
@@ -719,13 +736,13 @@ class AssignmentRecommender:
 
     def recommend(self, priority: Optional[str] = None, exclude_user_id: Optional[int] = None) -> list[CandidateScore]:
         logger.info("Running assignment recommendation (priority=%s)", priority or "any")
-        users_q = self.db.query(User).filter(
+        users_q = select(User).where(
             User.is_active == True,
             User.role.in_(["admin", "manager", "employee"]),
         )
         if exclude_user_id is not None:
-            users_q = users_q.filter(User.id != exclude_user_id)
-        users = users_q.all()
+            users_q = users_q.where(User.id != exclude_user_id)
+        users = self.db.execute(users_q).scalars().all()
 
         candidates = []
         for u in users:
@@ -818,40 +835,46 @@ class PerformanceAnalyzer:
         self.now = datetime.utcnow()
 
     def _batch_completion_days(self, user_ids: list[int]) -> dict[int, tuple[Optional[float], int]]:
-        rows = self.db.query(
-            Task.assigned_to_id,
-            func.avg((func.UNIX_TIMESTAMP(Task.updated_at) - func.UNIX_TIMESTAMP(Task.created_at)) / 86400),
-            func.count(Task.id),
-        ).filter(
-            Task.assigned_to_id.in_(user_ids),
-            Task.status == "done",
-            Task.updated_at.isnot(None),
-            Task.created_at.isnot(None),
-        ).group_by(Task.assigned_to_id).all()
+        rows = self.db.execute(
+            select(
+                Task.assigned_to_id,
+                func.avg((func.UNIX_TIMESTAMP(Task.updated_at) - func.UNIX_TIMESTAMP(Task.created_at)) / 86400),
+                func.count(Task.id),
+            ).where(
+                Task.assigned_to_id.in_(user_ids),
+                Task.status == "done",
+                Task.updated_at.isnot(None),
+                Task.created_at.isnot(None),
+            ).group_by(Task.assigned_to_id)
+        ).all()
         result = {}
         for uid, avg, cnt in rows:
             result[uid] = (round(float(avg), 1), cnt) if avg else (None, 0)
         return result
 
     def _batch_delay_stats(self, user_ids: list[int]) -> dict[int, tuple[int, int, float]]:
-        done_rows = self.db.query(
-            Task.assigned_to_id,
-            func.count(Task.id),
-        ).filter(
-            Task.assigned_to_id.in_(user_ids),
-            Task.status == "done",
-        ).group_by(Task.assigned_to_id).all()
+        done_rows = self.db.execute(
+            select(
+                Task.assigned_to_id,
+                func.count(Task.id),
+            ).where(
+                Task.assigned_to_id.in_(user_ids),
+                Task.status == "done",
+            ).group_by(Task.assigned_to_id)
+        ).all()
         done_map = {uid: cnt for uid, cnt in done_rows}
 
-        delayed_rows = self.db.query(
-            Task.assigned_to_id,
-            func.count(Task.id),
-        ).filter(
-            Task.assigned_to_id.in_(user_ids),
-            Task.status == "done",
-            Task.due_date.isnot(None),
-            Task.updated_at > Task.due_date,
-        ).group_by(Task.assigned_to_id).all()
+        delayed_rows = self.db.execute(
+            select(
+                Task.assigned_to_id,
+                func.count(Task.id),
+            ).where(
+                Task.assigned_to_id.in_(user_ids),
+                Task.status == "done",
+                Task.due_date.isnot(None),
+                Task.updated_at > Task.due_date,
+            ).group_by(Task.assigned_to_id)
+        ).all()
         delayed_map = {uid: cnt for uid, cnt in delayed_rows}
 
         result = {}
@@ -863,31 +886,37 @@ class PerformanceAnalyzer:
         return result
 
     def _batch_approval_stats(self, user_ids: list[int]) -> dict[int, tuple[float, Optional[float]]]:
-        total_rows = self.db.query(
-            Approval.requested_by,
-            func.count(Approval.id),
-        ).filter(
-            Approval.requested_by.in_(user_ids),
-        ).group_by(Approval.requested_by).all()
+        total_rows = self.db.execute(
+            select(
+                Approval.requested_by,
+                func.count(Approval.id),
+            ).where(
+                Approval.requested_by.in_(user_ids),
+            ).group_by(Approval.requested_by)
+        ).all()
         total_map = {uid: cnt for uid, cnt in total_rows}
 
-        approved_rows = self.db.query(
-            Approval.requested_by,
-            func.count(Approval.id),
-        ).filter(
-            Approval.requested_by.in_(user_ids),
-            Approval.status == "approved",
-        ).group_by(Approval.requested_by).all()
+        approved_rows = self.db.execute(
+            select(
+                Approval.requested_by,
+                func.count(Approval.id),
+            ).where(
+                Approval.requested_by.in_(user_ids),
+                Approval.status == "approved",
+            ).group_by(Approval.requested_by)
+        ).all()
         approved_map = {uid: cnt for uid, cnt in approved_rows}
 
-        avg_time_rows = self.db.query(
-            Approval.requested_by,
-            func.avg((func.UNIX_TIMESTAMP(Approval.updated_at) - func.UNIX_TIMESTAMP(Approval.created_at)) / 3600),
-        ).filter(
-            Approval.requested_by.in_(user_ids),
-            Approval.status == "approved",
-            Approval.updated_at.isnot(None),
-        ).group_by(Approval.requested_by).all()
+        avg_time_rows = self.db.execute(
+            select(
+                Approval.requested_by,
+                func.avg((func.UNIX_TIMESTAMP(Approval.updated_at) - func.UNIX_TIMESTAMP(Approval.created_at)) / 3600),
+            ).where(
+                Approval.requested_by.in_(user_ids),
+                Approval.status == "approved",
+                Approval.updated_at.isnot(None),
+            ).group_by(Approval.requested_by)
+        ).all()
         avg_time_map = {uid: round(float(avg), 1) for uid, avg in avg_time_rows if avg}
 
         result = {}
@@ -900,21 +929,25 @@ class PerformanceAnalyzer:
         return result
 
     def _batch_comment_counts(self, user_ids: list[int]) -> dict[int, int]:
-        rows = self.db.query(
-            Comment.user_id,
-            func.count(Comment.id),
-        ).filter(
-            Comment.user_id.in_(user_ids),
-        ).group_by(Comment.user_id).all()
+        rows = self.db.execute(
+            select(
+                Comment.user_id,
+                func.count(Comment.id),
+            ).where(
+                Comment.user_id.in_(user_ids),
+            ).group_by(Comment.user_id)
+        ).all()
         return {uid: cnt for uid, cnt in rows}
 
     def _batch_monthly_trends(self, user_ids: list[int]) -> dict[int, list[MonthlyTrendData]]:
         six_months_ago = self.now - timedelta(days=180)
-        tasks = self.db.query(Task).filter(
-            Task.assigned_to_id.in_(user_ids),
-            Task.status == "done",
-            Task.updated_at >= six_months_ago,
-        ).all()
+        tasks = self.db.execute(
+            select(Task).where(
+                Task.assigned_to_id.in_(user_ids),
+                Task.status == "done",
+                Task.updated_at >= six_months_ago,
+            )
+        ).scalars().all()
         groups: dict[int, dict] = {}
         for t in tasks:
             uid = t.assigned_to_id
@@ -1020,10 +1053,12 @@ class PerformanceAnalyzer:
 
     def analyze(self) -> PerformanceResult:
         logger.debug("Starting performance analytics")
-        users = self.db.query(User).filter(
-            User.is_active == True,
-            User.role.in_(["admin", "manager", "employee"]),
-        ).all()
+        users = self.db.execute(
+            select(User).where(
+                User.is_active == True,
+                User.role.in_(["admin", "manager", "employee"]),
+            )
+        ).scalars().all()
 
         user_ids = [u.id for u in users]
         if not user_ids:
@@ -1206,10 +1241,12 @@ class RecommendationEngine:
 
         if not critical_items:
             # if no critical risks, check high priority pending
-            task_q = self.db.query(Task).filter(
-                Task.priority == "high",
-                Task.status.in_(["todo", "in_progress"]),
-            ).options(joinedload(Task.assignee)).order_by(Task.due_date.asc()).limit(5).all()
+            task_q = self.db.execute(
+                select(Task).where(
+                    Task.priority == "high",
+                    Task.status.in_(["todo", "in_progress"]),
+                ).options(joinedload(Task.assignee)).order_by(Task.due_date.asc()).limit(5)
+            ).scalars().all()
 
             for t in task_q:
                 days_left = (t.due_date - self.now).days if t.due_date else None
@@ -1319,10 +1356,12 @@ class RecommendationEngine:
         recs = []
         skip = True
         # find tasks without assignee or high-priority unassigned
-        unassigned_high = self.db.query(Task).filter(
-            Task.assigned_to_id.is_(None),
-            Task.status.in_(["todo", "in_progress"]),
-        ).order_by(Task.priority.desc(), Task.due_date.asc()).limit(5).all()
+        unassigned_high = self.db.execute(
+            select(Task).where(
+                Task.assigned_to_id.is_(None),
+                Task.status.in_(["todo", "in_progress"]),
+            ).order_by(Task.priority.desc(), Task.due_date.asc()).limit(5)
+        ).scalars().all()
 
         for t in unassigned_high:
             recommender = AssignmentRecommender(self.db, self.rules)
@@ -1367,10 +1406,12 @@ class WorkloadAnalysisEngine:
         self._critical_threshold = rules_engine.workload_critical
 
     def _active_tasks(self, user_id: int) -> tuple[int, list]:
-        q = self.db.query(Task).filter(
-            Task.assigned_to_id == user_id,
-            Task.status != "done",
-        ).order_by(Task.due_date.asc()).all()
+        q = self.db.execute(
+            select(Task).where(
+                Task.assigned_to_id == user_id,
+                Task.status != "done",
+            ).order_by(Task.due_date.asc())
+        ).scalars().all()
         details = []
         for t in q:
             details.append({
@@ -1383,28 +1424,36 @@ class WorkloadAnalysisEngine:
         return len(q), details
 
     def _pending_approvals(self, user_id: int) -> int:
-        return self.db.query(Approval).filter(
-            Approval.requested_by == user_id,
-            Approval.status == "pending",
-        ).count()
+        return self.db.scalar(select(func.count()).select_from(
+            select(Approval).where(
+                Approval.requested_by == user_id,
+                Approval.status == "pending",
+            ).subquery()
+        ))
 
     def _overdue_tasks(self, user_id: int) -> int:
-        return self.db.query(Task).filter(
-            Task.assigned_to_id == user_id,
-            Task.status != "done",
-            Task.due_date < self.now,
-        ).count()
+        return self.db.scalar(select(func.count()).select_from(
+            select(Task).where(
+                Task.assigned_to_id == user_id,
+                Task.status != "done",
+                Task.due_date < self.now,
+            ).subquery()
+        ))
 
     def _completed_tasks(self, user_id: int) -> int:
-        return self.db.query(Task).filter(
-            Task.assigned_to_id == user_id,
-            Task.status == "done",
-        ).count()
+        return self.db.scalar(select(func.count()).select_from(
+            select(Task).where(
+                Task.assigned_to_id == user_id,
+                Task.status == "done",
+            ).subquery()
+        ))
 
     def _total_assignments(self, user_id: int) -> int:
-        return self.db.query(Task).filter(
-            Task.assigned_to_id == user_id,
-        ).count()
+        return self.db.scalar(select(func.count()).select_from(
+            select(Task).where(
+                Task.assigned_to_id == user_id,
+            ).subquery()
+        ))
 
     def _workload_score(self, active: int, overdue: int, pending: int) -> float:
         raw = active + (overdue * 2) + (pending * 0.5)
@@ -1421,11 +1470,13 @@ class WorkloadAnalysisEngine:
         return 0.0
 
     def _efficiency_score(self, user_id: int, active: int) -> float:
-        completed_30d = self.db.query(Task).filter(
-            Task.assigned_to_id == user_id,
-            Task.status == "done",
-            Task.updated_at >= self.now - timedelta(days=30),
-        ).count()
+        completed_30d = self.db.scalar(select(func.count()).select_from(
+            select(Task).where(
+                Task.assigned_to_id == user_id,
+                Task.status == "done",
+                Task.updated_at >= self.now - timedelta(days=30),
+            ).subquery()
+        ))
         if active == 0 and completed_30d == 0:
             return 0.0
         if active == 0:
@@ -1504,10 +1555,12 @@ class WorkloadAnalysisEngine:
 
     def analyze(self) -> WorkloadAnalysisResult:
         logger.debug("Starting workload analysis")
-        users = self.db.query(User).filter(
-            User.is_active == True,
-            User.role.in_(["admin", "manager", "employee"]),
-        ).all()
+        users = self.db.execute(
+            select(User).where(
+                User.is_active == True,
+                User.role.in_(["admin", "manager", "employee"]),
+            )
+        ).scalars().all()
 
         distribution = {"overloaded": 0, "balanced": 0, "underutilized": 0}
         employees = []

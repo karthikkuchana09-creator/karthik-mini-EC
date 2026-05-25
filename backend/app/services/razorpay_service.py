@@ -5,6 +5,7 @@ import asyncio
 from datetime import datetime, timedelta
 from typing import Optional
 from sqlalchemy.orm import Session
+from sqlalchemy import select, func
 from fastapi import HTTPException, status
 
 from app.core.config import settings
@@ -114,9 +115,9 @@ class RazorpayService:
         payment_id: str,
         signature: str,
     ) -> dict:
-        payment_record = db.query(RazorpayPayment).filter(
+        payment_record = db.scalar(select(RazorpayPayment).where(
             RazorpayPayment.razorpay_order_id == order_id,
-        ).first()
+        ))
 
         if not payment_record:
             raise HTTPException(
@@ -326,9 +327,9 @@ class RazorpayService:
         amount = payment_entity.get("amount", 0)
         status = payment_entity.get("status", "captured")
 
-        payment_record = db.query(RazorpayPayment).filter(
+        payment_record = db.scalar(select(RazorpayPayment).where(
             RazorpayPayment.razorpay_order_id == order_id,
-        ).first()
+        ))
 
         if payment_record:
             payment_record.razorpay_payment_id = payment_id
@@ -349,9 +350,9 @@ class RazorpayService:
         error_code = payment_entity.get("error_code")
         error_description = payment_entity.get("error_description")
 
-        payment_record = db.query(RazorpayPayment).filter(
+        payment_record = db.scalar(select(RazorpayPayment).where(
             RazorpayPayment.razorpay_order_id == order_id,
-        ).first()
+        ))
 
         if payment_record:
             payment_record.status = PaymentStatus.failed.value
@@ -371,9 +372,9 @@ class RazorpayService:
         current_end = sub_entity.get("current_end")
         paid_count = sub_entity.get("paid_count", 0)
 
-        sub_link = db.query(RazorpaySubscriptionLink).filter(
+        sub_link = db.scalar(select(RazorpaySubscriptionLink).where(
             RazorpaySubscriptionLink.razorpay_subscription_id == rzp_sub_id,
-        ).first()
+        ))
 
         if not sub_link:
             logger.warning("Webhook: Subscription %s not found in DB", rzp_sub_id)
@@ -412,9 +413,9 @@ class RazorpayService:
 
         self_sub = None
         if sub_link.tenant_subscription_id:
-            self_sub = db.query(TenantSubscription).filter(
+            self_sub = db.scalar(select(TenantSubscription).where(
                 TenantSubscription.id == sub_link.tenant_subscription_id,
-            ).first()
+            ))
 
         if self_sub:
             period_days = 30 if sub_link.billing_interval == "monthly" else 365
@@ -443,9 +444,9 @@ class RazorpayService:
         sub_entity = payload.get("subscription", {}).get("entity", {})
         rzp_sub_id = sub_entity.get("id")
 
-        sub_link = db.query(RazorpaySubscriptionLink).filter(
+        sub_link = db.scalar(select(RazorpaySubscriptionLink).where(
             RazorpaySubscriptionLink.razorpay_subscription_id == rzp_sub_id,
-        ).first()
+        ))
 
         if sub_link:
             sub_link.status = "active"
@@ -472,9 +473,9 @@ class RazorpayService:
         sub_entity = payload.get("subscription", {}).get("entity", {})
         rzp_sub_id = sub_entity.get("id")
 
-        sub_link = db.query(RazorpaySubscriptionLink).filter(
+        sub_link = db.scalar(select(RazorpaySubscriptionLink).where(
             RazorpaySubscriptionLink.razorpay_subscription_id == rzp_sub_id,
-        ).first()
+        ))
 
         if sub_link:
             sub_link.status = "completed"
@@ -487,9 +488,9 @@ class RazorpayService:
         sub_entity = payload.get("subscription", {}).get("entity", {})
         rzp_sub_id = sub_entity.get("id")
 
-        sub_link = db.query(RazorpaySubscriptionLink).filter(
+        sub_link = db.scalar(select(RazorpaySubscriptionLink).where(
             RazorpaySubscriptionLink.razorpay_subscription_id == rzp_sub_id,
-        ).first()
+        ))
 
         if sub_link:
             sub_link.status = "cancelled"
@@ -497,9 +498,9 @@ class RazorpayService:
 
             if sub_link.tenant_subscription_id:
                 try:
-                    self_sub = db.query(TenantSubscription).filter(
+                    self_sub = db.scalar(select(TenantSubscription).where(
                         TenantSubscription.id == sub_link.tenant_subscription_id,
-                    ).first()
+                    ))
                     if self_sub:
                         self_sub.auto_renew = False
                         db.commit()
@@ -520,9 +521,9 @@ class RazorpayService:
         payment_id = invoice_entity.get("payment_id")
         order_id = invoice_entity.get("order_id")
 
-        existing = db.query(RazorpayInvoice).filter(
+        existing = db.scalar(select(RazorpayInvoice).where(
             RazorpayInvoice.razorpay_invoice_id == invoice_id,
-        ).first()
+        ))
 
         if existing:
             existing.status = status
@@ -533,16 +534,16 @@ class RazorpayService:
 
         org_id = None
         if rzp_sub_id:
-            sub_link = db.query(RazorpaySubscriptionLink).filter(
+            sub_link = db.scalar(select(RazorpaySubscriptionLink).where(
                 RazorpaySubscriptionLink.razorpay_subscription_id == rzp_sub_id,
-            ).first()
+            ))
             if sub_link:
                 org_id = sub_link.organization_id
 
         if not org_id and order_id:
-            payment_rec = db.query(RazorpayPayment).filter(
+            payment_rec = db.scalar(select(RazorpayPayment).where(
                 RazorpayPayment.razorpay_order_id == order_id,
-            ).first()
+            ))
             if payment_rec:
                 org_id = payment_rec.organization_id
 
@@ -574,13 +575,13 @@ class RazorpayService:
         skip: int = 0,
         limit: int = 20,
     ) -> dict:
-        total = db.query(RazorpayPayment).filter(
+        total = db.scalar(select(func.count(RazorpayPayment.id)).where(
             RazorpayPayment.organization_id == org_id,
-        ).count()
+        ))
 
-        items = db.query(RazorpayPayment).filter(
+        items = db.execute(select(RazorpayPayment).where(
             RazorpayPayment.organization_id == org_id,
-        ).order_by(RazorpayPayment.created_at.desc()).offset(skip).limit(limit).all()
+        ).order_by(RazorpayPayment.created_at.desc()).offset(skip).limit(limit)).scalars().all()
 
         return {
             "items": items,
@@ -596,13 +597,13 @@ class RazorpayService:
         skip: int = 0,
         limit: int = 20,
     ) -> dict:
-        total = db.query(RazorpayInvoice).filter(
+        total = db.scalar(select(func.count(RazorpayInvoice.id)).where(
             RazorpayInvoice.organization_id == org_id,
-        ).count()
+        ))
 
-        items = db.query(RazorpayInvoice).filter(
+        items = db.execute(select(RazorpayInvoice).where(
             RazorpayInvoice.organization_id == org_id,
-        ).order_by(RazorpayInvoice.created_at.desc()).offset(skip).limit(limit).all()
+        ).order_by(RazorpayInvoice.created_at.desc()).offset(skip).limit(limit)).scalars().all()
 
         return {
             "items": items,

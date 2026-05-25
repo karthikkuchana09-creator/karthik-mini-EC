@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from typing import Optional
 from sqlalchemy.orm import Session
+from sqlalchemy import select, func
 from fastapi import HTTPException, status
 from app.models.subscription import (
     SubscriptionPlan, TenantSubscription, BillingHistory,
@@ -91,7 +92,7 @@ class SubscriptionService:
     def seed_plans(db: Session) -> list[SubscriptionPlan]:
         plans = []
         for tier, defaults in PLAN_DEFAULTS.items():
-            existing = db.query(SubscriptionPlan).filter(SubscriptionPlan.tier == tier).first()
+            existing = db.scalar(select(SubscriptionPlan).where(SubscriptionPlan.tier == tier))
             if existing:
                 for k, v in defaults.items():
                     setattr(existing, k, v)
@@ -112,27 +113,27 @@ class SubscriptionService:
             tier_enum = PlanTier(tier.lower())
         except ValueError:
             return None
-        return db.query(SubscriptionPlan).filter(
+        return db.scalar(select(SubscriptionPlan).where(
             SubscriptionPlan.tier == tier_enum,
             SubscriptionPlan.is_active == True,
-        ).first()
+        ))
 
     @staticmethod
     def get_plan_by_id(db: Session, plan_id: int) -> Optional[SubscriptionPlan]:
-        return db.query(SubscriptionPlan).filter(SubscriptionPlan.id == plan_id).first()
+        return db.scalar(select(SubscriptionPlan).where(SubscriptionPlan.id == plan_id))
 
     @staticmethod
     def list_plans(db: Session) -> list[SubscriptionPlan]:
-        return db.query(SubscriptionPlan).filter(
+        return db.execute(select(SubscriptionPlan).where(
             SubscriptionPlan.is_active == True
-        ).order_by(SubscriptionPlan.sort_order).all()
+        ).order_by(SubscriptionPlan.sort_order)).scalars().all()
 
     @staticmethod
     def get_subscription(db: Session, org_id: int) -> Optional[TenantSubscription]:
-        return db.query(TenantSubscription).filter(
+        return db.scalar(select(TenantSubscription).where(
             TenantSubscription.organization_id == org_id,
             TenantSubscription.is_active == True,
-        ).order_by(TenantSubscription.created_at.desc()).first()
+        ).order_by(TenantSubscription.created_at.desc()))
 
     @staticmethod
     def get_or_create_subscription(db: Session, org_id: int) -> TenantSubscription:
@@ -197,7 +198,7 @@ class SubscriptionService:
         )
         db.add(new_sub)
 
-        org = db.query(Organization).filter(Organization.id == org_id).first()
+        org = db.scalar(select(Organization).where(Organization.id == org_id))
         if org:
             try:
                 org.subscription_plan = PlanTier(target_tier)
@@ -280,9 +281,9 @@ class SubscriptionService:
         skip: int = 0,
         limit: int = 50,
     ) -> list[BillingHistory]:
-        return db.query(BillingHistory).filter(
+        return db.execute(select(BillingHistory).where(
             BillingHistory.organization_id == org_id,
-        ).order_by(BillingHistory.created_at.desc()).offset(skip).limit(limit).all()
+        ).order_by(BillingHistory.created_at.desc()).offset(skip).limit(limit)).scalars().all()
 
     @staticmethod
     def check_feature_access(db: Session, org_id: int, feature: str) -> bool:
@@ -316,9 +317,9 @@ class SubscriptionService:
     def get_usage_counts(db: Session, org_id: int) -> dict:
         from app.models.user import User
         from app.models.task import Task
-        current_users = db.query(User).filter(User.tenant_id == org_id, User.is_active == True).count()
-        current_tasks = db.query(Task).filter(Task.tenant_id == org_id).count()
-        current_storage_mb = db.query(Task).filter(Task.tenant_id == org_id).count() * 0.1
+        current_users = db.scalar(select(func.count(User.id)).where(User.tenant_id == org_id, User.is_active == True))
+        current_tasks = db.scalar(select(func.count(Task.id)).where(Task.tenant_id == org_id))
+        current_storage_mb = db.scalar(select(func.count(Task.id)).where(Task.tenant_id == org_id)) * 0.1
         return {
             "users": current_users,
             "tasks": current_tasks,

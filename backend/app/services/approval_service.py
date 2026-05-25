@@ -1,6 +1,9 @@
 from typing import Optional
 from fastapi import HTTPException
+from sqlalchemy import select, desc, asc
 from sqlalchemy.orm import Session, joinedload
+from fastapi_pagination import Params
+from fastapi_pagination.ext.sqlalchemy import paginate as fastapi_paginate
 from app.models.approval import Approval
 from app.models.approval_history import ApprovalHistory
 from app.models.user import User, UserRole
@@ -12,7 +15,6 @@ from app.services.notification_service import (
     create_approval_request_notification,
     create_approval_action_notification,
 )
-from app.utils.pagination import paginate_query
 
 logger = get_logger("approval_service")
 
@@ -23,12 +25,7 @@ def _invalidate_approval_caches():
         loop = asyncio.get_running_loop()
         asyncio.ensure_future(cache_delete_pattern("dashboard:*"))
     except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            loop.run_until_complete(cache_delete_pattern("dashboard:*"))
-        finally:
-            loop.close()
+        asyncio.run(cache_delete_pattern("dashboard:*"))
 
 
 def create_approval(db: Session, approval_data: ApprovalCreate, current_user):
@@ -49,10 +46,10 @@ def create_approval(db: Session, approval_data: ApprovalCreate, current_user):
         new_value={"title": approval_data.title, "description": approval_data.description},
     )
 
-    approvers = db.query(User).filter(
+    approvers = db.execute(select(User).where(
         User.role.in_([UserRole.manager, UserRole.admin]),
         User.is_active == True,
-    ).all()
+    )).scalars().all()
     for approver in approvers:
         create_approval_request_notification(
             db, approver.id, approval.id, approval.title,
@@ -75,24 +72,31 @@ def get_approvals(
     role = current_user.role.value if hasattr(current_user.role, "value") else str(current_user.role)
     logger.debug("Fetching approvals for user_id=%d role=%s", current_user.id, role)
 
-    query = db.query(Approval).options(joinedload(Approval.requester))
+    query = select(Approval).options(joinedload(Approval.requester))
 
     if role == "admin":
         pass
     elif role == "manager":
-        query = query.filter(Approval.current_level == "manager")
+        query = query.where(Approval.current_level == "manager")
     else:
-        query = query.filter(Approval.requested_by == current_user.id)
+        query = query.where(Approval.requested_by == current_user.id)
 
-    result = paginate_query(
-        db, query,
-        page=page, size=size,
-        sort_by=sort_by, sort_order=sort_order,
-        search=search, search_columns=[Approval.title, Approval.description],
-    )
+    if search:
+        pattern = f"%{search}%"
+        query = query.where(
+            Approval.title.ilike(pattern) | Approval.description.ilike(pattern)
+        )
+
+    if sort_by:
+        column = getattr(Approval, sort_by, None)
+        if column:
+            order_fn = desc if sort_order == "desc" else asc
+            query = query.order_by(order_fn(column))
+
+    result = fastapi_paginate(db, query, Params(page=page, size=size))
 
     enriched = []
-    for a in result["items"]:
+    for a in result.items:
         requester = a.requester
         enriched.append({
             "id": a.id,
@@ -109,7 +113,7 @@ def get_approvals(
             "updated_at": a.updated_at.isoformat() if a.updated_at else None,
         })
 
-    result["items"] = enriched
+    result.items = enriched
     logger.debug("Fetched %d approvals for user_id=%d", len(enriched), current_user.id)
     return result
 
@@ -119,7 +123,7 @@ def take_approval_action(db: Session, approval_id: int, action_data: ApprovalAct
     logger.info("Approval action: id=%d action=%s by user_id=%d role=%s",
                 approval_id, action_data.action, current_user.id, role)
 
-    approval = db.query(Approval).filter(Approval.id == approval_id).first()
+    approval = db.scalar(select(Approval).where(Approval.id == approval_id))
 
     if not approval:
         logger.warning("Approval action failed: not found id=%d", approval_id)
@@ -191,8 +195,8 @@ def take_approval_action(db: Session, approval_id: int, action_data: ApprovalAct
 
 def get_approval_history(db: Session, approval_id: int):
     logger.debug("Fetching approval history for id=%d", approval_id)
-    history = db.query(ApprovalHistory).filter(
+    history = db.execute(select(ApprovalHistory).where(
         ApprovalHistory.approval_id == approval_id
-    ).all()
+    )).scalars().all()
     logger.debug("Fetched %d history entries for approval id=%d", len(history), approval_id)
     return history

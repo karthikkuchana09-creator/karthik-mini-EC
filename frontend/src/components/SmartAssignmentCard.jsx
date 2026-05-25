@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { recommendAssignment } from '../api/ai';
 import { getWorkloadAnalysis } from '../api/ai';
+import { getUsers } from '../api/tasks';
 
 function WorkloadMeter({ score }) {
   const pct = Math.min(100, (score / 10) * 100);
@@ -68,7 +69,21 @@ function SmartAssignmentCard({ title, priority, onAssign, selectedUserId, disabl
           setCandidates(all.slice(0, 5));
           setTop(d?.recommended_user || null);
         })
-        .catch(() => {})
+        .catch(() => {
+          getUsers().then((data) => {
+            const all = Array.isArray(data) ? data : (data?.items || []);
+            setCandidates(all.slice(0, 5).map((u) => ({
+              user_id: u.id,
+              name: u.name || u.email,
+              email: u.email,
+              role: u.role || '',
+              score: null,
+              reason: null,
+              factors: null,
+            })));
+            setTop(null);
+          }).catch(() => {});
+        })
         .finally(() => setLoading(false));
     }, 400);
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };

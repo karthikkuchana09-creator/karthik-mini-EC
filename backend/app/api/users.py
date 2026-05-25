@@ -4,7 +4,6 @@ from fastapi_pagination import Page
 from app.schemas.user import UserUpdate, UserOut
 from app.api.deps import get_db
 from app.core.rbac import require_permission, Permissions
-from app.core.subscription_access import require_feature
 from app.repository.user_repository import list_all_users
 from app.services.user_service import (
     get_user_by_id, update_user,
@@ -19,7 +18,6 @@ def get_users(
     request: Request,
     db: Session = Depends(get_db),
     user=Depends(require_permission(Permissions.user_list)),
-    _=Depends(require_feature("user_management")),
 ):
     tenant_id = user.tenant_id if user else None
     return list_all_users(db, tenant_id=tenant_id)

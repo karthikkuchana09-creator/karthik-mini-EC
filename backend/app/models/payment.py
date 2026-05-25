@@ -1,6 +1,7 @@
-from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, Boolean
-from sqlalchemy.sql import func
-from sqlalchemy.orm import relationship
+from datetime import datetime
+from typing import Optional
+from sqlalchemy import Integer, String, DateTime, Text, ForeignKey, Boolean, func
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 import enum
 from app.db.base import Base
 
@@ -22,87 +23,87 @@ class PaymentType(str, enum.Enum):
 class RazorpayPayment(Base):
     __tablename__ = "razorpay_payments"
 
-    id = Column(Integer, primary_key=True, index=True)
-    organization_id = Column(Integer, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    organization_id: Mapped[int] = mapped_column(Integer, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
-    razorpay_order_id = Column(String(100), unique=True, nullable=False, index=True)
-    razorpay_payment_id = Column(String(100), nullable=True, index=True)
-    razorpay_signature = Column(String(255), nullable=True)
+    razorpay_order_id: Mapped[str] = mapped_column(String(100), unique=True, nullable=False, index=True)
+    razorpay_payment_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)
+    razorpay_signature: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
-    amount = Column(Integer, nullable=False)
-    amount_paid = Column(Integer, default=0)
-    currency = Column(String(3), default="INR")
-    status = Column(String(20), default=PaymentStatus.created.value, nullable=False)
+    amount: Mapped[int] = mapped_column(Integer, nullable=False)
+    amount_paid: Mapped[int] = mapped_column(Integer, default=0)
+    currency: Mapped[str] = mapped_column(String(3), default="INR")
+    status: Mapped[str] = mapped_column(String(20), default=PaymentStatus.created.value, nullable=False)
 
-    payment_type = Column(String(30), nullable=False)
-    plan_tier = Column(String(20), nullable=True)
-    billing_interval = Column(String(10), nullable=True)
-    credit_amount = Column(Integer, nullable=True)
+    payment_type: Mapped[str] = mapped_column(String(30), nullable=False)
+    plan_tier: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    billing_interval: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
+    credit_amount: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
-    invoice_id = Column(String(100), nullable=True)
-    receipt = Column(String(100), nullable=True)
-    error_code = Column(String(100), nullable=True)
-    error_description = Column(Text, nullable=True)
-    notes_json = Column(Text, nullable=True)
+    invoice_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    receipt: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    error_code: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    error_description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    notes_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
-    created_at = Column(DateTime, server_default=func.now(), nullable=False)
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 
-    organization = relationship("Organization", foreign_keys=[organization_id])
-    user = relationship("User", foreign_keys=[user_id])
+    organization: Mapped["Organization"] = relationship("Organization", foreign_keys=[organization_id])
+    user: Mapped[Optional["User"]] = relationship("User", foreign_keys=[user_id])
 
 
 class RazorpaySubscriptionLink(Base):
     __tablename__ = "razorpay_subscription_links"
 
-    id = Column(Integer, primary_key=True, index=True)
-    organization_id = Column(Integer, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
-    tenant_subscription_id = Column(Integer, ForeignKey("tenant_subscriptions.id", ondelete="SET NULL"), nullable=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    organization_id: Mapped[int] = mapped_column(Integer, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    tenant_subscription_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("tenant_subscriptions.id", ondelete="SET NULL"), nullable=True)
 
-    razorpay_subscription_id = Column(String(100), unique=True, nullable=False, index=True)
-    plan_tier = Column(String(20), nullable=False)
-    billing_interval = Column(String(10), nullable=False)
-    status = Column(String(20), default="created", nullable=False)
-    short_url = Column(String(500), nullable=True)
+    razorpay_subscription_id: Mapped[str] = mapped_column(String(100), unique=True, nullable=False, index=True)
+    plan_tier: Mapped[str] = mapped_column(String(20), nullable=False)
+    billing_interval: Mapped[str] = mapped_column(String(10), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="created", nullable=False)
+    short_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
 
-    current_start = Column(DateTime, nullable=True)
-    current_end = Column(DateTime, nullable=True)
-    total_count = Column(Integer, default=0)
-    paid_count = Column(Integer, default=0)
+    current_start: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    current_end: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    total_count: Mapped[int] = mapped_column(Integer, default=0)
+    paid_count: Mapped[int] = mapped_column(Integer, default=0)
 
-    created_at = Column(DateTime, server_default=func.now(), nullable=False)
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 
-    organization = relationship("Organization", foreign_keys=[organization_id])
-    user = relationship("User", foreign_keys=[user_id])
-    tenant_subscription = relationship("TenantSubscription", foreign_keys=[tenant_subscription_id])
+    organization: Mapped["Organization"] = relationship("Organization", foreign_keys=[organization_id])
+    user: Mapped[Optional["User"]] = relationship("User", foreign_keys=[user_id])
+    tenant_subscription: Mapped[Optional["TenantSubscription"]] = relationship("TenantSubscription", foreign_keys=[tenant_subscription_id])
 
 
 class RazorpayInvoice(Base):
     __tablename__ = "razorpay_invoices"
 
-    id = Column(Integer, primary_key=True, index=True)
-    organization_id = Column(Integer, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    organization_id: Mapped[int] = mapped_column(Integer, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
 
-    razorpay_invoice_id = Column(String(100), unique=True, nullable=False, index=True)
-    razorpay_subscription_id = Column(String(100), nullable=True, index=True)
-    razorpay_payment_id = Column(String(100), nullable=True, index=True)
-    order_id = Column(String(100), nullable=True)
+    razorpay_invoice_id: Mapped[str] = mapped_column(String(100), unique=True, nullable=False, index=True)
+    razorpay_subscription_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)
+    razorpay_payment_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)
+    order_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
 
-    amount = Column(Integer, nullable=False)
-    amount_paid = Column(Integer, default=0)
-    currency = Column(String(3), default="INR")
-    status = Column(String(20), nullable=False)
+    amount: Mapped[int] = mapped_column(Integer, nullable=False)
+    amount_paid: Mapped[int] = mapped_column(Integer, default=0)
+    currency: Mapped[str] = mapped_column(String(3), default="INR")
+    status: Mapped[str] = mapped_column(String(20), nullable=False)
 
-    invoice_url = Column(String(500), nullable=True)
-    pdf_url = Column(String(500), nullable=True)
+    invoice_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    pdf_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
 
-    period_start = Column(DateTime, nullable=True)
-    period_end = Column(DateTime, nullable=True)
+    period_start: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    period_end: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
-    created_at = Column(DateTime, server_default=func.now(), nullable=False)
-    paid_at = Column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+    paid_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
-    organization = relationship("Organization", foreign_keys=[organization_id])
+    organization: Mapped["Organization"] = relationship("Organization", foreign_keys=[organization_id])

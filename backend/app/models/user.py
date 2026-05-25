@@ -1,7 +1,9 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Enum, ForeignKey
+from typing import Optional
 from datetime import datetime
+from sqlalchemy import String, Integer, Boolean, DateTime, Enum, ForeignKey
+from sqlalchemy.sql import func
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
-from sqlalchemy.orm import relationship
 import enum
 
 
@@ -21,47 +23,50 @@ class SubscriptionRole(str, enum.Enum):
 class User(Base):
     __tablename__ = "users"
 
-    id = Column(Integer, primary_key=True, index=True)
-    tenant_id = Column(Integer, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True)
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    tenant_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True)
 
-    name = Column(String(100), nullable=False)
-    email = Column(String(255), unique=True, index=True, nullable=False)
-    hashed_password = Column(String(255), nullable=False)
+    name: Mapped[str] = mapped_column(String(100))
+    email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    hashed_password: Mapped[str] = mapped_column(String(255))
 
-    role = Column(Enum(UserRole), default=UserRole.employee, nullable=False)
-    subscription_role = Column(Enum(SubscriptionRole), default=SubscriptionRole.member, nullable=False)
+    role: Mapped[UserRole] = mapped_column(Enum(UserRole), default=UserRole.employee)
+    subscription_role: Mapped[SubscriptionRole] = mapped_column(Enum(SubscriptionRole), default=SubscriptionRole.member)
 
-    is_active = Column(Boolean, default=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
-    google_id = Column(String(255), unique=True, nullable=True, index=True)
-    avatar_url = Column(String(500), nullable=True)
-    auth_provider = Column(String(50), default="email")
+    google_id: Mapped[Optional[str]] = mapped_column(String(255), unique=True, nullable=True, index=True)
+    avatar_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    auth_provider: Mapped[str] = mapped_column(String(50), default="email")
 
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
 
-    updated_at = Column(
+    updated_at: Mapped[datetime] = mapped_column(
         DateTime,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow
+        default=func.now(),
+        onupdate=func.now()
     )
 
-    # ✅ FIXED RELATIONSHIPS
-    created_tasks = relationship(
+    created_tasks: Mapped[list["Task"]] = relationship(
         "Task",
         foreign_keys="Task.created_by_id",
         back_populates="creator"
     )
 
-    assigned_tasks = relationship(
+    assigned_tasks: Mapped[list["Task"]] = relationship(
         "Task",
         foreign_keys="Task.assigned_to_id",
         back_populates="assignee"
     )
 
-    updated_tasks = relationship(
+    updated_tasks: Mapped[list["Task"]] = relationship(
         "Task",
         foreign_keys="Task.updated_by",
         back_populates="updater"
     )
 
-    documents = relationship("Document", back_populates="uploader")
+    documents: Mapped[list["Document"]] = relationship("Document", back_populates="uploader")
+
+    refresh_tokens: Mapped[list["RefreshToken"]] = relationship(back_populates="user")
+    password_reset_tokens: Mapped[list["PasswordResetToken"]] = relationship(back_populates="user")
+    sent_invitations: Mapped[list["OrganizationInvitation"]] = relationship(back_populates="inviter")

@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
-from sqlalchemy import func, extract
+from sqlalchemy import select, func, extract
 from app.core.log import get_logger
 from app.models.invoice import Invoice, InvoiceStatus, FailedPaymentLog
 from app.models.payment import RazorpayPayment, PaymentStatus
@@ -13,34 +13,35 @@ class BillingAnalyticsService:
 
     @staticmethod
     def get_revenue_summary(db: Session, org_id: int) -> dict:
-        paid_invoices = db.query(Invoice).filter(
-            Invoice.organization_id == org_id,
-            Invoice.status == InvoiceStatus.paid.value,
+        total_revenue = db.scalar(
+            select(func.coalesce(func.sum(Invoice.total_amount), 0)).where(
+                Invoice.organization_id == org_id,
+                Invoice.status == InvoiceStatus.paid.value,
+            ),
         )
 
-        total_revenue = paid_invoices.with_entities(
-            func.coalesce(func.sum(Invoice.total_amount), 0),
-        ).scalar()
-
-        paid_count = paid_invoices.count()
-
-        total_invoices = db.query(func.count(Invoice.id)).filter(
+        paid_count = db.scalar(select(func.count(Invoice.id)).where(
             Invoice.organization_id == org_id,
-        ).scalar()
+            Invoice.status == InvoiceStatus.paid.value,
+        ))
 
-        cancelled_count = db.query(func.count(Invoice.id)).filter(
+        total_invoices = db.scalar(select(func.count(Invoice.id)).where(
+            Invoice.organization_id == org_id,
+        ))
+
+        cancelled_count = db.scalar(select(func.count(Invoice.id)).where(
             Invoice.organization_id == org_id,
             Invoice.status == InvoiceStatus.cancelled.value,
-        ).scalar()
+        ))
 
         now = datetime.utcnow()
         month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
-        current_mrr = db.query(func.coalesce(func.sum(Invoice.total_amount), 0)).filter(
+        current_mrr = db.scalar(select(func.coalesce(func.sum(Invoice.total_amount), 0)).where(
             Invoice.organization_id == org_id,
             Invoice.status == InvoiceStatus.paid.value,
             Invoice.paid_date >= month_start,
-        ).scalar()
+        ))
 
         avg_revenue = round(total_revenue / paid_count, 2) if paid_count > 0 else None
 
@@ -63,21 +64,23 @@ class BillingAnalyticsService:
         now = datetime.utcnow()
         cutoff = now - timedelta(days=months * 31)
 
-        results = db.query(
-            extract("year", Invoice.paid_date).label("year"),
-            extract("month", Invoice.paid_date).label("month"),
-            func.coalesce(func.sum(Invoice.total_amount), 0).label("amount"),
-            func.count(Invoice.id).label("count"),
-        ).filter(
-            Invoice.organization_id == org_id,
-            Invoice.status == InvoiceStatus.paid.value,
-            Invoice.paid_date >= cutoff,
-        ).group_by(
-            extract("year", Invoice.paid_date),
-            extract("month", Invoice.paid_date),
-        ).order_by(
-            extract("year", Invoice.paid_date),
-            extract("month", Invoice.paid_date),
+        results = db.execute(
+            select(
+                extract("year", Invoice.paid_date).label("year"),
+                extract("month", Invoice.paid_date).label("month"),
+                func.coalesce(func.sum(Invoice.total_amount), 0).label("amount"),
+                func.count(Invoice.id).label("count"),
+            ).where(
+                Invoice.organization_id == org_id,
+                Invoice.status == InvoiceStatus.paid.value,
+                Invoice.paid_date >= cutoff,
+            ).group_by(
+                extract("year", Invoice.paid_date),
+                extract("month", Invoice.paid_date),
+            ).order_by(
+                extract("year", Invoice.paid_date),
+                extract("month", Invoice.paid_date),
+            )
         ).all()
 
         return [
@@ -91,16 +94,18 @@ class BillingAnalyticsService:
 
     @staticmethod
     def get_revenue_by_plan(db: Session, org_id: int) -> list[dict]:
-        results = db.query(
-            Invoice.plan_tier,
-            func.coalesce(func.sum(Invoice.total_amount), 0).label("amount"),
-            func.count(Invoice.id).label("count"),
-        ).filter(
-            Invoice.organization_id == org_id,
-            Invoice.status == InvoiceStatus.paid.value,
-            Invoice.plan_tier.isnot(None),
-        ).group_by(Invoice.plan_tier).order_by(
-            func.sum(Invoice.total_amount).desc(),
+        results = db.execute(
+            select(
+                Invoice.plan_tier,
+                func.coalesce(func.sum(Invoice.total_amount), 0).label("amount"),
+                func.count(Invoice.id).label("count"),
+            ).where(
+                Invoice.organization_id == org_id,
+                Invoice.status == InvoiceStatus.paid.value,
+                Invoice.plan_tier.isnot(None),
+            ).group_by(Invoice.plan_tier).order_by(
+                func.sum(Invoice.total_amount).desc(),
+            )
         ).all()
 
         return [
@@ -114,18 +119,18 @@ class BillingAnalyticsService:
 
     @staticmethod
     def get_failed_payments_summary(db: Session, org_id: int) -> dict:
-        total_failed = db.query(func.count(FailedPaymentLog.id)).filter(
+        total_failed = db.scalar(select(func.count(FailedPaymentLog.id)).where(
             FailedPaymentLog.organization_id == org_id,
-        ).scalar()
+        ))
 
-        unresolved = db.query(func.count(FailedPaymentLog.id)).filter(
+        unresolved = db.scalar(select(func.count(FailedPaymentLog.id)).where(
             FailedPaymentLog.organization_id == org_id,
             FailedPaymentLog.resolved == False,
-        ).scalar()
+        ))
 
-        recent = db.query(FailedPaymentLog).filter(
+        recent = db.execute(select(FailedPaymentLog).where(
             FailedPaymentLog.organization_id == org_id,
-        ).order_by(FailedPaymentLog.created_at.desc()).limit(10).all()
+        ).order_by(FailedPaymentLog.created_at.desc()).limit(10)).scalars().all()
 
         return {
             "total_failed": total_failed or 0,

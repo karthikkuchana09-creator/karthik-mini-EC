@@ -41,17 +41,17 @@ class OrganizationSettingsUpdate(BaseModel):
 class OrganizationSettingsResponse(BaseModel):
     id: int
     organization_id: int
-    primary_color: str
-    secondary_color: str
+    primary_color: Optional[str] = None
+    secondary_color: Optional[str] = None
     logo_url: Optional[str] = None
     favicon_url: Optional[str] = None
     company_address: Optional[str] = None
-    timezone: str
-    date_format: str
-    max_users: int
-    max_storage_gb: int
-    allowed_auth_providers: list
-    feature_flags: dict
+    timezone: Optional[str] = None
+    date_format: Optional[str] = None
+    max_users: Optional[int] = None
+    max_storage_gb: Optional[int] = None
+    allowed_auth_providers: Optional[list] = None
+    feature_flags: Optional[dict] = None
 
     model_config = {"from_attributes": True}
 

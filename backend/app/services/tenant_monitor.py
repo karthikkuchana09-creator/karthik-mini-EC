@@ -3,7 +3,8 @@ import json
 import time
 from datetime import datetime
 from typing import Optional
-from sqlalchemy import Column, Integer, String, DateTime, Float, Text, func
+from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import Integer, String, DateTime, Float, Text, func, select
 from sqlalchemy.sql import func as sqlfunc
 from app.db.base import Base
 from app.core.log import get_logger
@@ -14,11 +15,11 @@ logger = get_logger("tenant_monitor")
 class TenantMetric(Base):
     __tablename__ = "tenant_metrics"
 
-    id = Column(Integer, primary_key=True, index=True)
-    organization_id = Column(Integer, nullable=False, index=True)
-    metric_name = Column(String(100), nullable=False, index=True)
-    metric_value = Column(Float, default=0.0)
-    recorded_at = Column(DateTime, server_default=sqlfunc.now(), index=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    organization_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    metric_name: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    metric_value: Mapped[float] = mapped_column(Float, default=0.0)
+    recorded_at: Mapped[datetime] = mapped_column(DateTime, server_default=sqlfunc.now(), index=True)
 
 
 class TenantMonitor:
@@ -67,11 +68,16 @@ class TenantMonitor:
                         hours: int = 24) -> list[dict]:
         from datetime import datetime, timedelta
         cutoff = datetime.utcnow() - timedelta(hours=hours)
-        rows = db.query(TenantMetric).filter(
-            TenantMetric.organization_id == org_id,
-            TenantMetric.metric_name.like(f"{metric_name}%"),
-            TenantMetric.recorded_at >= cutoff,
-        ).order_by(TenantMetric.recorded_at.desc()).limit(100).all()
+        rows = db.execute(
+            select(TenantMetric)
+            .where(
+                TenantMetric.organization_id == org_id,
+                TenantMetric.metric_name.like(f"{metric_name}%"),
+                TenantMetric.recorded_at >= cutoff,
+            )
+            .order_by(TenantMetric.recorded_at.desc())
+            .limit(100)
+        ).scalars().all()
         return [
             {"value": r.metric_value, "recorded_at": r.recorded_at.isoformat()
              if r.recorded_at else None}
@@ -82,15 +88,18 @@ class TenantMonitor:
     def get_org_summary(db, org_id: int) -> dict:
         from datetime import datetime, timedelta
         cutoff = datetime.utcnow() - timedelta(hours=24)
-        stats = db.query(
-            func.avg(TenantMetric.metric_value).label("avg"),
-            func.max(TenantMetric.metric_value).label("max"),
-            func.min(TenantMetric.metric_value).label("min"),
-            func.count(TenantMetric.id).label("count"),
-        ).filter(
-            TenantMetric.organization_id == org_id,
-            TenantMetric.metric_name == "query_time",
-            TenantMetric.recorded_at >= cutoff,
+        stats = db.execute(
+            select(
+                func.avg(TenantMetric.metric_value).label("avg"),
+                func.max(TenantMetric.metric_value).label("max"),
+                func.min(TenantMetric.metric_value).label("min"),
+                func.count(TenantMetric.id).label("count"),
+            )
+            .where(
+                TenantMetric.organization_id == org_id,
+                TenantMetric.metric_name == "query_time",
+                TenantMetric.recorded_at >= cutoff,
+            )
         ).first()
         return {
             "org_id": org_id,
@@ -104,19 +113,21 @@ class TenantMonitor:
     def get_all_orgs_summary(db, hours: int = 24) -> list[dict]:
         from datetime import datetime, timedelta
         cutoff = datetime.utcnow() - timedelta(hours=hours)
-        rows = db.query(
-            TenantMetric.organization_id,
-            func.avg(TenantMetric.metric_value).label("avg_time"),
-            func.max(TenantMetric.metric_value).label("max_time"),
-            func.count(TenantMetric.id).label("query_count"),
-        ).filter(
-            TenantMetric.metric_name == "query_time",
-            TenantMetric.recorded_at >= cutoff,
-        ).group_by(
-            TenantMetric.organization_id,
-        ).order_by(
-            func.avg(TenantMetric.metric_value).desc(),
-        ).limit(20).all()
+        rows = db.execute(
+            select(
+                TenantMetric.organization_id,
+                func.avg(TenantMetric.metric_value).label("avg_time"),
+                func.max(TenantMetric.metric_value).label("max_time"),
+                func.count(TenantMetric.id).label("query_count"),
+            )
+            .where(
+                TenantMetric.metric_name == "query_time",
+                TenantMetric.recorded_at >= cutoff,
+            )
+            .group_by(TenantMetric.organization_id)
+            .order_by(func.avg(TenantMetric.metric_value).desc())
+            .limit(20)
+        ).all()
         return [
             {
                 "org_id": r.organization_id,

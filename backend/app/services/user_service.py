@@ -1,10 +1,12 @@
 from typing import Optional
 from fastapi import HTTPException
+from sqlalchemy import select, desc, asc
 from sqlalchemy.orm import Session
+from fastapi_pagination import Params
+from fastapi_pagination.ext.sqlalchemy import paginate as fastapi_paginate
 from app.models.user import User, SubscriptionRole
 from app.schemas.user import UserUpdate
 from app.core.log import get_logger
-from app.utils.pagination import paginate_query
 from app.core.tenant import tenant_filter, get_current_tenant_id
 from fastapi.encoders import jsonable_encoder
 from fastapi import Request
@@ -24,7 +26,7 @@ def get_all_users(
     tenant_id: Optional[int] = None,
 ):
     logger.debug("Fetching all users")
-    query = db.query(User)
+    query = select(User)
 
     if tenant_id is not None:
         query = tenant_filter(query, User, tenant_id)
@@ -33,13 +35,20 @@ def get_all_users(
         if tid:
             query = tenant_filter(query, User, tid)
 
-    result = paginate_query(
-        db, query,
-        page=page, size=size,
-        sort_by=sort_by, sort_order=sort_order,
-        search=search, search_columns=[User.name, User.email],
-    )
-    result["items"] = [
+    if search:
+        pattern = f"%{search}%"
+        query = query.where(
+            User.name.ilike(pattern) | User.email.ilike(pattern)
+        )
+
+    if sort_by:
+        column = getattr(User, sort_by, None)
+        if column:
+            order_fn = desc if sort_order == "desc" else asc
+            query = query.order_by(order_fn(column))
+
+    result = fastapi_paginate(db, query, Params(page=page, size=size))
+    enriched = [
         {
             "id": u.id,
             "name": u.name,
@@ -49,26 +58,27 @@ def get_all_users(
             "tenant_id": u.tenant_id,
             "is_active": u.is_active,
         }
-        for u in result["items"]
+        for u in result.items
     ]
-    logger.debug("Fetched %d users", len(result["items"]))
+    result.items = enriched
+    logger.debug("Fetched %d users", len(result.items))
     return result
 
 
 def get_user_by_id(db: Session, user_id: int):
     logger.debug("Fetching user id=%d", user_id)
-    user = db.query(User).filter(User.id == user_id).first()
+    user = db.scalar(select(User).where(User.id == user_id))
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return jsonable_encoder(user)
 
 
 def update_user(db: Session, user_id: int, data: UserUpdate):
-    user = db.query(User).filter(User.id == user_id).first()
+    user = db.scalar(select(User).where(User.id == user_id))
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    existing = db.query(User).filter(User.email == data.email, User.id != user_id).first()
+    existing = db.scalar(select(User).where(User.email == data.email, User.id != user_id))
     if existing:
         raise HTTPException(status_code=400, detail="Email already in use")
 
@@ -100,7 +110,7 @@ def update_user(db: Session, user_id: int, data: UserUpdate):
 
 
 def toggle_user_active(db: Session, user_id: int):
-    user = db.query(User).filter(User.id == user_id).first()
+    user = db.scalar(select(User).where(User.id == user_id))
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     user.is_active = not user.is_active
@@ -109,7 +119,7 @@ def toggle_user_active(db: Session, user_id: int):
 
 
 def delete_user(db: Session, user_id: int):
-    user = db.query(User).filter(User.id == user_id).first()
+    user = db.scalar(select(User).where(User.id == user_id))
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     db.delete(user)
@@ -118,7 +128,7 @@ def delete_user(db: Session, user_id: int):
 
 
 def set_subscription_role(db: Session, user_id: int, role: str) -> User:
-    user = db.query(User).filter(User.id == user_id).first()
+    user = db.scalar(select(User).where(User.id == user_id))
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     try:

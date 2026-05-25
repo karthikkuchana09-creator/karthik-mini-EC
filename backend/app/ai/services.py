@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import func
+from sqlalchemy import select, func
 from app.models.task import Task
 from app.models.approval import Approval
 from app.models.ai import AIAnalysis
@@ -36,23 +36,23 @@ def _calculate_urgency(due_date, now):
 
 def _task_base_query(db: Session, current_user):
     role = current_user.role.value if hasattr(current_user.role, "value") else str(current_user.role)
-    q = db.query(Task)
+    q = select(Task)
     if role == "admin":
         return q
     elif role == "manager":
-        return q.filter(
+        return q.where(
             (Task.created_by_id == current_user.id) |
             (Task.assigned_to_id == current_user.id)
         )
     else:
-        return q.filter(Task.assigned_to_id == current_user.id)
+        return q.where(Task.assigned_to_id == current_user.id)
 
 
 def _approval_base_query(db: Session, current_user):
     role = current_user.role.value if hasattr(current_user.role, "value") else str(current_user.role)
-    q = db.query(Approval)
+    q = select(Approval)
     if role == "manager":
-        return q.filter(Approval.current_level == "manager")
+        return q.where(Approval.current_level == "manager")
     return q
 
 
@@ -162,7 +162,7 @@ class AIService:
         logger.info("AI suggestion requested by user_id=%d", current_user.id)
 
         if request.task_id:
-            task = self.db.query(Task).filter(Task.id == request.task_id).first()
+            task = self.db.scalar(select(Task).where(Task.id == request.task_id))
             if not task:
                 from fastapi import HTTPException
                 raise HTTPException(404, "Task not found")
@@ -370,11 +370,13 @@ class AIService:
     def get_high_priority_tasks(self, current_user) -> list[dict]:
         logger.info("Fetching high priority pending tasks for user_id=%d", current_user.id)
         now = datetime.utcnow()
-        q = _task_base_query(self.db, current_user).filter(
+        q = _task_base_query(self.db, current_user).where(
             Task.priority == "high",
             Task.status != "done",
         )
-        tasks = q.options(joinedload(Task.assignee)).order_by(Task.due_date.asc()).all()
+        tasks = self.db.execute(
+            q.options(joinedload(Task.assignee)).order_by(Task.due_date.asc())
+        ).scalars().all()
         results = []
         for t in tasks:
             urgency = _calculate_urgency(t.due_date, now)
@@ -530,17 +532,21 @@ class AIService:
 
         delayed_tasks_by_user = []
         for uid in all_ids:
-            overdue = self.db.query(Task).filter(
+            overdue = self.db.execute(select(Task).where(
                 Task.assigned_to_id == uid,
                 Task.due_date < now,
                 Task.status != "done",
-            ).all()
-            completed_late = self.db.query(Task).filter(
-                Task.assigned_to_id == uid,
-                Task.status == "done",
-                Task.due_date.isnot(None),
-                Task.updated_at > Task.due_date,
-            ).count()
+            )).scalars().all()
+            completed_late = self.db.scalar(
+                select(func.count()).select_from(
+                    select(Task).where(
+                        Task.assigned_to_id == uid,
+                        Task.status == "done",
+                        Task.due_date.isnot(None),
+                        Task.updated_at > Task.due_date,
+                    ).subquery()
+                )
+            )
             p = perf_by_user.get(uid)
             name = p.name if p else "Unknown"
             delayed_tasks_by_user.append({
@@ -560,23 +566,28 @@ class AIService:
         for uid in all_ids:
             p = perf_by_user.get(uid)
             name = p.name if p else "Unknown"
-            total_reqs = self.db.query(Approval).filter(Approval.requested_by == uid).count()
-            pending = self.db.query(Approval).filter(Approval.requested_by == uid, Approval.status == "pending").count()
-            approved = self.db.query(Approval).filter(Approval.requested_by == uid, Approval.status == "approved").count()
-            rejected = self.db.query(Approval).filter(Approval.requested_by == uid, Approval.status == "rejected").count()
-            delayed_count = self.db.query(Approval).filter(
-                Approval.requested_by == uid,
-                Approval.status == "pending",
-                Approval.created_at < now - timedelta(hours=self.rules.approval_delay_hours),
-            ).count()
+            total_reqs = self.db.scalar(select(func.count()).select_from(select(Approval).where(Approval.requested_by == uid).subquery()))
+            pending = self.db.scalar(select(func.count()).select_from(select(Approval).where(Approval.requested_by == uid, Approval.status == "pending").subquery()))
+            approved = self.db.scalar(select(func.count()).select_from(select(Approval).where(Approval.requested_by == uid, Approval.status == "approved").subquery()))
+            rejected = self.db.scalar(select(func.count()).select_from(select(Approval).where(Approval.requested_by == uid, Approval.status == "rejected").subquery()))
+            delayed_count = self.db.scalar(
+                select(func.count()).select_from(
+                    select(Approval).where(
+                        Approval.requested_by == uid,
+                        Approval.status == "pending",
+                        Approval.created_at < now - timedelta(hours=self.rules.approval_delay_hours),
+                    ).subquery()
+                )
+            )
             approval_rate = round(approved / total_reqs * 100, 1) if total_reqs > 0 else 0
-            avg_wait = self.db.query(
-                func.avg((func.UNIX_TIMESTAMP(Approval.updated_at) - func.UNIX_TIMESTAMP(Approval.created_at)) / 3600)
-            ).filter(
-                Approval.requested_by == uid,
-                Approval.status.in_(["approved", "rejected"]),
-                Approval.updated_at.isnot(None),
-            ).scalar()
+            avg_wait = self.db.scalar(
+                select(func.avg((func.UNIX_TIMESTAMP(Approval.updated_at) - func.UNIX_TIMESTAMP(Approval.created_at)) / 3600)
+                ).where(
+                    Approval.requested_by == uid,
+                    Approval.status.in_(["approved", "rejected"]),
+                    Approval.updated_at.isnot(None),
+                )
+            )
             avg_wait_hours = round(float(avg_wait), 1) if avg_wait else None
             approval_efficiency.append({
                 "user_id": uid, "name": name,
@@ -641,12 +652,13 @@ class AIService:
 
     def get_history(self, current_user, skip: int = 0, limit: int = 50):
         return (
-            self.db.query(AIAnalysis)
-            .filter(AIAnalysis.user_id == current_user.id)
-            .order_by(AIAnalysis.created_at.desc())
-            .offset(skip)
-            .limit(limit)
-            .all()
+            self.db.execute(
+                select(AIAnalysis)
+                .where(AIAnalysis.user_id == current_user.id)
+                .order_by(AIAnalysis.created_at.desc())
+                .offset(skip)
+                .limit(limit)
+            ).scalars().all()
         )
 
 

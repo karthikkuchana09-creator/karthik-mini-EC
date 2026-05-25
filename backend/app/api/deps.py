@@ -1,5 +1,7 @@
+from typing import Optional
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.db.session import SessionLocal
 from app.models.user import User
@@ -68,7 +70,8 @@ def get_current_user(
 
     request.state.user_id = user_id
 
-    user = db.query(User).filter(User.id == user_id).first()
+    stmt = select(User).where(User.id == user_id)
+    user = db.scalar(stmt)
 
     if not user:
         raise credentials_exception
@@ -147,10 +150,10 @@ class TenantPathDependency:
         tenant_id = get_current_tenant_id(request)
         if tenant_id is None:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tenant required")
-        q = db.query(self.model)
+        stmt = select(self.model)
         if not self.allow_cross_tenant:
-            q = tenant_filter(q, self.model, tenant_id)
-        return q
+            stmt = tenant_filter(stmt, self.model, tenant_id)
+        return db.execute(stmt).scalars().all()
 
 
 def rate_limit(requests: int, window: int, prefix: str = "default"):

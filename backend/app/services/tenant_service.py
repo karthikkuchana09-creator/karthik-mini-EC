@@ -1,5 +1,6 @@
 from typing import Optional
 from sqlalchemy.orm import Session
+from sqlalchemy import select, func
 from fastapi import HTTPException, status
 from app.models.organization import Organization, SubscriptionPlan
 from app.models.organization_settings import OrganizationSettings
@@ -10,11 +11,11 @@ class TenantService:
 
     @staticmethod
     def get_org(db: Session, org_id: int) -> Optional[Organization]:
-        return db.query(Organization).filter(Organization.id == org_id).first()
+        return db.scalar(select(Organization).where(Organization.id == org_id))
 
     @staticmethod
     def get_org_by_slug(db: Session, slug: str) -> Optional[Organization]:
-        return db.query(Organization).filter(Organization.slug == slug).first()
+        return db.scalar(select(Organization).where(Organization.slug == slug))
 
     @staticmethod
     def assert_active(org: Organization) -> None:
@@ -58,7 +59,7 @@ class TenantService:
         logo: Optional[str] = None,
         plan: SubscriptionPlan = SubscriptionPlan.free,
     ) -> Organization:
-        existing = db.query(Organization).filter(Organization.slug == slug).first()
+        existing = db.scalar(select(Organization).where(Organization.slug == slug))
         if existing:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -122,14 +123,14 @@ class TenantService:
         limit: int = 100,
         include_inactive: bool = False,
     ) -> list[Organization]:
-        q = db.query(Organization)
+        stmt = select(Organization)
         if not include_inactive:
-            q = q.filter(Organization.is_active == True)
-        return q.order_by(Organization.created_at.desc()).offset(skip).limit(limit).all()
+            stmt = stmt.where(Organization.is_active == True)
+        return db.execute(stmt.order_by(Organization.created_at.desc()).offset(skip).limit(limit)).scalars().all()
 
     @staticmethod
     def get_settings(db: Session, org_id: int) -> Optional[OrganizationSettings]:
-        return db.query(OrganizationSettings).filter(OrganizationSettings.organization_id == org_id).first()
+        return db.scalar(select(OrganizationSettings).where(OrganizationSettings.organization_id == org_id))
 
     @staticmethod
     def update_settings(db: Session, org_id: int, data: dict) -> OrganizationSettings:
@@ -151,7 +152,7 @@ class TenantService:
     @staticmethod
     def count_active_users(db: Session, org_id: int) -> int:
         from app.models.user import User
-        return db.query(User).filter(User.tenant_id == org_id, User.is_active == True).count()
+        return db.scalar(select(func.count(User.id)).where(User.tenant_id == org_id, User.is_active == True))
 
     @staticmethod
     def is_at_user_limit(db: Session, org_id: int) -> bool:

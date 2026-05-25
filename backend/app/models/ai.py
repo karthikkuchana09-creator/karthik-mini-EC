@@ -1,4 +1,6 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
+from sqlalchemy import String, Text, DateTime, ForeignKey, func
+from sqlalchemy.orm import Mapped, mapped_column
+from typing import Optional
 from datetime import datetime
 from app.db.base import Base
 
@@ -6,12 +8,12 @@ from app.db.base import Base
 class AIAnalysis(Base):
     __tablename__ = "ai_analyses"
 
-    id = Column(Integer, primary_key=True, index=True)
-    tenant_id = Column(Integer, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    task_id = Column(Integer, ForeignKey("tasks.id"), nullable=True, index=True)
-    prompt = Column(Text, nullable=False)
-    response = Column(Text, nullable=False)
-    model_name = Column(String(100), default="gpt-4")
-    tokens_used = Column(Integer, default=0)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    tenant_id: Mapped[Optional[int]] = mapped_column(ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    task_id: Mapped[Optional[int]] = mapped_column(ForeignKey("tasks.id"), nullable=True, index=True)
+    prompt: Mapped[str] = mapped_column(Text, nullable=False)
+    response: Mapped[str] = mapped_column(Text, nullable=False)
+    model_name: Mapped[str] = mapped_column(String(100), default="gpt-4")
+    tokens_used: Mapped[int] = mapped_column(default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())

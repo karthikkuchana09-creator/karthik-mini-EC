@@ -5,6 +5,7 @@ from typing import Optional
 from fastapi import Request, HTTPException, status, Depends
 from fastapi.responses import JSONResponse
 from starlette.datastructures import MutableHeaders
+from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 from app.db.session import SessionLocal
 from app.models.organization import Organization
@@ -85,7 +86,7 @@ class TenantResolver:
             cached = cls._get_cached(f"id:{org_id}")
             if cached:
                 return cached
-            org = db.query(Organization).filter(Organization.id == org_id).first()
+            org = db.execute(select(Organization).where(Organization.id == org_id)).scalar_one_or_none()
             if org:
                 info = TenantInfo(id=org.id, slug=org.slug, name=org.name, is_active=org.is_active)
                 cls._set_cache(f"id:{org.id}", info)
@@ -95,7 +96,7 @@ class TenantResolver:
             cached = cls._get_cached(f"slug:{slug}")
             if cached:
                 return cached
-            org = db.query(Organization).filter(Organization.slug == slug).first()
+            org = db.execute(select(Organization).where(Organization.slug == slug)).scalar_one_or_none()
             if org:
                 info = TenantInfo(id=org.id, slug=org.slug, name=org.name, is_active=org.is_active)
                 cls._set_cache(f"id:{org.id}", info)
@@ -190,7 +191,7 @@ class TenantResolver:
         user_id = getattr(request.state, "user_id", None)
         if user_id:
             from app.models.user import User
-            user = db.query(User).filter(User.id == user_id).first()
+            user = db.execute(select(User).where(User.id == user_id)).scalar_one_or_none()
             if user and user.tenant_id:
                 request.state.user = user
                 info = cls.resolve_from_db(db, org_id=user.tenant_id)
@@ -331,16 +332,16 @@ def require_active_tenant(request: Request) -> int:
     return info.id
 
 
-def tenant_filter(query, model, tenant_id: int):
+def tenant_filter(stmt, model, tenant_id: int):
     if hasattr(model, "tenant_id"):
-        return query.filter(model.tenant_id == tenant_id)
-    return query
+        return stmt.where(model.tenant_id == tenant_id)
+    return stmt
 
 
-def multi_tenant_filter(query, model, tenant_ids: list[int]):
+def multi_tenant_filter(stmt, model, tenant_ids: list[int]):
     if hasattr(model, "tenant_id") and tenant_ids:
-        return query.filter(model.tenant_id.in_(tenant_ids))
-    return query
+        return stmt.where(model.tenant_id.in_(tenant_ids))
+    return stmt
 
 
 def get_tenant_db(request: Request):
@@ -378,19 +379,18 @@ class TenantQuery:
         self.db = db
         self.tenant_id = tenant_id
 
-    def query(self):
-        q = self.db.query(self.model)
-        return tenant_filter(q, self.model, self.tenant_id)
+    def _stmt(self):
+        stmt = select(self.model)
+        return tenant_filter(stmt, self.model, self.tenant_id)
 
     def get(self, ident):
-        q = self.query().filter(self.model.id == ident)
-        return q.first()
+        return self.db.execute(self._stmt().where(self.model.id == ident)).scalar_one_or_none()
 
     def all(self):
-        return self.query().all()
+        return self.db.execute(self._stmt().order_by(self.model.id)).scalars().all()
 
     def count(self):
-        return self.query().count()
+        return self.db.scalar(select(func.count()).select_from(self._stmt().subquery()))
 
     def paginate(self, skip: int = 0, limit: int = 100):
-        return self.query().offset(skip).limit(limit).all()
+        return self.db.execute(self._stmt().offset(skip).limit(limit)).scalars().all()

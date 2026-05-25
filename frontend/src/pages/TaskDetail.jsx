@@ -159,8 +159,8 @@ function TaskDetail() {
           canManage ? getUsers() : Promise.resolve([]),
         ]);
         setTask(taskData);
-        setComments(Array.isArray(commentsData) ? commentsData : []);
-        setUsers(Array.isArray(usersData) ? usersData : []);
+        setComments(Array.isArray(commentsData) ? commentsData : (commentsData?.items || []));
+        setUsers(Array.isArray(usersData) ? usersData : (usersData?.items || []));
       } catch (err) {
         console.error('Failed to fetch data:', err);
         setError(err.response?.data?.detail || err.message || 'Failed to load task');

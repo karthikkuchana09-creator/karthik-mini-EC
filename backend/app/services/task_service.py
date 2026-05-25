@@ -1,6 +1,9 @@
 from typing import Optional
 from fastapi import HTTPException
+from sqlalchemy import select, asc, desc
 from sqlalchemy.orm import Session, joinedload
+from fastapi_pagination import Params
+from fastapi_pagination.ext.sqlalchemy import paginate as fastapi_paginate
 from app.models.task import Task
 from app.models.user import User
 from app.schemas.task import TaskCreate, TaskUpdate
@@ -13,7 +16,7 @@ from app.services.notification_service import (
     create_task_assignment_notification,
     create_task_status_notification,
 )
-from app.utils.pagination import paginate_query
+
 from fastapi.encoders import jsonable_encoder
 from app.websocket.manager import manager
 from app.websocket.kanban import build_kanban_task_data, KanbanAction, detect_conflict
@@ -32,7 +35,10 @@ def _emit_kanban(action: KanbanAction, task, previous_status: str | None = None)
         "previous_status": previous_status,
         "timestamp": __import__("datetime").datetime.utcnow().isoformat(),
     }
-    asyncio.ensure_future(manager.notify_kanban(event))
+    try:
+        asyncio.ensure_future(manager.notify_kanban(event))
+    except RuntimeError:
+        pass
 
 
 def _invalidate_task_caches():
@@ -42,20 +48,15 @@ def _invalidate_task_caches():
         asyncio.ensure_future(cache_delete_pattern("dashboard:*"))
         asyncio.ensure_future(cache_delete_pattern("ai:summary:*"))
     except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            loop.run_until_complete(cache_delete_pattern("dashboard:*"))
-            loop.run_until_complete(cache_delete_pattern("ai:summary:*"))
-        finally:
-            loop.close()
+        asyncio.run(cache_delete_pattern("dashboard:*"))
+        asyncio.run(cache_delete_pattern("ai:summary:*"))
 
 
 def create_task(db: Session, task_data: TaskCreate, current_user):
     logger.info("Creating task: title=%s assigned_to=%d by user_id=%d",
                 task_data.title, task_data.assigned_to_id, current_user.id)
 
-    assigned_user = db.query(User).filter(User.id == task_data.assigned_to_id).first()
+    assigned_user = db.scalar(select(User).where(User.id == task_data.assigned_to_id))
     if not assigned_user:
         logger.warning("Task creation failed: assigned user not found user_id=%d", task_data.assigned_to_id)
         raise HTTPException(404, "Assigned user not found")
@@ -95,32 +96,38 @@ def get_tasks(
     search: Optional[str] = None,
 ):
     logger.debug("Fetching tasks for user_id=%d role=%s", current_user.id, current_user.role)
-    query = db.query(Task).options(joinedload(Task.assignee))
+    query = select(Task).options(joinedload(Task.assignee))
 
     if current_user.role == "admin":
         pass
     elif current_user.role == "manager":
-        query = query.filter(
+        query = query.where(
             (Task.created_by_id == current_user.id) |
             (Task.assigned_to_id == current_user.id)
         )
     else:
-        query = query.filter(Task.assigned_to_id == current_user.id)
+        query = query.where(Task.assigned_to_id == current_user.id)
 
-    result = paginate_query(
-        db, query,
-        page=page, size=size,
-        sort_by=sort_by, sort_order=sort_order,
-        search=search, search_columns=[Task.title, Task.description],
-    )
+    if search:
+        pattern = f"%{search}%"
+        query = query.where(
+            Task.title.ilike(pattern) | Task.description.ilike(pattern)
+        )
 
-    result["items"] = jsonable_encoder(result["items"])
-    logger.debug("Fetched %d tasks for user_id=%d", len(result["items"]), current_user.id)
+    if sort_by:
+        column = getattr(Task, sort_by, None)
+        if column:
+            order_fn = desc if sort_order == "desc" else asc
+            query = query.order_by(order_fn(column))
+
+    result = fastapi_paginate(db, query, Params(page=page, size=size))
+    result.items = jsonable_encoder(result.items)
+    logger.debug("Fetched %d tasks for user_id=%d", len(result.items), current_user.id)
     return result
 
 
 def get_kanban_view(db: Session):
-    tasks = db.query(Task).all()
+    tasks = db.execute(select(Task)).scalars().all()
     logger.debug("Kanban view: %d total tasks", len(tasks))
 
     return {
@@ -133,10 +140,10 @@ def get_kanban_view(db: Session):
 
 def get_task_by_id(db: Session, task_id: int, current_user):
     logger.debug("Fetching task id=%d by user_id=%d", task_id, current_user.id)
-    task = db.query(Task).options(
+    task = db.scalar(select(Task).options(
         joinedload(Task.assignee),
         joinedload(Task.creator)
-    ).filter(Task.id == task_id).first()
+    ).where(Task.id == task_id))
 
     if not task:
         logger.warning("Task not found id=%d", task_id)
@@ -151,7 +158,7 @@ def get_task_by_id(db: Session, task_id: int, current_user):
 
 def update_task(db: Session, task_id: int, task_data: TaskUpdate, current_user):
     logger.info("Updating task id=%d by user_id=%d", task_id, current_user.id)
-    task = db.query(Task).filter(Task.id == task_id).first()
+    task = db.scalar(select(Task).where(Task.id == task_id))
 
     if not task:
         logger.warning("Task update failed: not found id=%d", task_id)
@@ -192,7 +199,7 @@ def update_task(db: Session, task_id: int, task_data: TaskUpdate, current_user):
 
 def delete_task(db: Session, task_id: int, current_user):
     logger.info("Deleting task id=%d", task_id)
-    task = db.query(Task).filter(Task.id == task_id).first()
+    task = db.scalar(select(Task).where(Task.id == task_id))
 
     if not task:
         logger.warning("Task delete failed: not found id=%d", task_id)
@@ -211,13 +218,13 @@ def delete_task(db: Session, task_id: int, current_user):
 
 def assign_task(db: Session, task_id: int, assigned_to_id: int, current_user):
     logger.info("Assigning task id=%d to user_id=%d", task_id, assigned_to_id)
-    task = db.query(Task).filter(Task.id == task_id).first()
+    task = db.scalar(select(Task).where(Task.id == task_id))
 
     if not task:
         logger.warning("Task assign failed: task not found id=%d", task_id)
         raise HTTPException(404, "Task not found")
 
-    assigned_user = db.query(User).filter(User.id == assigned_to_id).first()
+    assigned_user = db.scalar(select(User).where(User.id == assigned_to_id))
     if not assigned_user:
         logger.warning("Task assign failed: user not found user_id=%d", assigned_to_id)
         raise HTTPException(404, "User not found")
@@ -246,7 +253,7 @@ def assign_task(db: Session, task_id: int, assigned_to_id: int, current_user):
 
 def update_task_status(db: Session, task_id: int, new_status: str, current_user):
     logger.info("Updating task id=%d status to %s by user_id=%d", task_id, new_status, current_user.id)
-    task = db.query(Task).filter(Task.id == task_id).first()
+    task = db.scalar(select(Task).where(Task.id == task_id))
 
     if not task:
         logger.warning("Status update failed: task not found id=%d", task_id)

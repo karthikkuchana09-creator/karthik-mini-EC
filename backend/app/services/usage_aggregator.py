@@ -3,8 +3,8 @@ import asyncio
 import json
 from datetime import datetime, timedelta
 from typing import Optional
-from sqlalchemy.orm import Session
-from sqlalchemy import Column, Integer, String, DateTime, Text, Float, func
+from sqlalchemy.orm import Session, Mapped, mapped_column
+from sqlalchemy import Integer, String, DateTime, Text, Float, func, select
 from sqlalchemy.sql import func as sqlfunc
 from app.db.base import Base
 from app.core.log import get_logger
@@ -16,13 +16,13 @@ logger = get_logger("usage_aggregator")
 class UsageAggregation(Base):
     __tablename__ = "usage_aggregations"
 
-    id = Column(Integer, primary_key=True, index=True)
-    organization_id = Column(Integer, nullable=False, index=True)
-    period = Column(String(7), nullable=False, index=True)
-    metric = Column(String(50), nullable=False, index=True)
-    value = Column(Integer, default=0)
-    created_at = Column(DateTime, server_default=sqlfunc.now())
-    updated_at = Column(DateTime, server_default=sqlfunc.now(), onupdate=sqlfunc.now())
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    organization_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    period: Mapped[str] = mapped_column(String(7), nullable=False, index=True)
+    metric: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    value: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=sqlfunc.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=sqlfunc.now(), onupdate=sqlfunc.now())
 
 
 class UsageAggregator:
@@ -35,9 +35,9 @@ class UsageAggregator:
         try:
             period = datetime.utcnow().strftime("%Y-%m")
             from app.models.organization import Organization
-            all_orgs = db.query(Organization.id).filter(
+            all_orgs = db.execute(select(Organization.id).where(
                 Organization.is_active == True,
-            ).all()
+            )).all()
             org_ids = list({o[0] for o in all_orgs})
             db.close()
 
@@ -68,37 +68,37 @@ class UsageAggregator:
         db = SessionLocal()
         try:
             agg = {}
-            credits_used = db.query(
-                func.coalesce(func.sum(CreditTransaction.credits_used), 0)
-            ).filter(
-                CreditTransaction.organization_id == org_id,
-                CreditTransaction.transaction_type == TransactionType.deduction.value,
-            ).scalar() or 0
+            credits_used = db.scalar(
+                select(func.coalesce(func.sum(CreditTransaction.credits_used), 0)).where(
+                    CreditTransaction.organization_id == org_id,
+                    CreditTransaction.transaction_type == TransactionType.deduction.value,
+                )
+            ) or 0
             agg["credits_used"] = int(credits_used)
 
-            ai_queries = db.query(func.count(AIAnalysis.id)).filter(
+            ai_queries = db.scalar(select(func.count(AIAnalysis.id)).where(
                 AIAnalysis.tenant_id == org_id,
-            ).scalar() or 0
+            )) or 0
             agg["ai_queries"] = ai_queries
 
-            ai_tokens = db.query(
-                func.coalesce(func.sum(AIAnalysis.tokens_used), 0)
-            ).filter(
-                AIAnalysis.tenant_id == org_id,
-            ).scalar() or 0
+            ai_tokens = db.scalar(
+                select(func.coalesce(func.sum(AIAnalysis.tokens_used), 0)).where(
+                    AIAnalysis.tenant_id == org_id,
+                )
+            ) or 0
             agg["ai_tokens"] = int(ai_tokens)
 
-            revenue = db.query(
-                func.coalesce(func.sum(Invoice.total_amount), 0)
-            ).filter(
-                Invoice.organization_id == org_id,
-                Invoice.status == InvoiceStatus.paid.value,
-            ).scalar() or 0
+            revenue = db.scalar(
+                select(func.coalesce(func.sum(Invoice.total_amount), 0)).where(
+                    Invoice.organization_id == org_id,
+                    Invoice.status == InvoiceStatus.paid.value,
+                )
+            ) or 0
             agg["revenue_paise"] = int(revenue)
 
-            tasks = db.query(func.count(Task.id)).filter(
+            tasks = db.scalar(select(func.count(Task.id)).where(
                 Task.tenant_id == org_id,
-            ).scalar() or 0
+            )) or 0
             agg["tasks_created"] = tasks
 
             UsageAggregator._upsert(db, org_id, period, agg)
@@ -112,11 +112,11 @@ class UsageAggregator:
     @staticmethod
     def _upsert(db: Session, org_id: int, period: str, metrics: dict):
         for metric, value in metrics.items():
-            existing = db.query(UsageAggregation).filter(
+            existing = db.scalar(select(UsageAggregation).where(
                 UsageAggregation.organization_id == org_id,
                 UsageAggregation.period == period,
                 UsageAggregation.metric == metric,
-            ).first()
+            ))
             if existing:
                 existing.value = value
             else:
@@ -129,19 +129,19 @@ class UsageAggregator:
 
     @staticmethod
     def get_aggregated(db: Session, org_id: int, period: str) -> dict:
-        rows = db.query(UsageAggregation).filter(
+        rows = db.execute(select(UsageAggregation).where(
             UsageAggregation.organization_id == org_id,
             UsageAggregation.period == period,
-        ).all()
+        )).scalars().all()
         return {row.metric: row.value for row in rows}
 
     @staticmethod
     def get_trend(db: Session, org_id: int, metric: str, months: int = 6) -> list[dict]:
         from datetime import datetime
         cutoff = (datetime.utcnow() - timedelta(days=months * 31)).strftime("%Y-%m")
-        rows = db.query(UsageAggregation).filter(
+        rows = db.execute(select(UsageAggregation).where(
             UsageAggregation.organization_id == org_id,
             UsageAggregation.metric == metric,
             UsageAggregation.period >= cutoff,
-        ).order_by(UsageAggregation.period).all()
+        ).order_by(UsageAggregation.period)).scalars().all()
         return [{"period": r.period, "value": r.value} for r in rows]

@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 
-import { getUsers, getTask, updateTask } from '../api/tasks';
+import { getTask, updateTask } from '../api/tasks';
 import { useRolePermissions } from '../hooks/useRolePermissions';
+import { useUsers } from '../services/useUsersQuery';
 
 const statusConfig = {
   todo: { label: 'To Do', disabled: false },
@@ -16,7 +17,7 @@ function EditTask() {
   const navigate = useNavigate();
   const { canEditTask, isEmployee } = useRolePermissions();
 
-  const [users, setUsers] = useState([]);
+  const { data: users = [], isLoading: usersLoading, error: usersError, refetch: refetchUsers } = useUsers();
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
   const [error, setError] = useState(null);
@@ -37,10 +38,7 @@ function EditTask() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [taskData, usersData] = await Promise.all([
-          getTask(id),
-          canEditTask ? getUsers() : Promise.resolve([]),
-        ]);
+        const taskData = await getTask(id);
 
         const dueDate = taskData.due_date
           ? new Date(taskData.due_date).toISOString().split('T')[0]
@@ -54,8 +52,6 @@ function EditTask() {
           due_date: dueDate,
           assigned_to_id: taskData.assigned_to_id?.toString() || '',
         });
-
-        setUsers(Array.isArray(usersData) ? usersData : []);
       } catch (err) {
         console.error('Failed to fetch data:', err);
         setError(err.response?.data?.detail || err.message || 'Failed to load task');
@@ -65,7 +61,7 @@ function EditTask() {
     };
 
     fetchData();
-  }, [id, navigate, canEditTask]);
+  }, [id, navigate]);
 
   const validate = () => {
     const newErrors = {};
@@ -254,12 +250,37 @@ function EditTask() {
                     }`}
                   >
                     <option value="">Select a user...</option>
-                    {users.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.name || u.email} ({u.role})
-                      </option>
-                    ))}
+                    {usersLoading ? (
+                      <option disabled>Loading users...</option>
+                    ) : !users.length && usersError ? (
+                      <option disabled>Failed to load users</option>
+                    ) : !users.length ? (
+                      <option disabled>No users available</option>
+                    ) : (
+                      users.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.name || u.email} ({u.role})
+                        </option>
+                      ))
+                    )}
                   </select>
+                  {!usersLoading && !users.length && usersError && (
+                    <div className="mt-2">
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs text-red-500">Could not load users.</p>
+                        <button
+                          type="button"
+                          onClick={() => refetchUsers()}
+                          className="text-xs text-indigo-600 hover:text-indigo-700 underline"
+                        >
+                          Retry
+                        </button>
+                      </div>
+                      <p className="text-[10px] text-gray-400 mt-0.5">
+                        {usersError?.response?.data?.detail || usersError?.response?.data?.message || usersError?.message}
+                      </p>
+                    </div>
+                  )}
                   {errors.assigned_to_id && <p className="mt-1 text-xs text-red-600">{errors.assigned_to_id}</p>}
                 </div>
               )}

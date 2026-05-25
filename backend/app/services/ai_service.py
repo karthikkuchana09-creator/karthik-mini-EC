@@ -2,7 +2,7 @@ import random
 from datetime import datetime, timedelta
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, select
 from app.models.ai import AIAnalysis
 from app.models.task import Task
 from app.models.approval import Approval
@@ -22,24 +22,24 @@ WORKLOAD_CRITICAL_THRESHOLD = 10
 
 def _task_base_query(db: Session, current_user):
     role = current_user.role.value if hasattr(current_user.role, "value") else str(current_user.role)
-    q = db.query(Task)
+    stmt = select(Task)
 
     if role == "admin":
-        return q
+        return stmt
     elif role == "manager":
-        return q.filter(
+        return stmt.where(
             (Task.created_by_id == current_user.id) |
             (Task.assigned_to_id == current_user.id)
         )
     else:
-        return q.filter(Task.assigned_to_id == current_user.id)
+        return stmt.where(Task.assigned_to_id == current_user.id)
 
 
 def generate_suggestion(db: Session, request: AIRequest, current_user):
     logger.info("AI suggestion requested by user_id=%d prompt=%s", current_user.id, request.prompt[:50])
 
     if request.task_id:
-        task = db.query(Task).filter(Task.id == request.task_id).first()
+        task = db.scalar(select(Task).where(Task.id == request.task_id))
         if not task:
             raise HTTPException(404, "Task not found")
 
@@ -86,26 +86,26 @@ def generate_ai_summary(db: Session, current_user):
 
     base = _task_base_query(db, current_user)
 
-    total = base.count()
-    pending = base.filter(Task.status.in_(["todo", "in_progress"])).count()
-    in_review = base.filter(Task.status == "review").count()
-    done = base.filter(Task.status == "done").count()
-    high_priority = base.filter(
+    total = db.scalar(select(func.count()).select_from(base.subquery()))
+    pending = db.scalar(select(func.count()).select_from(base.where(Task.status.in_(["todo", "in_progress"])).subquery()))
+    in_review = db.scalar(select(func.count()).select_from(base.where(Task.status == "review").subquery()))
+    done = db.scalar(select(func.count()).select_from(base.where(Task.status == "done").subquery()))
+    high_priority = db.scalar(select(func.count()).select_from(base.where(
         Task.priority == "high",
         Task.status.in_(["todo", "in_progress"]),
-    ).count()
-    overdue = base.filter(
+    ).subquery()))
+    overdue = db.scalar(select(func.count()).select_from(base.where(
         Task.due_date < now,
         Task.status != "done",
-    ).count()
-    due_today = base.filter(
+    ).subquery()))
+    due_today = db.scalar(select(func.count()).select_from(base.where(
         func.date(Task.due_date) == func.date(now),
         Task.status != "done",
-    ).count()
-    completed_week = base.filter(
+    ).subquery()))
+    completed_week = db.scalar(select(func.count()).select_from(base.where(
         Task.status == "done",
         Task.updated_at >= now - timedelta(days=7),
-    ).count()
+    ).subquery()))
 
     stats = {
         "total_tasks": total,
@@ -125,10 +125,11 @@ def generate_ai_summary(db: Session, current_user):
         insights.append({"type": "warning", "severity": "high"
                          if overdue > 3 else "medium",
                          "text": f"{overdue} task{'s' if overdue != 1 else ''} overdue."})
-        overdue_tasks = base.filter(
-            Task.due_date < now,
-            Task.status != "done",
-        ).order_by(Task.due_date.asc()).limit(5).all()
+        overdue_tasks = db.execute(
+            base.where(Task.due_date < now, Task.status != "done")
+            .order_by(Task.due_date.asc())
+            .limit(5)
+        ).scalars().all()
         for t in overdue_tasks:
             days_late = (now - t.due_date).days
             assignee = t.assignee.email if t.assignee else "unassigned"
@@ -142,10 +143,11 @@ def generate_ai_summary(db: Session, current_user):
         insights.append({"type": "warning", "severity": "high"
                          if high_priority > 5 else "medium",
                          "text": f"{high_priority} high priority task{'s' if high_priority != 1 else ''} pending."})
-        hp_tasks = base.filter(
-            Task.priority == "high",
-            Task.status.in_(["todo", "in_progress"]),
-        ).order_by(Task.due_date.asc()).limit(3).all()
+        hp_tasks = db.execute(
+            base.where(Task.priority == "high", Task.status.in_(["todo", "in_progress"]))
+            .order_by(Task.due_date.asc())
+            .limit(3)
+        ).scalars().all()
         for t in hp_tasks:
             recommendations.append({
                 "severity": "high",
@@ -161,14 +163,14 @@ def generate_ai_summary(db: Session, current_user):
         insights.append({"type": "positive", "severity": "low",
                          "text": f"{completed_week} task{'s' if completed_week != 1 else ''} completed this week."})
 
-    approval_query = db.query(Approval)
+    approval_stmt = select(Approval)
     if role == "manager":
-        approval_query = approval_query.filter(Approval.current_level == "manager")
+        approval_stmt = approval_stmt.where(Approval.current_level == "manager")
 
-    total_approvals = approval_query.count()
-    pending_approvals = approval_query.filter(Approval.status == "pending").count()
-    approved_count = approval_query.filter(Approval.status == "approved").count()
-    rejected_count = approval_query.filter(Approval.status == "rejected").count()
+    total_approvals = db.scalar(select(func.count()).select_from(approval_stmt.subquery()))
+    pending_approvals = db.scalar(select(func.count()).select_from(approval_stmt.where(Approval.status == "pending").subquery()))
+    approved_count = db.scalar(select(func.count()).select_from(approval_stmt.where(Approval.status == "approved").subquery()))
+    rejected_count = db.scalar(select(func.count()).select_from(approval_stmt.where(Approval.status == "rejected").subquery()))
 
     stats["total_approvals"] = total_approvals
     stats["pending_approvals"] = pending_approvals
@@ -176,19 +178,21 @@ def generate_ai_summary(db: Session, current_user):
     stats["rejected_approvals"] = rejected_count
 
     if pending_approvals > 0:
-        delayed_approvals = approval_query.filter(
+        delayed_approvals = db.scalar(select(func.count()).select_from(approval_stmt.where(
             Approval.status == "pending",
             Approval.created_at < now - timedelta(hours=APPROVAL_DELAY_HOURS),
-        ).count()
+        ).subquery()))
 
         if delayed_approvals > 0:
             insights.append({"type": "warning", "severity": "high"
                              if delayed_approvals > 3 else "medium",
                              "text": f"{delayed_approvals} approval{'s' if delayed_approvals != 1 else ''} delayed beyond {APPROVAL_DELAY_HOURS}h."})
-            old_approvals = approval_query.filter(
-                Approval.status == "pending",
-                Approval.created_at < now - timedelta(hours=APPROVAL_DELAY_HOURS),
-            ).order_by(Approval.created_at.asc()).limit(3).all()
+            old_approvals = db.execute(
+                approval_stmt.where(
+                    Approval.status == "pending",
+                    Approval.created_at < now - timedelta(hours=APPROVAL_DELAY_HOURS),
+                ).order_by(Approval.created_at.asc()).limit(3)
+            ).scalars().all()
             for a in old_approvals:
                 wait_hours = int((now - a.created_at).total_seconds() / 3600)
                 requester = a.requester.email if a.requester else "unknown"
@@ -203,21 +207,17 @@ def generate_ai_summary(db: Session, current_user):
 
     assignee_task_counts = {}
     if role == "admin":
-        assignee_data = db.query(
-            Task.assigned_to_id,
-            func.count(Task.id),
-        ).filter(
-            Task.assigned_to_id.isnot(None),
-            Task.status != "done",
-        ).group_by(Task.assigned_to_id).all()
+        assignee_data = db.execute(
+            select(Task.assigned_to_id, func.count(Task.id))
+            .where(Task.assigned_to_id.isnot(None), Task.status != "done")
+            .group_by(Task.assigned_to_id)
+        ).all()
     else:
-        assignee_data = base.filter(
-            Task.assigned_to_id.isnot(None),
-            Task.status != "done",
-        ).with_entities(
-            Task.assigned_to_id,
-            func.count(Task.id),
-        ).group_by(Task.assigned_to_id).all()
+        assignee_data = db.execute(
+            base.where(Task.assigned_to_id.isnot(None), Task.status != "done")
+            .with_only_columns(Task.assigned_to_id, func.count(Task.id))
+            .group_by(Task.assigned_to_id)
+        ).all()
 
     for assignee_id, task_count in assignee_data:
         assignee_task_counts[assignee_id] = task_count
@@ -231,7 +231,7 @@ def generate_ai_summary(db: Session, current_user):
         if critical:
             user_ids = list(critical.keys())
             users_map = {
-                u.id: u for u in db.query(User).filter(User.id.in_(user_ids)).all()
+                u.id: u for u in db.execute(select(User).where(User.id.in_(user_ids))).scalars().all()
             }
             for uid, cnt in list(critical.items())[:3]:
                 u = users_map.get(uid)
@@ -250,7 +250,7 @@ def generate_ai_summary(db: Session, current_user):
         if overloaded and not critical:
             user_ids = list(overloaded.keys())
             users_map = {
-                u.id: u for u in db.query(User).filter(User.id.in_(user_ids)).all()
+                u.id: u for u in db.execute(select(User).where(User.id.in_(user_ids))).scalars().all()
             }
             for uid, cnt in list(overloaded.items())[:2]:
                 u = users_map.get(uid)
@@ -271,7 +271,7 @@ def generate_ai_summary(db: Session, current_user):
         if lightly_loaded and total > 5:
             user_ids = list(lightly_loaded.keys())
             users_map = {
-                u.id: u for u in db.query(User).filter(User.id.in_(user_ids)).all()
+                u.id: u for u in db.execute(select(User).where(User.id.in_(user_ids))).scalars().all()
             }
             for uid, cnt in list(lightly_loaded.items())[:2]:
                 u = users_map.get(uid)
@@ -321,10 +321,11 @@ def get_ai_history(
 ):
     logger.debug("Fetching AI history for user_id=%d", current_user.id)
     return (
-        db.query(AIAnalysis)
-        .filter(AIAnalysis.user_id == current_user.id)
-        .order_by(AIAnalysis.created_at.desc())
-        .offset(skip)
-        .limit(limit)
-        .all()
+        db.execute(
+            select(AIAnalysis)
+            .where(AIAnalysis.user_id == current_user.id)
+            .order_by(AIAnalysis.created_at.desc())
+            .offset(skip)
+            .limit(limit)
+        ).scalars().all()
     )

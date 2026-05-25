@@ -1,7 +1,9 @@
 import secrets
 from datetime import datetime, timedelta
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
+from fastapi_pagination.ext.sqlalchemy import paginate as fastapi_paginate
 from app.models.organization import Organization, SubscriptionPlan
 from app.models.organization_settings import OrganizationSettings
 from app.models.invitation import OrganizationInvitation, InvitationStatus
@@ -9,13 +11,13 @@ from app.models.user import User
 from app.schemas.organization import OrganizationCreate, OrganizationSettingsUpdate
 
 def get_organization(db: Session, org_id: int) -> Organization | None:
-    return db.query(Organization).filter(Organization.id == org_id).first()
+    return db.scalar(select(Organization).where(Organization.id == org_id))
 
 def get_organization_by_slug(db: Session, slug: str) -> Organization | None:
-    return db.query(Organization).filter(Organization.slug == slug).first()
+    return db.scalar(select(Organization).where(Organization.slug == slug))
 
 def create_organization(db: Session, data: OrganizationCreate) -> Organization:
-    existing = db.query(Organization).filter(Organization.slug == data.slug).first()
+    existing = db.scalar(select(Organization).where(Organization.slug == data.slug))
     if existing:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Organization slug already exists")
     org = Organization(name=data.name, slug=data.slug, logo=data.logo)
@@ -39,7 +41,7 @@ def update_organization(db: Session, org_id: int, data: dict) -> Organization:
     return org
 
 def get_org_settings(db: Session, org_id: int) -> OrganizationSettings | None:
-    return db.query(OrganizationSettings).filter(OrganizationSettings.organization_id == org_id).first()
+    return db.scalar(select(OrganizationSettings).where(OrganizationSettings.organization_id == org_id))
 
 def update_org_settings(db: Session, org_id: int, data: OrganizationSettingsUpdate) -> OrganizationSettings:
     settings = get_org_settings(db, org_id)
@@ -57,7 +59,7 @@ def create_invitation(db: Session, org_id: int, email: str, role: str, invited_b
     org = get_organization(db, org_id)
     if not org:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found")
-    existing = db.query(User).filter(User.email == email).first()
+    existing = db.scalar(select(User).where(User.email == email))
     if existing and existing.tenant_id == org_id:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User already in this organization")
     token = secrets.token_urlsafe(32)
@@ -75,5 +77,5 @@ def create_invitation(db: Session, org_id: int, email: str, role: str, invited_b
     db.refresh(invitation)
     return invitation
 
-def list_organizations(db: Session, skip: int = 0, limit: int = 100) -> list[Organization]:
-    return db.query(Organization).offset(skip).limit(limit).all()
+def list_organizations(db: Session):
+    return fastapi_paginate(db, select(Organization).order_by(Organization.id))

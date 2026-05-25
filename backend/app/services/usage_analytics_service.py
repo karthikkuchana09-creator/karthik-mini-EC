@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from typing import Optional
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import select, func
 from app.models.subscription import SubscriptionPlan, TenantSubscription, BillingHistory
 from app.models.credit import UsageCredit, CreditTransaction, TransactionType
 from app.models.user import User
@@ -40,9 +40,9 @@ class UsageAnalyticsService:
         else:
             savings_vs_monthly = 0
 
-        recent_billing = db.query(BillingHistory).filter(
+        recent_billing = db.execute(select(BillingHistory).where(
             BillingHistory.organization_id == org_id,
-        ).order_by(BillingHistory.created_at.desc()).limit(5).all()
+        ).order_by(BillingHistory.created_at.desc()).limit(5)).scalars().all()
 
         return {
             "subscription": {
@@ -103,36 +103,42 @@ class UsageAnalyticsService:
         seven_days_ago = now - timedelta(days=7)
         thirty_days_ago = now - timedelta(days=30)
 
-        last_7_days = db.query(
-            func.sum(CreditTransaction.credits_used).label("total_used"),
-            func.count(CreditTransaction.id).label("count"),
-        ).filter(
-            CreditTransaction.organization_id == org_id,
-            CreditTransaction.transaction_type == TransactionType.deduction.value,
-            CreditTransaction.created_at >= seven_days_ago,
+        last_7_days = db.execute(
+            select(
+                func.sum(CreditTransaction.credits_used).label("total_used"),
+                func.count(CreditTransaction.id).label("count"),
+            ).where(
+                CreditTransaction.organization_id == org_id,
+                CreditTransaction.transaction_type == TransactionType.deduction.value,
+                CreditTransaction.created_at >= seven_days_ago,
+            )
         ).first()
 
-        last_30_days = db.query(
-            func.sum(CreditTransaction.credits_used).label("total_used"),
-            func.count(CreditTransaction.id).label("count"),
-        ).filter(
-            CreditTransaction.organization_id == org_id,
-            CreditTransaction.transaction_type == TransactionType.deduction.value,
-            CreditTransaction.created_at >= thirty_days_ago,
+        last_30_days = db.execute(
+            select(
+                func.sum(CreditTransaction.credits_used).label("total_used"),
+                func.count(CreditTransaction.id).label("count"),
+            ).where(
+                CreditTransaction.organization_id == org_id,
+                CreditTransaction.transaction_type == TransactionType.deduction.value,
+                CreditTransaction.created_at >= thirty_days_ago,
+            )
         ).first()
 
-        daily_trend = db.query(
-            func.date(CreditTransaction.created_at).label("day"),
-            func.sum(CreditTransaction.credits_used).label("total_used"),
-            func.count(CreditTransaction.id).label("count"),
-        ).filter(
-            CreditTransaction.organization_id == org_id,
-            CreditTransaction.transaction_type == TransactionType.deduction.value,
-            CreditTransaction.created_at >= thirty_days_ago,
-        ).group_by(
-            func.date(CreditTransaction.created_at),
-        ).order_by(
-            func.date(CreditTransaction.created_at),
+        daily_trend = db.execute(
+            select(
+                func.date(CreditTransaction.created_at).label("day"),
+                func.sum(CreditTransaction.credits_used).label("total_used"),
+                func.count(CreditTransaction.id).label("count"),
+            ).where(
+                CreditTransaction.organization_id == org_id,
+                CreditTransaction.transaction_type == TransactionType.deduction.value,
+                CreditTransaction.created_at >= thirty_days_ago,
+            ).group_by(
+                func.date(CreditTransaction.created_at),
+            ).order_by(
+                func.date(CreditTransaction.created_at),
+            )
         ).all()
 
         avg_daily_usage = round((last_30_days.total_used or 0) / 30, 1)
@@ -140,15 +146,17 @@ class UsageAnalyticsService:
         if avg_daily_usage > 0:
             projected_exhaustion_days = round(account.remaining_credits / avg_daily_usage)
 
-        feature_breakdown = db.query(
-            CreditTransaction.feature,
-            func.sum(CreditTransaction.credits_used).label("total_used"),
-            func.count(CreditTransaction.id).label("call_count"),
-        ).filter(
-            CreditTransaction.organization_id == org_id,
-            CreditTransaction.transaction_type == TransactionType.deduction.value,
-        ).group_by(CreditTransaction.feature).order_by(
-            func.sum(CreditTransaction.credits_used).desc(),
+        feature_breakdown = db.execute(
+            select(
+                CreditTransaction.feature,
+                func.sum(CreditTransaction.credits_used).label("total_used"),
+                func.count(CreditTransaction.id).label("call_count"),
+            ).where(
+                CreditTransaction.organization_id == org_id,
+                CreditTransaction.transaction_type == TransactionType.deduction.value,
+            ).group_by(CreditTransaction.feature).order_by(
+                func.sum(CreditTransaction.credits_used).desc(),
+            )
         ).all()
 
         return {
@@ -195,35 +203,39 @@ class UsageAnalyticsService:
         thirty_days_ago = now - timedelta(days=30)
         seven_days_ago = now - timedelta(days=30)
 
-        total_api_calls = db.query(func.count(AuditLog.id)).filter(
+        total_api_calls = db.scalar(select(func.count(AuditLog.id)).where(
             AuditLog.tenant_id == org_id,
-        ).scalar()
+        ))
 
-        recent_api_calls = db.query(func.count(AuditLog.id)).filter(
+        recent_api_calls = db.scalar(select(func.count(AuditLog.id)).where(
             AuditLog.tenant_id == org_id,
             AuditLog.timestamp >= thirty_days_ago,
-        ).scalar()
+        ))
 
-        calls_by_endpoint = db.query(
-            AuditLog.action,
-            func.count(AuditLog.id).label("call_count"),
-        ).filter(
-            AuditLog.tenant_id == org_id,
-            AuditLog.timestamp >= thirty_days_ago,
-        ).group_by(AuditLog.action).order_by(
-            func.count(AuditLog.id).desc(),
-        ).limit(15).all()
+        calls_by_endpoint = db.execute(
+            select(
+                AuditLog.action,
+                func.count(AuditLog.id).label("call_count"),
+            ).where(
+                AuditLog.tenant_id == org_id,
+                AuditLog.timestamp >= thirty_days_ago,
+            ).group_by(AuditLog.action).order_by(
+                func.count(AuditLog.id).desc(),
+            ).limit(15)
+        ).all()
 
-        calls_by_day = db.query(
-            func.date(AuditLog.timestamp).label("day"),
-            func.count(AuditLog.id).label("call_count"),
-        ).filter(
-            AuditLog.tenant_id == org_id,
-            AuditLog.timestamp >= seven_days_ago,
-        ).group_by(
-            func.date(AuditLog.timestamp),
-        ).order_by(
-            func.date(AuditLog.timestamp),
+        calls_by_day = db.execute(
+            select(
+                func.date(AuditLog.timestamp).label("day"),
+                func.count(AuditLog.id).label("call_count"),
+            ).where(
+                AuditLog.tenant_id == org_id,
+                AuditLog.timestamp >= seven_days_ago,
+            ).group_by(
+                func.date(AuditLog.timestamp),
+            ).order_by(
+                func.date(AuditLog.timestamp),
+            )
         ).all()
 
         return {
@@ -248,15 +260,17 @@ class UsageAnalyticsService:
     @staticmethod
     def get_storage_usage(db: Session, org_id: int) -> dict:
         import os
-        storage_stats = db.query(
-            func.count(Document.id).label("total_files"),
-        ).filter(
-            Document.tenant_id == org_id,
+        storage_stats = db.execute(
+            select(
+                func.count(Document.id).label("total_files"),
+            ).where(
+                Document.tenant_id == org_id,
+            )
         ).first()
 
-        all_docs = db.query(Document).filter(
+        all_docs = db.execute(select(Document).where(
             Document.tenant_id == org_id,
-        ).all()
+        )).scalars().all()
 
         total_files = storage_stats.total_files or 0
 
@@ -266,9 +280,9 @@ class UsageAnalyticsService:
             files_by_type.setdefault(ext, {"file_count": 0})
             files_by_type[ext]["file_count"] += 1
 
-        recent_uploads = db.query(Document).filter(
+        recent_uploads = db.execute(select(Document).where(
             Document.tenant_id == org_id,
-        ).order_by(Document.created_at.desc()).limit(10).all()
+        ).order_by(Document.created_at.desc()).limit(10)).scalars().all()
 
         return {
             "total_files": total_files,
@@ -295,34 +309,38 @@ class UsageAnalyticsService:
         now = datetime.utcnow()
         thirty_days_ago = now - timedelta(days=30)
 
-        total_ai_queries = db.query(func.count(AIAnalysis.id)).filter(
+        total_ai_queries = db.scalar(select(func.count(AIAnalysis.id)).where(
             AIAnalysis.tenant_id == org_id,
-        ).scalar()
+        ))
 
-        recent_ai_queries = db.query(func.count(AIAnalysis.id)).filter(
+        recent_ai_queries = db.scalar(select(func.count(AIAnalysis.id)).where(
             AIAnalysis.tenant_id == org_id,
             AIAnalysis.created_at >= thirty_days_ago,
-        ).scalar()
+        ))
 
-        ai_by_type = db.query(
-            AIAnalysis.model_name,
-            func.count(AIAnalysis.id).label("query_count"),
-        ).filter(
-            AIAnalysis.tenant_id == org_id,
-        ).group_by(AIAnalysis.model_name).order_by(
-            func.count(AIAnalysis.id).desc(),
+        ai_by_type = db.execute(
+            select(
+                AIAnalysis.model_name,
+                func.count(AIAnalysis.id).label("query_count"),
+            ).where(
+                AIAnalysis.tenant_id == org_id,
+            ).group_by(AIAnalysis.model_name).order_by(
+                func.count(AIAnalysis.id).desc(),
+            )
         ).all()
 
-        ai_by_day = db.query(
-            func.date(AIAnalysis.created_at).label("day"),
-            func.count(AIAnalysis.id).label("query_count"),
-        ).filter(
-            AIAnalysis.tenant_id == org_id,
-            AIAnalysis.created_at >= thirty_days_ago,
-        ).group_by(
-            func.date(AIAnalysis.created_at),
-        ).order_by(
-            func.date(AIAnalysis.created_at),
+        ai_by_day = db.execute(
+            select(
+                func.date(AIAnalysis.created_at).label("day"),
+                func.count(AIAnalysis.id).label("query_count"),
+            ).where(
+                AIAnalysis.tenant_id == org_id,
+                AIAnalysis.created_at >= thirty_days_ago,
+            ).group_by(
+                func.date(AIAnalysis.created_at),
+            ).order_by(
+                func.date(AIAnalysis.created_at),
+            )
         ).all()
 
         credit_cost_for_ai = sum(
@@ -351,18 +369,20 @@ class UsageAnalyticsService:
 
     @staticmethod
     def get_users_usage(db: Session, org_id: int) -> dict:
-        total_users = db.query(func.count(User.id)).filter(
+        total_users = db.scalar(select(func.count(User.id)).where(
             User.tenant_id == org_id,
             User.is_active == True,
-        ).scalar()
+        ))
 
-        users_by_role = db.query(
-            User.subscription_role,
-            func.count(User.id).label("user_count"),
-        ).filter(
-            User.tenant_id == org_id,
-            User.is_active == True,
-        ).group_by(User.subscription_role).all()
+        users_by_role = db.execute(
+            select(
+                User.subscription_role,
+                func.count(User.id).label("user_count"),
+            ).where(
+                User.tenant_id == org_id,
+                User.is_active == True,
+            ).group_by(User.subscription_role)
+        ).all()
 
         return {
             "total_active_users": total_users or 0,
@@ -394,9 +414,9 @@ class UsageAnalyticsService:
                 )
 
         plan = subscription["plan"]
-        total_tasks = db.query(func.count(Task.id)).filter(
+        total_tasks = db.scalar(select(func.count(Task.id)).where(
             Task.tenant_id == org_id,
-        ).scalar() or 0
+        )) or 0
 
         limits = {
             "users": {"current": users["total_active_users"], "limit": plan["max_users"], "pct": round((users["total_active_users"] / plan["max_users"]) * 100, 1) if plan["max_users"] > 0 else 0},

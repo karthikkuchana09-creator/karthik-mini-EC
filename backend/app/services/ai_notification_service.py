@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, select
 from sqlalchemy.orm import joinedload
 
 from app.models.notification import Notification, NotificationType
@@ -52,17 +52,23 @@ async def _notify_users(
 
 
 def _get_manager_ids(db: Session) -> list[int]:
-    rows = db.query(User.id).filter(
-        User.is_active == True,
-        User.role.in_(["admin", "manager"]),
+    rows = db.execute(
+        select(User.id)
+        .where(
+            User.is_active == True,
+            User.role.in_(["admin", "manager"]),
+        )
     ).all()
     return [r[0] for r in rows]
 
 
 def _get_admin_ids(db: Session) -> list[int]:
-    rows = db.query(User.id).filter(
-        User.is_active == True,
-        User.role == "admin",
+    rows = db.execute(
+        select(User.id)
+        .where(
+            User.is_active == True,
+            User.role == "admin",
+        )
     ).all()
     return [r[0] for r in rows]
 
@@ -74,12 +80,15 @@ def _check_delay_risk(db: Session) -> list[dict]:
     threshold_days = 2
     results = []
 
-    tasks = db.query(Task).options(joinedload(Task.assignee)).filter(
-        Task.status != "done",
-        Task.due_date.isnot(None),
-        Task.due_date <= now + timedelta(days=threshold_days),
-        Task.due_date >= now,
-    ).all()
+    tasks = db.execute(
+        select(Task).options(joinedload(Task.assignee))
+        .where(
+            Task.status != "done",
+            Task.due_date.isnot(None),
+            Task.due_date <= now + timedelta(days=threshold_days),
+            Task.due_date >= now,
+        )
+    ).scalars().all()
 
     for t in tasks:
         remaining = (t.due_date - now).days
@@ -119,14 +128,17 @@ def _check_overloaded(db: Session) -> list[dict]:
     workload_critical = 10
     results = []
 
-    rows = db.query(
-        Task.assigned_to_id,
-        func.count(Task.id).label("cnt"),
-    ).filter(
-        Task.assigned_to_id.isnot(None),
-        Task.status != "done",
-    ).group_by(Task.assigned_to_id).having(
-        func.count(Task.id) >= workload_high,
+    rows = db.execute(
+        select(
+            Task.assigned_to_id,
+            func.count(Task.id).label("cnt"),
+        )
+        .where(
+            Task.assigned_to_id.isnot(None),
+            Task.status != "done",
+        )
+        .group_by(Task.assigned_to_id)
+        .having(func.count(Task.id) >= workload_high)
     ).all()
 
     if not rows:
@@ -135,7 +147,7 @@ def _check_overloaded(db: Session) -> list[dict]:
     uids = [r[0] for r in rows]
     users_map = {
         u.id: u
-        for u in db.query(User).filter(User.id.in_(uids)).all()
+        for u in db.execute(select(User).where(User.id.in_(uids))).scalars().all()
     }
 
     manager_ids = _get_manager_ids(db)
@@ -174,10 +186,13 @@ def _check_delayed_approvals(db: Session) -> list[dict]:
     delay_hours = 48
     results = []
 
-    delayed = db.query(Approval).options(joinedload(Approval.requester)).filter(
-        Approval.status == "pending",
-        Approval.created_at < now - timedelta(hours=delay_hours),
-    ).all()
+    delayed = db.execute(
+        select(Approval).options(joinedload(Approval.requester))
+        .where(
+            Approval.status == "pending",
+            Approval.created_at < now - timedelta(hours=delay_hours),
+        )
+    ).scalars().all()
 
     for a in delayed:
         wait_hours = int((now - a.created_at).total_seconds() / 3600)
@@ -217,11 +232,14 @@ def _check_ignored_high_priority(db: Session) -> list[dict]:
     ignore_hours = 24
     results = []
 
-    tasks = db.query(Task).options(joinedload(Task.assignee)).filter(
-        Task.priority == "high",
-        Task.status.in_(["todo", "in_progress"]),
-        Task.updated_at < now - timedelta(hours=ignore_hours),
-    ).all()
+    tasks = db.execute(
+        select(Task).options(joinedload(Task.assignee))
+        .where(
+            Task.priority == "high",
+            Task.status.in_(["todo", "in_progress"]),
+            Task.updated_at < now - timedelta(hours=ignore_hours),
+        )
+    ).scalars().all()
 
     for t in tasks:
         stalled_hours = int((now - t.updated_at).total_seconds() / 3600)

@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 
 from sqlalchemy.orm import Session
-from sqlalchemy import func, case, and_, text
+from sqlalchemy import select, func, case, and_, text
 from app.models.task import Task
 from app.models.approval import Approval
 from app.models.user import User
@@ -14,15 +14,15 @@ logger = get_logger("dashboard_service")
 
 @cached(prefix="dashboard:summary", ttl=lambda: settings.CACHE_TTL_DASHBOARD, exclude_args=[0])
 def get_summary(db: Session):
-    task_counts = db.query(
-        func.count(Task.id).label("total"),
-        func.sum(case((Task.status == "done", 1), else_=0)).label("completed"),
-        func.sum(case((Task.status != "done", 1), else_=0)).label("pending"),
-    ).one()
+    task_counts = db.execute(select(
+        func.coalesce(func.count(Task.id), 0).label("total"),
+        func.coalesce(func.sum(case((Task.status == "done", 1), else_=0)), 0).label("completed"),
+        func.coalesce(func.sum(case((Task.status != "done", 1), else_=0)), 0).label("pending"),
+    )).one()
 
-    pending_approvals = db.query(func.count(Approval.id)).filter(
+    pending_approvals = db.scalar(select(func.count(Approval.id)).where(
         Approval.status == "pending"
-    ).scalar()
+    ))
 
     logger.info("Dashboard summary: total=%d completed=%d pending=%d approvals=%d",
                 task_counts.total, task_counts.completed, task_counts.pending, pending_approvals)
@@ -37,10 +37,10 @@ def get_summary(db: Session):
 
 @cached(prefix="dashboard:distribution", ttl=lambda: settings.CACHE_TTL_DASHBOARD, exclude_args=[0])
 def get_task_distribution(db: Session):
-    rows = db.query(
-        Task.status,
-        func.count(Task.id).label("count"),
-    ).group_by(Task.status).all()
+    rows = db.execute(
+        select(Task.status, func.count(Task.id).label("count"))
+        .group_by(Task.status)
+    ).all()
 
     status_map = {r.status: r.count for r in rows}
     order = ["todo", "in_progress", "review", "done"]
@@ -53,10 +53,10 @@ def get_task_distribution(db: Session):
 
 @cached(prefix="dashboard:approval_stats", ttl=lambda: settings.CACHE_TTL_DASHBOARD, exclude_args=[0])
 def get_approval_stats(db: Session):
-    rows = db.query(
-        Approval.status,
-        func.count(Approval.id).label("count"),
-    ).group_by(Approval.status).all()
+    rows = db.execute(
+        select(Approval.status, func.count(Approval.id).label("count"))
+        .group_by(Approval.status)
+    ).all()
 
     stats = {"pending": 0, "approved": 0, "rejected": 0, "hold": 0}
     for r in rows:
@@ -72,12 +72,11 @@ def get_approval_stats(db: Session):
 
 @cached(prefix="dashboard:performance", ttl=lambda: settings.CACHE_TTL_DASHBOARD, exclude_args=[0])
 def get_performance(db: Session):
-    data = db.query(
-        User.name,
-        func.count(Task.id).label("tasks_count")
-    ).join(Task, Task.assigned_to_id == User.id)\
-     .group_by(User.name)\
-     .all()
+    data = db.execute(
+        select(User.name, func.count(Task.id).label("tasks_count"))
+        .join(Task, Task.assigned_to_id == User.id)
+        .group_by(User.name)
+    ).all()
 
     performance = [{"user": name, "tasks": count} for name, count in data]
     logger.debug("Performance data: %s", performance)
@@ -93,7 +92,7 @@ def get_enterprise_ai_summary(db: Session) -> dict:
     at_risk_days = 2
 
     # ── 1. Task risk metrics (single query) ──
-    task_row = db.query(
+    task_row = db.execute(select(
         func.sum(case(
             (and_(Task.priority == "high", Task.status.in_(["todo", "in_progress"])), 1),
             else_=0
@@ -123,49 +122,46 @@ def get_enterprise_ai_summary(db: Session) -> dict:
             (and_(Task.status == "done", Task.updated_at >= now - timedelta(days=7)), 1),
             else_=0
         )).label("completed_week"),
-    ).one()
+    )).one()
 
     # ── 2. Delayed approvals ──
-    delayed_approvals = db.query(func.count(Approval.id)).filter(
+    delayed_approvals = db.scalar(select(func.count(Approval.id)).where(
         Approval.status == "pending",
         Approval.created_at < now - timedelta(hours=delay_threshold_hours),
-    ).scalar() or 0
+    )) or 0
 
-    pending_approvals = db.query(func.count(Approval.id)).filter(
+    pending_approvals = db.scalar(select(func.count(Approval.id)).where(
         Approval.status == "pending",
-    ).scalar() or 0
+    )) or 0
 
     # ── 3. Overloaded employees ──
-    overloaded_row = db.query(
-        Task.assigned_to_id,
-        func.count(Task.id).label("task_count"),
-    ).filter(
-        Task.assigned_to_id.isnot(None),
-        Task.status != "done",
-    ).group_by(Task.assigned_to_id).having(
-        func.count(Task.id) >= workload_high,
+    overloaded_row = db.execute(
+        select(Task.assigned_to_id, func.count(Task.id).label("task_count"))
+        .where(Task.assigned_to_id.isnot(None), Task.status != "done")
+        .group_by(Task.assigned_to_id)
+        .having(func.count(Task.id) >= workload_high)
     ).all()
     overloaded_count = len(overloaded_row)
     critical_count = sum(1 for _, cnt in overloaded_row if cnt >= 10)
 
     underutilized_count = 0
-    underutilized_subq = db.query(
+    underutilized_subq = select(
         Task.assigned_to_id,
         func.count(Task.id).label("task_count"),
-    ).filter(
+    ).where(
         Task.assigned_to_id.isnot(None),
         Task.status != "done",
     ).group_by(Task.assigned_to_id).having(
         func.count(Task.id) == 0,
     ).subquery()
-    total_users = db.query(func.count(User.id)).filter(
+    total_users = db.scalar(select(func.count(User.id)).where(
         User.is_active == True,
-    ).scalar() or 0
+    )) or 0
     users_with_tasks = len(overloaded_row)
     underutilized_count = max(0, total_users - users_with_tasks)
 
     # ── 4. Team performance avg ──
-    perf_row = db.query(
+    perf_row = db.execute(select(
         func.avg(case(
             (and_(
                 Task.status == "done",
@@ -173,7 +169,7 @@ def get_enterprise_ai_summary(db: Session) -> dict:
                 Task.created_at.isnot(None),
             ), func.TIMESTAMPDIFF(text("SECOND"), Task.created_at, Task.updated_at) / 86400),
         )).label("avg_completion_days"),
-    ).one()
+    )).one()
     avg_completion = round(perf_row.avg_completion_days, 1) if perf_row.avg_completion_days else None
 
     # ── 5. Build summary strings ──

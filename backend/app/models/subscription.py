@@ -1,6 +1,7 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, JSON, ForeignKey, Enum as SAEnum
-from sqlalchemy.sql import func
-from sqlalchemy.orm import relationship
+from datetime import datetime
+from typing import Optional
+from sqlalchemy import Integer, String, Boolean, DateTime, Text, JSON, ForeignKey, func, Enum as SAEnum
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 import enum
 from app.db.base import Base
 
@@ -27,63 +28,63 @@ class BillingInterval(str, enum.Enum):
 class SubscriptionPlan(Base):
     __tablename__ = "subscription_plans"
 
-    id = Column(Integer, primary_key=True, index=True)
-    tier = Column(SAEnum(PlanTier), unique=True, nullable=False, index=True)
-    name = Column(String(100), nullable=False)
-    description = Column(Text, nullable=True)
-    price_monthly = Column(Integer, default=0)
-    price_yearly = Column(Integer, default=0)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    tier: Mapped[PlanTier] = mapped_column(SAEnum(PlanTier), unique=True, nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    price_monthly: Mapped[int] = mapped_column(Integer, default=0)
+    price_yearly: Mapped[int] = mapped_column(Integer, default=0)
 
-    max_users = Column(Integer, default=5)
-    max_tasks = Column(Integer, default=100)
-    max_ai_queries = Column(Integer, default=50)
-    max_storage_mb = Column(Integer, default=100)
-    max_teams = Column(Integer, default=1)
+    max_users: Mapped[int] = mapped_column(Integer, default=5)
+    max_tasks: Mapped[int] = mapped_column(Integer, default=100)
+    max_ai_queries: Mapped[int] = mapped_column(Integer, default=50)
+    max_storage_mb: Mapped[int] = mapped_column(Integer, default=100)
+    max_teams: Mapped[int] = mapped_column(Integer, default=1)
 
-    has_analytics = Column(Boolean, default=False)
-    has_approvals = Column(Boolean, default=False)
-    has_ai_intelligence = Column(Boolean, default=False)
-    has_realtime_collaboration = Column(Boolean, default=False)
-    has_advanced_analytics = Column(Boolean, default=False)
-    has_api_access = Column(Boolean, default=False)
-    has_audit_trail = Column(Boolean, default=False)
-    has_custom_branding = Column(Boolean, default=False)
-    has_priority_support = Column(Boolean, default=False)
-    has_sla = Column(Boolean, default=False)
+    has_analytics: Mapped[bool] = mapped_column(Boolean, default=False)
+    has_approvals: Mapped[bool] = mapped_column(Boolean, default=False)
+    has_ai_intelligence: Mapped[bool] = mapped_column(Boolean, default=False)
+    has_realtime_collaboration: Mapped[bool] = mapped_column(Boolean, default=False)
+    has_advanced_analytics: Mapped[bool] = mapped_column(Boolean, default=False)
+    has_api_access: Mapped[bool] = mapped_column(Boolean, default=False)
+    has_audit_trail: Mapped[bool] = mapped_column(Boolean, default=False)
+    has_custom_branding: Mapped[bool] = mapped_column(Boolean, default=False)
+    has_priority_support: Mapped[bool] = mapped_column(Boolean, default=False)
+    has_sla: Mapped[bool] = mapped_column(Boolean, default=False)
 
-    features_json = Column(JSON, default=dict)
-    is_active = Column(Boolean, default=True)
-    sort_order = Column(Integer, default=0)
-    created_at = Column(DateTime, server_default=func.now())
+    features_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
-    subscriptions = relationship("TenantSubscription", back_populates="plan")
+    subscriptions: Mapped[list["TenantSubscription"]] = relationship("TenantSubscription", back_populates="plan")
 
 
 class TenantSubscription(Base):
     __tablename__ = "tenant_subscriptions"
 
-    id = Column(Integer, primary_key=True, index=True)
-    organization_id = Column(Integer, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    organization_id: Mapped[int] = mapped_column(Integer, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
 
-    plan_id = Column(Integer, ForeignKey("subscription_plans.id", ondelete="RESTRICT"), nullable=False, index=True)
-    status = Column(SAEnum(SubscriptionStatus), default=SubscriptionStatus.active, nullable=False)
-    billing_interval = Column(SAEnum(BillingInterval), default=BillingInterval.monthly)
+    plan_id: Mapped[int] = mapped_column(Integer, ForeignKey("subscription_plans.id", ondelete="RESTRICT"), nullable=False, index=True)
+    status: Mapped[SubscriptionStatus] = mapped_column(SAEnum(SubscriptionStatus), default=SubscriptionStatus.active, nullable=False)
+    billing_interval: Mapped[BillingInterval] = mapped_column(SAEnum(BillingInterval), default=BillingInterval.monthly)
 
-    start_date = Column(DateTime, server_default=func.now(), nullable=False)
-    current_period_start = Column(DateTime, server_default=func.now(), nullable=False)
-    current_period_end = Column(DateTime, nullable=False)
-    trial_end = Column(DateTime, nullable=True)
-    canceled_at = Column(DateTime, nullable=True)
-    ended_at = Column(DateTime, nullable=True)
+    start_date: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+    current_period_start: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+    current_period_end: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    trial_end: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    canceled_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    ended_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
-    auto_renew = Column(Boolean, default=True)
-    is_active = Column(Boolean, default=True)
-    metadata_json = Column(Text, nullable=True)
+    auto_renew: Mapped[bool] = mapped_column(Boolean, default=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    metadata_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 
-    plan = relationship("SubscriptionPlan", back_populates="subscriptions", foreign_keys=[plan_id])
+    plan: Mapped["SubscriptionPlan"] = relationship("SubscriptionPlan", back_populates="subscriptions", foreign_keys=[plan_id])
 
     @property
     def is_expired(self) -> bool:
@@ -111,30 +112,30 @@ class TenantSubscription(Base):
 class BillingHistory(Base):
     __tablename__ = "billing_history"
 
-    id = Column(Integer, primary_key=True, index=True)
-    organization_id = Column(Integer, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
-    subscription_id = Column(Integer, ForeignKey("tenant_subscriptions.id", ondelete="SET NULL"), nullable=True, index=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    organization_id: Mapped[int] = mapped_column(Integer, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    subscription_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("tenant_subscriptions.id", ondelete="SET NULL"), nullable=True, index=True)
 
-    event_type = Column(String(50), nullable=False, index=True)
-    description = Column(Text, nullable=True)
+    event_type: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
-    previous_plan_id = Column(Integer, nullable=True)
-    new_plan_id = Column(Integer, nullable=True)
+    previous_plan_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    new_plan_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
-    previous_status = Column(String(50), nullable=True)
-    new_status = Column(String(50), nullable=True)
+    previous_status: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    new_status: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
 
-    amount = Column(Integer, default=0)
-    currency = Column(String(3), default="USD")
-    interval = Column(String(20), nullable=True)
-    period_start = Column(DateTime, nullable=True)
-    period_end = Column(DateTime, nullable=True)
+    amount: Mapped[int] = mapped_column(Integer, default=0)
+    currency: Mapped[str] = mapped_column(String(3), default="USD")
+    interval: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    period_start: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    period_end: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
-    invoice_url = Column(String(500), nullable=True)
-    receipt_url = Column(String(500), nullable=True)
-    payment_method = Column(String(50), nullable=True)
+    invoice_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    receipt_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    payment_method: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
 
-    metadata_json = Column(Text, nullable=True)
-    created_at = Column(DateTime, server_default=func.now(), nullable=False, index=True)
+    metadata_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False, index=True)
 
     organization_id_index = "ix_billing_history_org_id"

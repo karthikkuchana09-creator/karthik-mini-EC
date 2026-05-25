@@ -1,18 +1,17 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { getUsers, createTask } from '../api/tasks';
+import { createTask } from '../api/tasks';
 import { useRolePermissions } from '../hooks/useRolePermissions';
+import { useUsers } from '../services/useUsersQuery';
 import SmartAssignmentCard from '../components/SmartAssignmentCard';
 
 function CreateTask() {
   const navigate = useNavigate();
   const { canCreateTask } = useRolePermissions();
 
-  const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [fetchingUsers, setFetchingUsers] = useState(true);
+  const [submitError, setSubmitError] = useState(null);
 
   const [form, setForm] = useState({
     title: '',
@@ -24,26 +23,21 @@ function CreateTask() {
 
   const [errors, setErrors] = useState({});
 
+  const { data: users = [], isLoading: fetchingUsers, error: usersError, refetch: refetchUsers } = useUsers();
+
   useEffect(() => {
     if (!canCreateTask) {
       navigate('/dashboard');
-      return;
     }
-
-    const fetchUsers = async () => {
-      try {
-        const data = await getUsers();
-        setUsers(Array.isArray(data) ? data : []);
-      } catch (err) {
-        console.error('Failed to fetch users:', err);
-        setError(err.response?.data?.detail || err.response?.data?.message || 'Failed to load users');
-      } finally {
-        setFetchingUsers(false);
-      }
-    };
-
-    fetchUsers();
   }, [canCreateTask, navigate]);
+
+  const userFetchError = usersError
+    ? usersError?.response?.data?.detail || usersError?.response?.data?.message || usersError?.message || 'Failed to load users'
+    : null;
+
+  if (usersError) {
+    console.error('[CreateTask] Failed to fetch users:', usersError?.response?.status, usersError?.response?.data || usersError?.message);
+  }
 
   const validate = () => {
     const newErrors = {};
@@ -65,7 +59,7 @@ function CreateTask() {
     if (!validate()) return;
 
     setLoading(true);
-    setError(null);
+    setSubmitError(null);
 
     try {
       const taskData = {
@@ -79,7 +73,7 @@ function CreateTask() {
       await createTask(taskData);
       navigate('/tasks');
     } catch (err) {
-      setError(err.response?.data?.detail || err.response?.data?.message || err.message || 'Failed to create task');
+      setSubmitError(err.response?.data?.detail || err.response?.data?.message || err.message || 'Failed to create task');
     } finally {
       setLoading(false);
     }
@@ -113,9 +107,9 @@ function CreateTask() {
           <p className="text-sm text-gray-500 mt-1">Fill in the details to create a new task</p>
         </div>
 
-        {error && (
+        {(submitError || userFetchError) && (
           <div className="mb-6 p-4 rounded-lg bg-red-50 border border-red-200">
-            <p className="text-sm text-red-700">{error}</p>
+            <p className="text-sm text-red-700">{submitError || userFetchError}</p>
           </div>
         )}
 
@@ -208,6 +202,10 @@ function CreateTask() {
                   <option value="">Select a user...</option>
                   {fetchingUsers ? (
                     <option disabled>Loading users...</option>
+                  ) : !users.length && userFetchError ? (
+                    <option disabled>Failed to load users</option>
+                  ) : !users.length ? (
+                    <option disabled>No users available</option>
                   ) : (
                     users.map((u) => (
                       <option key={u.id} value={u.id}>
@@ -216,6 +214,21 @@ function CreateTask() {
                     ))
                   )}
                 </select>
+                {!fetchingUsers && !users.length && userFetchError && (
+                  <div className="mt-2">
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs text-red-500">Could not load users.</p>
+                      <button
+                        type="button"
+                        onClick={() => refetchUsers()}
+                        className="text-xs text-indigo-600 hover:text-indigo-700 underline"
+                      >
+                        Retry
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-gray-400 mt-0.5">{userFetchError}</p>
+                  </div>
+                )}
               </details>
             </div>
           </div>

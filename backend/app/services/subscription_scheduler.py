@@ -3,6 +3,7 @@ import asyncio
 from datetime import datetime, timedelta
 from typing import Optional
 from sqlalchemy.orm import Session
+from sqlalchemy import select, func
 from app.core.background_tasks import task_queue, BackgroundTask, TaskPriority
 from app.core.config import settings
 from app.core.log import get_logger
@@ -21,11 +22,11 @@ class SubscriptionScheduler:
         db = SessionLocal()
         try:
             now = datetime.utcnow()
-            expired = db.query(TenantSubscription).filter(
+            expired = db.execute(select(TenantSubscription).where(
                 TenantSubscription.status == SubscriptionStatus.active.value,
                 TenantSubscription.current_period_end < now,
                 TenantSubscription.is_active == True,
-            ).all()
+            )).scalars().all()
 
             for sub in expired:
                 if sub.auto_renew:
@@ -74,12 +75,12 @@ class SubscriptionScheduler:
             now = datetime.utcnow()
             threshold = now + timedelta(days=warning_days)
 
-            approaching = db.query(TenantSubscription).filter(
+            approaching = db.execute(select(TenantSubscription).where(
                 TenantSubscription.status == SubscriptionStatus.active.value,
                 TenantSubscription.current_period_end <= threshold,
                 TenantSubscription.current_period_end > now,
                 TenantSubscription.is_active == True,
-            ).all()
+            )).scalars().all()
 
             for sub in approaching:
                 days_left = (sub.current_period_end - now).days
@@ -123,13 +124,13 @@ class BillingProcessor:
 
         db = SessionLocal()
         try:
-            unprocessed = db.query(RazorpayPayment).filter(
+            unprocessed = db.execute(select(RazorpayPayment).where(
                 RazorpayPayment.status == PaymentStatus.captured.value,
             ).outerjoin(
                 Invoice, Invoice.payment_id == RazorpayPayment.id,
-            ).filter(
+            ).where(
                 Invoice.id.is_(None),
-            ).limit(50).all()
+            ).limit(50)).scalars().all()
 
             generated = 0
             for payment in unprocessed:

@@ -4,7 +4,7 @@ import json
 from datetime import datetime, timedelta
 from typing import Optional
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import select, func
 from fastapi import HTTPException, status
 from app.core.config import settings
 from app.core.log import get_logger
@@ -29,10 +29,10 @@ def _invoice_number(db: Session) -> str:
     year = datetime.utcnow().year
     year_start = datetime(year, 1, 1)
     year_end = datetime(year + 1, 1, 1)
-    count = db.query(func.count(Invoice.id)).filter(
+    count = db.scalar(select(func.count(Invoice.id)).where(
         Invoice.created_at >= year_start,
         Invoice.created_at < year_end,
-    ).scalar() or 0
+    )) or 0
     return f"INV-{year}-{count + 1:05d}"
 
 
@@ -65,18 +65,18 @@ class InvoiceService:
 
     @staticmethod
     def generate_from_payment(db: Session, payment_id: int) -> Optional[Invoice]:
-        payment = db.query(RazorpayPayment).filter(
+        payment = db.scalar(select(RazorpayPayment).where(
             RazorpayPayment.id == payment_id,
-        ).first()
+        ))
         if not payment:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Payment {payment_id} not found",
             )
 
-        existing = db.query(Invoice).filter(
+        existing = db.scalar(select(Invoice).where(
             Invoice.payment_id == payment_id,
-        ).first()
+        ))
         if existing:
             return existing
 
@@ -105,14 +105,14 @@ class InvoiceService:
             notes=f"Invoice for payment {payment.razorpay_payment_id or payment.razorpay_order_id}",
         )
 
-        org = db.query(Organization).filter(
+        org = db.scalar(select(Organization).where(
             Organization.id == payment.organization_id,
-        ).first()
+        ))
         if org:
             inv.billing_name = org.name
 
         if payment.user_id:
-            user = db.query(User).filter(User.id == payment.user_id).first()
+            user = db.scalar(select(User).where(User.id == payment.user_id))
             if user:
                 inv.billing_email = user.email
 
@@ -127,7 +127,7 @@ class InvoiceService:
 
     @staticmethod
     def issue_invoice(db: Session, invoice_id: int) -> Invoice:
-        inv = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+        inv = db.scalar(select(Invoice).where(Invoice.id == invoice_id))
         if not inv:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invoice not found")
 
@@ -141,7 +141,7 @@ class InvoiceService:
 
     @staticmethod
     def mark_paid(db: Session, invoice_id: int, paid_amount: Optional[int] = None) -> Invoice:
-        inv = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+        inv = db.scalar(select(Invoice).where(Invoice.id == invoice_id))
         if not inv:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invoice not found")
 
@@ -160,7 +160,7 @@ class InvoiceService:
 
     @staticmethod
     def cancel_invoice(db: Session, invoice_id: int, reason: Optional[str] = None) -> Invoice:
-        inv = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+        inv = db.scalar(select(Invoice).where(Invoice.id == invoice_id))
         if not inv:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invoice not found")
         if inv.status == InvoiceStatus.paid.value:
@@ -179,13 +179,13 @@ class InvoiceService:
 
     @staticmethod
     def get_invoice(db: Session, invoice_id: int) -> Optional[Invoice]:
-        return db.query(Invoice).filter(Invoice.id == invoice_id).first()
+        return db.scalar(select(Invoice).where(Invoice.id == invoice_id))
 
     @staticmethod
     def get_invoice_by_number(db: Session, invoice_number: str) -> Optional[Invoice]:
-        return db.query(Invoice).filter(
+        return db.scalar(select(Invoice).where(
             Invoice.invoice_number == invoice_number,
-        ).first()
+        ))
 
     @staticmethod
     def list_invoices(
@@ -195,19 +195,19 @@ class InvoiceService:
         limit: int = 20,
         status: Optional[str] = None,
     ) -> dict:
-        q = db.query(Invoice).filter(Invoice.organization_id == org_id)
+        filters = [Invoice.organization_id == org_id]
         if status:
-            q = q.filter(Invoice.status == status)
+            filters.append(Invoice.status == status)
 
-        total = q.count()
-        total_amount = db.query(func.coalesce(func.sum(Invoice.total_amount), 0)).filter(
+        total = db.scalar(select(func.count(Invoice.id)).where(*filters))
+        total_amount = db.scalar(select(func.coalesce(func.sum(Invoice.total_amount), 0)).where(
             Invoice.organization_id == org_id,
-        ).scalar()
-        total_tax = db.query(func.coalesce(func.sum(Invoice.tax_amount), 0)).filter(
+        ))
+        total_tax = db.scalar(select(func.coalesce(func.sum(Invoice.tax_amount), 0)).where(
             Invoice.organization_id == org_id,
-        ).scalar()
+        ))
 
-        items = q.order_by(Invoice.created_at.desc()).offset(skip).limit(limit).all()
+        items = db.execute(select(Invoice).where(*filters).order_by(Invoice.created_at.desc()).offset(skip).limit(limit)).scalars().all()
 
         return {
             "items": items,
@@ -305,9 +305,9 @@ class InvoiceService:
         failure_reason: Optional[str] = None,
         payment_type: Optional[str] = None,
     ) -> FailedPaymentLog:
-        existing = db.query(FailedPaymentLog).filter(
+        existing = db.scalar(select(FailedPaymentLog).where(
             FailedPaymentLog.razorpay_payment_id == razorpay_payment_id,
-        ).first() if razorpay_payment_id else None
+        )) if razorpay_payment_id else None
 
         if existing:
             existing.attempt_count = FailedPaymentLog.attempt_count + 1
@@ -345,11 +345,12 @@ class InvoiceService:
         skip: int = 0,
         limit: int = 20,
     ) -> dict:
-        q = db.query(FailedPaymentLog).filter(
+        total = db.scalar(select(func.count(FailedPaymentLog.id)).where(
             FailedPaymentLog.organization_id == org_id,
-        )
-        total = q.count()
-        items = q.order_by(FailedPaymentLog.created_at.desc()).offset(skip).limit(limit).all()
+        ))
+        items = db.execute(select(FailedPaymentLog).where(
+            FailedPaymentLog.organization_id == org_id,
+        ).order_by(FailedPaymentLog.created_at.desc()).offset(skip).limit(limit)).scalars().all()
         return {
             "items": items,
             "total": total,
@@ -359,7 +360,7 @@ class InvoiceService:
 
     @staticmethod
     def resolve_failed_payment(db: Session, log_id: int) -> FailedPaymentLog:
-        entry = db.query(FailedPaymentLog).filter(FailedPaymentLog.id == log_id).first()
+        entry = db.scalar(select(FailedPaymentLog).where(FailedPaymentLog.id == log_id))
         if not entry:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Failed payment log not found")
         entry.resolved = True

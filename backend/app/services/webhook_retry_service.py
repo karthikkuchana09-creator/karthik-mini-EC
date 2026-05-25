@@ -3,8 +3,8 @@ import json
 import time
 from datetime import datetime
 from typing import Optional
-from sqlalchemy.orm import Session
-from sqlalchemy import Column, Integer, String, DateTime, Text, Boolean, JSON
+from sqlalchemy.orm import Session, Mapped, mapped_column
+from sqlalchemy import Integer, String, DateTime, Text, Boolean, JSON, select
 from sqlalchemy.sql import func
 from app.db.base import Base
 from app.core.background_tasks import task_queue, BackgroundTask, TaskPriority
@@ -16,17 +16,17 @@ logger = get_logger("webhook_retry")
 class WebhookRetryLog(Base):
     __tablename__ = "webhook_retry_logs"
 
-    id = Column(Integer, primary_key=True, index=True)
-    event_type = Column(String(100), nullable=False, index=True)
-    payload = Column(JSON, nullable=True)
-    razorpay_event_id = Column(String(100), nullable=True, index=True)
-    status = Column(String(20), default="pending", index=True)
-    attempts = Column(Integer, default=0)
-    max_attempts = Column(Integer, default=5)
-    last_error = Column(Text, nullable=True)
-    next_retry_at = Column(DateTime, nullable=True, index=True)
-    resolved_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, server_default=func.now())
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    event_type: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    payload: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    razorpay_event_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)
+    status: Mapped[str] = mapped_column(String(20), default="pending", index=True)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    max_attempts: Mapped[int] = mapped_column(Integer, default=5)
+    last_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    next_retry_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True, index=True)
+    resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
 RETRY_BACKOFFS = [60, 300, 900, 3600, 14400]
@@ -67,7 +67,7 @@ class WebhookRetryService:
 
         db = SessionLocal()
         try:
-            record = db.query(WebhookRetryLog).filter(WebhookRetryLog.id == record_id).first()
+            record = db.scalar(select(WebhookRetryLog).where(WebhookRetryLog.id == record_id))
             if not record or record.status == "resolved":
                 return
 
@@ -125,11 +125,11 @@ class WebhookRetryService:
         db = SessionLocal()
         try:
             now = datetime.utcnow()
-            pending = db.query(WebhookRetryLog).filter(
+            pending = db.execute(select(WebhookRetryLog).where(
                 WebhookRetryLog.status.in_(["pending", "retrying"]),
                 WebhookRetryLog.next_retry_at <= now,
                 WebhookRetryLog.attempts < WebhookRetryLog.max_attempts,
-            ).limit(20).all()
+            ).limit(20)).scalars().all()
 
             for record in pending:
                 await task_queue.enqueue(
@@ -148,14 +148,14 @@ class WebhookRetryService:
 
     @staticmethod
     def get_stats(db: Session) -> dict:
-        total = db.query(func.count(WebhookRetryLog.id)).scalar() or 0
-        pending = db.query(func.count(WebhookRetryLog.id)).filter(
+        total = db.scalar(select(func.count(WebhookRetryLog.id))) or 0
+        pending = db.scalar(select(func.count(WebhookRetryLog.id)).where(
             WebhookRetryLog.status.in_(["pending", "retrying"]),
-        ).scalar() or 0
-        resolved = db.query(func.count(WebhookRetryLog.id)).filter(
+        )) or 0
+        resolved = db.scalar(select(func.count(WebhookRetryLog.id)).where(
             WebhookRetryLog.status == "resolved",
-        ).scalar() or 0
-        failed = db.query(func.count(WebhookRetryLog.id)).filter(
+        )) or 0
+        failed = db.scalar(select(func.count(WebhookRetryLog.id)).where(
             WebhookRetryLog.status == "failed",
-        ).scalar() or 0
+        )) or 0
         return {"total": total, "pending": pending, "resolved": resolved, "failed": failed}

@@ -4,6 +4,7 @@ from typing import Optional
 from urllib.parse import urlencode
 from datetime import datetime, timedelta
 from fastapi import HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.models.user import User, UserRole, SubscriptionRole
 from app.models.organization import Organization, SubscriptionPlan
@@ -65,7 +66,7 @@ def _issue_refresh_token(db: Session, user_id: int) -> str:
 def register_user(db: Session, user_data: UserCreate):
     logger.info("Registration attempt: email=%s role=%s", user_data.email, user_data.role)
 
-    existing = db.query(User).filter(User.email == user_data.email).first()
+    existing = db.scalar(select(User).where(User.email == user_data.email))
     if existing:
         logger.warning("Registration failed: email exists email=%s", user_data.email)
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -95,11 +96,11 @@ def register_user(db: Session, user_data: UserCreate):
 def register_org_user(db: Session, data: OrganizationRegisterRequest) -> dict:
     logger.info("Org registration attempt: email=%s org_slug=%s", data.email, data.org_slug)
 
-    existing = db.query(User).filter(User.email == data.email).first()
+    existing = db.scalar(select(User).where(User.email == data.email))
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
 
-    org = db.query(Organization).filter(Organization.slug == data.org_slug).first()
+    org = db.scalar(select(Organization).where(Organization.slug == data.org_slug))
     if org:
         raise HTTPException(status_code=409, detail="Organization slug already exists")
 
@@ -155,7 +156,7 @@ def register_org_user(db: Session, data: OrganizationRegisterRequest) -> dict:
 
 def login_user(db: Session, email: str, password: str) -> dict:
     logger.info("Login attempt: email=%s", email)
-    user = db.query(User).filter(User.email == email).first()
+    user = db.scalar(select(User).where(User.email == email))
     if not user or not verify_password(password, user.hashed_password):
         logger.warning("Login failed: invalid credentials email=%s", email)
         raise HTTPException(status_code=401, detail="Invalid credentials")
@@ -169,7 +170,7 @@ def login_user(db: Session, email: str, password: str) -> dict:
     subscription_role = user.subscription_role.value if hasattr(user.subscription_role, "value") else user.subscription_role
 
     if user.tenant_id:
-        org = db.query(Organization).filter(Organization.id == user.tenant_id).first()
+        org = db.scalar(select(Organization).where(Organization.id == user.tenant_id))
         if org:
             if not org.is_active:
                 raise HTTPException(status_code=403, detail="Organization is inactive")
@@ -199,7 +200,7 @@ def login_user(db: Session, email: str, password: str) -> dict:
 def login_org_user(db: Session, email: str, password: str, tenant_slug: Optional[str]) -> dict:
     logger.info("Org-scoped login attempt: email=%s tenant_slug=%s", email, tenant_slug)
 
-    user = db.query(User).filter(User.email == email).first()
+    user = db.scalar(select(User).where(User.email == email))
     if not user or not verify_password(password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
@@ -208,7 +209,7 @@ def login_org_user(db: Session, email: str, password: str, tenant_slug: Optional
 
     org = None
     if tenant_slug:
-        org = db.query(Organization).filter(Organization.slug == tenant_slug).first()
+        org = db.scalar(select(Organization).where(Organization.slug == tenant_slug))
         if not org:
             raise HTTPException(status_code=404, detail="Organization not found")
         if not org.is_active:
@@ -216,7 +217,7 @@ def login_org_user(db: Session, email: str, password: str, tenant_slug: Optional
         if user.tenant_id and user.tenant_id != org.id:
             raise HTTPException(status_code=403, detail="User does not belong to this organization")
     elif user.tenant_id:
-        org = db.query(Organization).filter(Organization.id == user.tenant_id).first()
+        org = db.scalar(select(Organization).where(Organization.id == user.tenant_id))
         if org and not org.is_active:
             raise HTTPException(status_code=403, detail="Organization is inactive")
 
@@ -243,9 +244,7 @@ def login_org_user(db: Session, email: str, password: str, tenant_slug: Optional
 
 def refresh_access_token(db: Session, raw_refresh_token: str) -> dict:
     token_hash = hash_token_raw(raw_refresh_token)
-    stored_token = db.query(RefreshToken).filter(
-        RefreshToken.token_hash == token_hash
-    ).first()
+    stored_token = db.scalar(select(RefreshToken).where(RefreshToken.token_hash == token_hash))
     if not stored_token:
         raise HTTPException(status_code=401, detail="Invalid refresh token")
     if stored_token.is_revoked:
@@ -254,7 +253,7 @@ def refresh_access_token(db: Session, raw_refresh_token: str) -> dict:
     if stored_token.expires_at < datetime.utcnow():
         raise HTTPException(status_code=401, detail="Refresh token has expired")
 
-    user = db.query(User).filter(User.id == stored_token.user_id).first()
+    user = db.scalar(select(User).where(User.id == stored_token.user_id))
     if not user or not user.is_active:
         raise HTTPException(status_code=401, detail="User not found or inactive")
 
@@ -267,7 +266,7 @@ def refresh_access_token(db: Session, raw_refresh_token: str) -> dict:
     tenant = None
     tenant_slug = None
     if user.tenant_id:
-        org = db.query(Organization).filter(Organization.id == user.tenant_id).first()
+        org = db.scalar(select(Organization).where(Organization.id == user.tenant_id))
         if org:
             tenant = _build_tenant_dict(org)
             tenant_slug = org.slug
@@ -294,18 +293,14 @@ def refresh_access_token(db: Session, raw_refresh_token: str) -> dict:
 def _revoke_token_family(db: Session, token: RefreshToken):
     token.is_revoked = True
     token.revoked_at = datetime.utcnow()
-    child = db.query(RefreshToken).filter(
-        RefreshToken.token_hash == token.replaced_by_token_hash
-    ).first()
+    child = db.scalar(select(RefreshToken).where(RefreshToken.token_hash == token.replaced_by_token_hash))
     if child and not child.is_revoked:
         _revoke_token_family(db, child)
 
 
 def logout_user(db: Session, raw_refresh_token: str):
     token_hash = hash_token_raw(raw_refresh_token)
-    stored_token = db.query(RefreshToken).filter(
-        RefreshToken.token_hash == token_hash
-    ).first()
+    stored_token = db.scalar(select(RefreshToken).where(RefreshToken.token_hash == token_hash))
     if not stored_token:
         raise HTTPException(status_code=404, detail="Refresh token not found")
     stored_token.is_revoked = True
@@ -317,7 +312,7 @@ def logout_user(db: Session, raw_refresh_token: str):
 
 def forgot_password(db: Session, email: str):
     logger.info("Password reset requested for email=%s", email)
-    user = db.query(User).filter(User.email == email).first()
+    user = db.scalar(select(User).where(User.email == email))
     if not user:
         return {"message": "If the email exists, a reset link has been sent"}
     raw_token, token_hash = create_reset_token()
@@ -338,16 +333,14 @@ def forgot_password(db: Session, email: str):
 def reset_password(db: Session, raw_token: str, new_password: str):
     logger.info("Password reset attempt")
     token_hash = hash_token_raw(raw_token)
-    stored_token = db.query(PasswordResetToken).filter(
-        PasswordResetToken.token_hash == token_hash
-    ).first()
+    stored_token = db.scalar(select(PasswordResetToken).where(PasswordResetToken.token_hash == token_hash))
     if not stored_token:
         raise HTTPException(status_code=400, detail="Invalid or expired reset token")
     if stored_token.is_used:
         raise HTTPException(status_code=400, detail="Reset token has already been used")
     if stored_token.expires_at < datetime.utcnow():
         raise HTTPException(status_code=400, detail="Reset token has expired")
-    user = db.query(User).filter(User.id == stored_token.user_id).first()
+    user = db.scalar(select(User).where(User.id == stored_token.user_id))
     if not user:
         raise HTTPException(status_code=400, detail="User not found")
     user.hashed_password = hash_password(new_password)
@@ -412,9 +405,7 @@ def google_oauth_callback(db: Session, code: str, state: Optional[str] = None):
     if not email:
         raise HTTPException(status_code=400, detail="Google account has no email")
 
-    user = db.query(User).filter(
-        (User.google_id == google_id) | (User.email == email)
-    ).first()
+    user = db.scalar(select(User).where((User.google_id == google_id) | (User.email == email)))
 
     if user:
         user.google_id = user.google_id or google_id
@@ -445,7 +436,7 @@ def google_oauth_callback(db: Session, code: str, state: Optional[str] = None):
     tenant = None
     tenant_slug = None
     if user.tenant_id:
-        org = db.query(Organization).filter(Organization.id == user.tenant_id).first()
+        org = db.scalar(select(Organization).where(Organization.id == user.tenant_id))
         if org:
             tenant = _build_tenant_dict(org)
             tenant_slug = org.slug
