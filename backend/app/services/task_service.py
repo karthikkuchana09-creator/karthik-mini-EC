@@ -78,6 +78,7 @@ def create_task(db: Session, task_data: TaskCreate, current_user):
     log_action(
         db, current_user.id, "create", "task", new_task.id,
         new_value={"title": new_task.title, "status": "todo", "priority": new_task.priority, "assigned_to_id": new_task.assigned_to_id},
+        module_name="task", action_type="create", record_id=new_task.id,
     )
     create_task_assignment_notification(db, task_data.assigned_to_id, new_task.id, new_task.title)
     _emit_kanban(KanbanAction.TASK_CREATED, new_task)
@@ -164,6 +165,8 @@ def update_task(db: Session, task_id: int, task_data: TaskUpdate, current_user):
         logger.warning("Task update failed: not found id=%d", task_id)
         raise HTTPException(404, "Task not found")
 
+    old_status = task.status
+
     if current_user.role == "employee":
         if task.assigned_to_id != current_user.id:
             logger.warning("Employee user_id=%d not authorized to update task id=%d", current_user.id, task_id)
@@ -181,6 +184,11 @@ def update_task(db: Session, task_id: int, task_data: TaskUpdate, current_user):
 
         task.updated_at = datetime.utcnow()
 
+    if old_status != "done" and task.status == "done":
+        task.sla_status = "on_track"
+        task.is_sla_breached = False
+        task.sla_due_time = None
+
     db.commit()
     db.refresh(task)
 
@@ -188,6 +196,7 @@ def update_task(db: Session, task_id: int, task_data: TaskUpdate, current_user):
         db, current_user.id, "update", "task", task_id,
         old_value={"title": task.title, "status": task.status},
         new_value=task_data.dict(exclude_unset=True) if not current_user.role == "employee" else {"status": task.status},
+        module_name="task", action_type="update", record_id=task_id,
     )
     if task.assigned_to_id:
         create_task_status_notification(db, task.assigned_to_id, task_id, task.title, task.status)
@@ -209,7 +218,8 @@ def delete_task(db: Session, task_id: int, current_user):
     db.delete(task)
     db.commit()
 
-    log_action(db, current_user.id, "delete", "task", task_id, old_value=deleted)
+    log_action(db, current_user.id, "delete", "task", task_id, old_value=deleted,
+               module_name="task", action_type="delete", record_id=task_id)
     _emit_kanban(KanbanAction.TASK_DELETED, task)
     logger.info("Task id=%d deleted successfully", task_id)
     _invalidate_task_caches()
@@ -243,6 +253,7 @@ def assign_task(db: Session, task_id: int, assigned_to_id: int, current_user):
         db, current_user.id, "assign", "task", task_id,
         old_value={"assigned_to_id": task.assigned_to_id},
         new_value={"assigned_to_id": assigned_to_id},
+        module_name="task", action_type="assign", record_id=task_id,
     )
     create_task_assignment_notification(db, assigned_to_id, task_id, task.title)
     _emit_kanban(KanbanAction.TASK_UPDATED, task)
@@ -274,6 +285,11 @@ def update_task_status(db: Session, task_id: int, new_status: str, current_user)
     task.status = new_status
     task.updated_by = current_user.id
 
+    if new_status == "done" and previous_status != "done":
+        task.sla_status = "on_track"
+        task.is_sla_breached = False
+        task.sla_due_time = None
+
     db.commit()
     db.refresh(task)
 
@@ -281,6 +297,7 @@ def update_task_status(db: Session, task_id: int, new_status: str, current_user)
         db, current_user.id, "status_update", "task", task_id,
         old_value={"status": previous_status},
         new_value={"status": new_status},
+        module_name="task", action_type="status_change", record_id=task_id,
     )
     if task.assigned_to_id and task.assigned_to_id != current_user.id:
         create_task_status_notification(db, task.assigned_to_id, task_id, task.title, new_status)

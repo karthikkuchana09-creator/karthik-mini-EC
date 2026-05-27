@@ -37,6 +37,7 @@ def add_comment(db: Session, task_id: int, comment_data: CommentCreate, current_
     log_action(
         db, current_user.id, "create", "comment", comment.id,
         new_value={"task_id": task_id, "is_internal": comment_data.is_internal},
+        module_name="comment", action_type="create", record_id=comment.id,
     )
     notify_user_id = task.assigned_to_id if task.assigned_to_id != current_user.id else task.created_by_id
     if notify_user_id:
@@ -76,5 +77,6 @@ def delete_all_comments(db: Session, task_id: int, current_user):
     count = result.rowcount
     db.commit()
 
-    log_action(db, current_user.id, "delete", "comment", task_id, old_value={"task_id": task_id, "count": count})
+    log_action(db, current_user.id, "delete", "comment", task_id, old_value={"task_id": task_id, "count": count},
+               module_name="comment", action_type="delete", record_id=task_id)
     return {"message": f"Deleted {count} comments"}

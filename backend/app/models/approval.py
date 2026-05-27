@@ -1,6 +1,6 @@
 from typing import Optional
 from datetime import datetime
-from sqlalchemy import String, Integer, Text, DateTime, ForeignKey, Index
+from sqlalchemy import String, Integer, Boolean, Text, DateTime, ForeignKey, Index
 from sqlalchemy.sql import func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
@@ -18,6 +18,12 @@ class Approval(Base):
 
     status: Mapped[str] = mapped_column(String(50), default="pending", index=True)
     current_level: Mapped[str] = mapped_column(String(50), default="manager", index=True)
+    is_escalated: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    sla_status: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, index=True)
+    sla_due_time: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    current_escalation_to: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+
     created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), onupdate=func.now())
 

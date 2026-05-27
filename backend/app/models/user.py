@@ -70,3 +70,9 @@ class User(Base):
     refresh_tokens: Mapped[list["RefreshToken"]] = relationship(back_populates="user")
     password_reset_tokens: Mapped[list["PasswordResetToken"]] = relationship(back_populates="user")
     sent_invitations: Mapped[list["OrganizationInvitation"]] = relationship(back_populates="inviter")
+
+    sla_rules: Mapped[list["SLARule"]] = relationship("SLARule", back_populates="creator")
+
+    notification_preferences: Mapped[Optional["NotificationPreference"]] = relationship(
+        "NotificationPreference", back_populates="user", uselist=False
+    )

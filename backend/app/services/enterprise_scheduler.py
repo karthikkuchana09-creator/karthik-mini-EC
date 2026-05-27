@@ -33,6 +33,9 @@ class EnterpriseScheduler:
         self._tasks["maintenance"] = asyncio.create_task(
             self._run_periodic("maintenance", settings.SCHEDULER_MAINTENANCE_INTERVAL, self._run_maintenance)
         )
+        self._tasks["sla_monitor"] = asyncio.create_task(
+            self._run_periodic("sla_monitor", settings.SCHEDULER_SLA_MONITOR_INTERVAL, self._check_sla_breaches)
+        )
         logger.info("Enterprise scheduler started with %d tasks", len(self._tasks))
 
     async def stop(self):
@@ -71,6 +74,18 @@ class EnterpriseScheduler:
     async def _generate_invoices(self):
         from app.services.subscription_scheduler import BillingProcessor
         await BillingProcessor.run_all()
+
+    async def _check_sla_breaches(self):
+        from app.db.session import SessionLocal
+        from app.services.sla_monitor_service import SlaMonitorService
+        try:
+            db = SessionLocal()
+            try:
+                SlaMonitorService.check_and_process_overdue(db)
+            finally:
+                db.close()
+        except Exception as exc:
+            logger.error("SLA monitor error: %s", exc)
 
     async def _run_maintenance(self):
         logger.info("Running maintenance tasks...")

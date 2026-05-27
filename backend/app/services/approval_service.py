@@ -44,6 +44,7 @@ def create_approval(db: Session, approval_data: ApprovalCreate, current_user):
     log_action(
         db, current_user.id, "create", "approval", approval.id,
         new_value={"title": approval_data.title, "description": approval_data.description},
+        module_name="approval", action_type="create", record_id=approval.id,
     )
 
     approvers = db.execute(select(User).where(
@@ -109,6 +110,10 @@ def get_approvals(
             } if requester else None,
             "status": a.status,
             "current_level": a.current_level,
+            "is_escalated": a.is_escalated,
+            "sla_status": a.sla_status,
+            "sla_due_time": a.sla_due_time.isoformat() if a.sla_due_time else None,
+            "current_escalation_to": a.current_escalation_to,
             "created_at": a.created_at.isoformat() if a.created_at else None,
             "updated_at": a.updated_at.isoformat() if a.updated_at else None,
         })
@@ -156,10 +161,14 @@ def take_approval_action(db: Session, approval_id: int, action_data: ApprovalAct
             logger.info("Approval id=%d moved to admin level", approval_id)
         else:
             approval.status = "approved"
+            approval.sla_status = "on_track"
+            approval.sla_due_time = None
             logger.info("Approval id=%d approved", approval_id)
 
     elif action_data.action == "rejected":
         approval.status = "rejected"
+        approval.sla_status = "on_track"
+        approval.sla_due_time = None
         logger.info("Approval id=%d rejected", approval_id)
 
     elif action_data.action == "hold":
@@ -184,6 +193,7 @@ def take_approval_action(db: Session, approval_id: int, action_data: ApprovalAct
         db, current_user.id, action_data.action, "approval", approval_id,
         old_value={"status": old_status, "current_level": old_level},
         new_value={"status": approval.status, "current_level": approval.current_level, "action": action_data.action, "comment": action_data.comment},
+        module_name="approval", action_type=action_data.action, record_id=approval_id,
     )
     create_approval_action_notification(
         db, approval.requested_by, approval_id, 0, approval.title, action_data.action,

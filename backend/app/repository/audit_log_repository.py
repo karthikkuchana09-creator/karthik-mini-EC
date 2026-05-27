@@ -27,3 +27,26 @@ def list_audit_logs_by_user(db: Session, user_id: int):
         .order_by(AuditLog.timestamp.desc())
     )
     return paginate(db, stmt)
+
+
+def list_audit_logs_by_module(db: Session, module_name: str):
+    stmt = (
+        select(AuditLog)
+        .options(selectinload(AuditLog.user))
+        .where(AuditLog.module_name == module_name)
+        .order_by(AuditLog.timestamp.desc())
+    )
+    return paginate(db, stmt)
+
+
+def list_audit_logs_by_date_range(db: Session, date_from, date_to):
+    stmt = (
+        select(AuditLog)
+        .options(selectinload(AuditLog.user))
+        .where(
+            AuditLog.timestamp >= date_from,
+            AuditLog.timestamp <= date_to,
+        )
+        .order_by(AuditLog.timestamp.desc())
+    )
+    return paginate(db, stmt)

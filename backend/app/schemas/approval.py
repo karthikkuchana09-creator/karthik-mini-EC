@@ -60,6 +60,9 @@ class RequesterOut(BaseModel):
     name: Optional[str] = None
     email: str
 
+    class Config:
+        from_attributes = True
+
 class ApprovalOut(BaseModel):
     id: int
     title: str
@@ -67,6 +70,10 @@ class ApprovalOut(BaseModel):
     requested_by: RequesterOut = Field(validation_alias="requester")
     status: str
     current_level: str
+    is_escalated: bool = False
+    sla_status: Optional[str] = None
+    sla_due_time: Optional[datetime] = None
+    current_escalation_to: Optional[int] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
 

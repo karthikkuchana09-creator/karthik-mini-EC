@@ -86,6 +86,9 @@ class TaskOut(BaseModel):
     status: TaskStatus
     priority: TaskPriority
     due_date: Optional[datetime]
+    sla_status: Optional[str] = None
+    sla_due_time: Optional[datetime] = None
+    is_sla_breached: bool = False
     created_by_id: int
     assigned_to_id: Optional[int]
 

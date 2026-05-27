@@ -1,10 +1,7 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
-from fastapi.exceptions import RequestValidationError
-from starlette.exceptions import HTTPException as StarletteHTTPException
+from fastapi import FastAPI
 from fastapi_pagination import add_pagination
-from app.api import auth, tasks, users, comments, approvals, dashboard, documents, audit_logs, notifications, ai, leaves, organizations, subscription, credits, usage, payments, webhooks, billing, super_admin, monitoring
+from app.routes import auth, tasks, users, comments, approvals, dashboard, documents, audit_logs, notifications, ai, leaves, organizations, subscription, credits, usage, payments, webhooks, billing, super_admin, monitoring, sla_rules, sla_tracking, approval_escalations, approval_delegations, notification_preferences as notification_prefs_router
 from app.websocket.routes import router as ws_router
 from app.websocket.manager import manager
 from app.websocket.pubsub import ws_pubsub
@@ -17,6 +14,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.log import setup_logging, get_logger, RequestLogMiddleware
 from app.core.rate_limiter import RateLimitMiddleware
 from app.core.tenant import TenantMiddleware
+from app.core.audit_middleware import EnterpriseAuditMiddleware
+from app.core.exceptions import register_exception_handlers
 from app.core.background_tasks import task_queue
 from app.core.redis_client import close as close_redis
 from app.services.enterprise_scheduler import enterprise_scheduler
@@ -49,26 +48,9 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
+register_exception_handlers(app)
 
-@app.exception_handler(StarletteHTTPException)
-async def http_exception_handler(request: Request, exc: StarletteHTTPException):
-    logger.warning("HTTP %d on %s %s", exc.status_code, request.method, request.url.path)
-    headers = getattr(exc, "headers", None)
-    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail}, headers=headers)
-
-
-@app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    errors = exc.errors()
-    details = "; ".join(e.get("msg", str(e)) for e in errors)
-    logger.warning("Validation error on %s %s: %s", request.method, request.url.path, details)
-    return JSONResponse(status_code=422, content={"detail": details})
-
-
-@app.exception_handler(Exception)
-async def unhandled_exception_handler(request: Request, exc: Exception):
-    logger.error("Unhandled error on %s %s: %s", request.method, request.url.path, exc)
-    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
+app.add_middleware(EnterpriseAuditMiddleware)
 
 app.add_middleware(RequestLogMiddleware)
 
@@ -109,6 +91,11 @@ app.include_router(webhooks.router)
 app.include_router(billing.router)
 app.include_router(super_admin.router)
 app.include_router(monitoring.router)
+app.include_router(sla_rules.router)
+app.include_router(sla_tracking.router)
+app.include_router(approval_escalations.router)
+app.include_router(approval_delegations.router)
+app.include_router(notification_prefs_router.router)
 
 add_pagination(app)
 logger.info("Application started")

@@ -5,6 +5,8 @@ from datetime import datetime
 
 
 class AuditLogUser(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     name: str
     email: str
@@ -22,7 +24,13 @@ class AuditLogOut(BaseModel):
     old_value: Optional[Any] = None
     new_value: Optional[Any] = None
     metadata: Optional[dict] = Field(None, validation_alias="metadata_json")
+    module_name: Optional[str] = None
+    action_type: Optional[str] = None
+    record_id: Optional[int] = None
+    old_data: Optional[Any] = None
+    new_data: Optional[Any] = None
     ip_address: Optional[str] = None
+    user_agent: Optional[str] = None
     timestamp: datetime
 
     @field_validator("metadata", mode="before")
@@ -56,7 +64,13 @@ class AuditLogDetail(BaseModel):
     old_value: Optional[Any] = None
     new_value: Optional[Any] = None
     metadata: Optional[dict] = Field(None, validation_alias="metadata_json")
+    module_name: Optional[str] = None
+    action_type: Optional[str] = None
+    record_id: Optional[int] = None
+    old_data: Optional[Any] = None
+    new_data: Optional[Any] = None
     ip_address: Optional[str] = None
+    user_agent: Optional[str] = None
     timestamp: datetime
     is_immutable: bool = True
 
@@ -100,7 +114,11 @@ class AuditLogExportRow(BaseModel):
     entity_id: Optional[int]
     old_value: Optional[str]
     new_value: Optional[str]
-    ip_address: Optional[str]
+    module_name: Optional[str] = None
+    action_type: Optional[str] = None
+    record_id: Optional[int] = None
+    ip_address: Optional[str] = None
+    user_agent: Optional[str] = None
     timestamp: str
 
 
@@ -109,3 +127,18 @@ class AuditLogExport(BaseModel):
     filename: str
     total_records: int
     data: list[AuditLogExportRow]
+
+
+class AuditLogFilter(BaseModel):
+    module_name: Optional[str] = None
+    action_type: Optional[str] = None
+    user_id: Optional[int] = None
+    entity: Optional[str] = None
+    entity_id: Optional[int] = None
+    date_from: Optional[datetime] = None
+    date_to: Optional[datetime] = None
+    q: Optional[str] = None
+    sort_by: Optional[str] = None
+    sort_order: str = "desc"
+    page: int = 1
+    size: int = 20

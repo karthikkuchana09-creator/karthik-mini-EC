@@ -1,6 +1,6 @@
 from typing import Optional
 from datetime import datetime
-from sqlalchemy import String, Integer, DateTime, Text, ForeignKey, Index
+from sqlalchemy import String, Integer, Boolean, DateTime, Text, ForeignKey, Index
 from sqlalchemy.sql import func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
@@ -16,6 +16,10 @@ class Task(Base):
     status: Mapped[str] = mapped_column(String(50), default="todo", index=True)
     priority: Mapped[Optional[str]] = mapped_column(String(50), index=True)
     due_date: Mapped[Optional[datetime]] = mapped_column(DateTime, index=True)
+
+    sla_status: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, index=True)
+    sla_due_time: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    is_sla_breached: Mapped[bool] = mapped_column(Boolean, default=False)
 
     created_by_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), index=True)
     assigned_to_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), index=True)

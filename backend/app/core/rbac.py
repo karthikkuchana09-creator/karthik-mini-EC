@@ -1,6 +1,6 @@
 from fastapi import Depends, HTTPException, status
 from app.models.user import User
-from app.api.deps import get_current_user
+from app.routes.deps import get_current_user
 
 
 class Permissions:
@@ -72,6 +72,25 @@ class Permissions:
     monitoring_manage = "monitoring:manage"
     monitoring_scheduler = "monitoring:scheduler"
 
+    sla_rule_create = "sla_rule:create"
+    sla_rule_read = "sla_rule:read"
+    sla_rule_update = "sla_rule:update"
+    sla_rule_delete = "sla_rule:delete"
+
+    sla_tracking_create = "sla_tracking:create"
+    sla_tracking_read = "sla_tracking:read"
+    sla_tracking_update = "sla_tracking:update"
+
+    approval_escalation_create = "approval_escalation:create"
+    approval_escalation_read = "approval_escalation:read"
+    approval_escalation_update = "approval_escalation:update"
+
+    approval_delegation_create = "approval_delegation:create"
+    approval_delegation_read = "approval_delegation:read"
+    approval_delegation_update = "approval_delegation:update"
+
+    notification_preference_manage = "notification_preference:manage"
+
     super_admin_all = "super_admin:*"
 
 
@@ -130,6 +149,25 @@ ROLE_PERMISSIONS = {
         Permissions.payment_create,
         Permissions.payment_verify,
         Permissions.monitoring_read,
+
+        Permissions.sla_rule_create,
+        Permissions.sla_rule_read,
+        Permissions.sla_rule_update,
+        Permissions.sla_rule_delete,
+
+        Permissions.sla_tracking_create,
+        Permissions.sla_tracking_read,
+        Permissions.sla_tracking_update,
+
+        Permissions.approval_escalation_create,
+        Permissions.approval_escalation_read,
+        Permissions.approval_escalation_update,
+
+        Permissions.approval_delegation_create,
+        Permissions.approval_delegation_read,
+        Permissions.approval_delegation_update,
+
+        Permissions.notification_preference_manage,
     },
     "manager": {
         Permissions.task_create,
@@ -158,10 +196,27 @@ ROLE_PERMISSIONS = {
         Permissions.leave_create,
         Permissions.leave_read,
         Permissions.leave_update,
+
+        Permissions.sla_tracking_create,
+        Permissions.sla_tracking_read,
+        Permissions.sla_tracking_update,
+
+        Permissions.approval_escalation_create,
+        Permissions.approval_escalation_read,
+        Permissions.approval_escalation_update,
+
+        Permissions.approval_delegation_create,
+        Permissions.approval_delegation_read,
+        Permissions.approval_delegation_update,
+
+        Permissions.notification_preference_manage,
     },
     "employee": {
+        Permissions.task_create,
         Permissions.task_read,
         Permissions.task_update_status,
+        Permissions.approval_read,
+        Permissions.approval_read_history,
         Permissions.dashboard_view,
         Permissions.document_upload,
         Permissions.document_read,
@@ -171,6 +226,8 @@ ROLE_PERMISSIONS = {
         Permissions.ai_use,
         Permissions.leave_create,
         Permissions.leave_read,
+
+        Permissions.sla_tracking_read,
     },
 }
 

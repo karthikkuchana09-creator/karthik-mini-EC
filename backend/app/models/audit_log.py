@@ -1,6 +1,6 @@
-from sqlalchemy import String, DateTime, ForeignKey, Index, Text, func, event
+from sqlalchemy import String, DateTime, ForeignKey, Index, Text, JSON, func, event
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from typing import Optional
+from typing import Optional, Any
 from datetime import datetime
 from app.db.base import Base
 
@@ -11,13 +11,23 @@ class AuditLog(Base):
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     tenant_id: Mapped[Optional[int]] = mapped_column(ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True)
     user_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
+
     action: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     entity: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     entity_id: Mapped[Optional[int]] = mapped_column(nullable=True, index=True)
     old_value: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     new_value: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     metadata_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    module_name: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, index=True)
+    action_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, index=True)
+    record_id: Mapped[Optional[int]] = mapped_column(nullable=True, index=True)
+    old_data: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    new_data: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+
     ip_address: Mapped[Optional[str]] = mapped_column(String(45), nullable=True)
+    user_agent: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
     timestamp: Mapped[datetime] = mapped_column(DateTime, default=func.now(), nullable=False, index=True)
 
     __table_args__ = (
@@ -25,6 +35,7 @@ class AuditLog(Base):
         Index("ix_audit_logs_user_action", "user_id", "action"),
         Index("ix_audit_logs_timestamp_action", "timestamp", "action"),
         Index("ix_audit_logs_entity_action", "entity", "action"),
+        Index("ix_audit_logs_module_action", "module_name", "action_type"),
     )
 
     user: Mapped[Optional["User"]] = relationship("User", foreign_keys=[user_id])

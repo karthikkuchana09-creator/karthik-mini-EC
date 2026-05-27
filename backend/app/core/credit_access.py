@@ -1,7 +1,7 @@
 from typing import Optional, Callable
 from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
-from app.api.deps import get_db, get_current_user
+from app.routes.deps import get_db, get_current_user
 from app.core.tenant import get_current_tenant_id
 from app.models.user import User
 from app.services.credit_service import CreditService, CREDIT_COSTS

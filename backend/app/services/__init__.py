@@ -24,7 +24,7 @@ from app.services.dashboard_service import (
     get_performance
 )
 from app.services.document_service import upload_document, get_documents, get_document, get_task_documents, get_document_versions, download_document, delete_document
-from app.services.audit_log_service import log_action, get_audit_logs, get_audit_logs_by_entity
+from app.services.audit_log_service import log_action, get_audit_logs
 from app.services.notification_service import (
     create_notification,
     create_task_assignment_notification,

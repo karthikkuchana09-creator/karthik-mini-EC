@@ -2,7 +2,7 @@ from fastapi import HTTPException
 from sqlalchemy import select, func, update
 from sqlalchemy.orm import Session
 from fastapi_pagination.ext.sqlalchemy import paginate as fastapi_paginate
-from app.models.notification import Notification, NotificationType
+from app.models.notification import Notification, NotificationType, NotificationCategory, NotificationPriority
 from app.core.log import get_logger
 from app.core.config import settings
 from app.core.cache import cached, cache_delete_pattern
@@ -25,19 +25,23 @@ def create_notification(
     user_id: int,
     message: str,
     type: NotificationType = NotificationType.system,
+    notification_type: str | None = None,
+    priority: str = NotificationPriority.medium,
 ):
     notification = Notification(
         user_id=user_id,
         message=message,
         type=type,
+        notification_type=notification_type,
+        priority=priority,
     )
     db.add(notification)
     db.commit()
     db.refresh(notification)
 
     logger.info(
-        "Notification created: user_id=%d type=%s id=%d",
-        user_id, type, notification.id,
+        "Notification created: user_id=%d type=%s notification_type=%s priority=%s id=%d",
+        user_id, type, notification_type, priority, notification.id,
     )
 
     import asyncio
@@ -52,7 +56,10 @@ def create_notification(
 
 def create_task_assignment_notification(db: Session, user_id: int, task_id: int, task_title: str):
     message = f"You have been assigned to Task #{task_id}: {task_title}"
-    notification = create_notification(db, user_id, message, NotificationType.task_assignment)
+    notification = create_notification(
+        db, user_id, message, NotificationType.task_assignment,
+        notification_type=NotificationCategory.task, priority=NotificationPriority.high,
+    )
     import asyncio
     try:
         asyncio.ensure_future(manager.notify_task("assigned", task_id, task_title, assigned_user_id=user_id))
@@ -63,7 +70,10 @@ def create_task_assignment_notification(db: Session, user_id: int, task_id: int,
 
 def create_task_status_notification(db: Session, user_id: int, task_id: int, task_title: str, new_status: str):
     message = f"Task #{task_id}: {task_title} changed to {new_status}"
-    notification = create_notification(db, user_id, message, NotificationType.task_status)
+    notification = create_notification(
+        db, user_id, message, NotificationType.task_status,
+        notification_type=NotificationCategory.task, priority=NotificationPriority.medium,
+    )
     import asyncio
     try:
         asyncio.ensure_future(manager.notify_task("status_update", task_id, task_title, assigned_user_id=user_id, new_status=new_status))
@@ -74,7 +84,10 @@ def create_task_status_notification(db: Session, user_id: int, task_id: int, tas
 
 def create_approval_request_notification(db: Session, user_id: int, approval_id: int, task_title: str):
     message = f"Approval #{approval_id} requested for: {task_title}"
-    notification = create_notification(db, user_id, message, NotificationType.approval_request)
+    notification = create_notification(
+        db, user_id, message, NotificationType.approval_request,
+        notification_type=NotificationCategory.approval, priority=NotificationPriority.high,
+    )
     import asyncio
     try:
         asyncio.ensure_future(manager.notify_approval("requested", approval_id, 0, task_title, target_user_id=user_id))
@@ -85,7 +98,10 @@ def create_approval_request_notification(db: Session, user_id: int, approval_id:
 
 def create_approval_action_notification(db: Session, user_id: int, approval_id: int, task_id: int, task_title: str, action: str):
     message = f"Approval #{approval_id} was {action} for: {task_title}"
-    notification = create_notification(db, user_id, message, NotificationType.approval_action)
+    notification = create_notification(
+        db, user_id, message, NotificationType.approval_action,
+        notification_type=NotificationCategory.approval, priority=NotificationPriority.medium,
+    )
     import asyncio
     try:
         asyncio.ensure_future(manager.notify_approval(action, approval_id, task_id, task_title, target_user_id=user_id))
@@ -96,7 +112,10 @@ def create_approval_action_notification(db: Session, user_id: int, approval_id: 
 
 def create_comment_notification(db: Session, user_id: int, task_id: int):
     message = f"New comment on Task #{task_id}"
-    notification = create_notification(db, user_id, message, NotificationType.comment)
+    notification = create_notification(
+        db, user_id, message, NotificationType.comment,
+        notification_type=NotificationCategory.comment, priority=NotificationPriority.low,
+    )
     import asyncio
     try:
         asyncio.ensure_future(manager.notify_task("comment", task_id, "", assigned_user_id=user_id))
@@ -107,7 +126,10 @@ def create_comment_notification(db: Session, user_id: int, task_id: int):
 
 def create_document_notification(db: Session, user_id: int, document_id: int, filename: str, task_id: int):
     message = f"Document uploaded: {filename} to Task #{task_id}"
-    notification = create_notification(db, user_id, message, NotificationType.document_upload)
+    notification = create_notification(
+        db, user_id, message, NotificationType.document_upload,
+        notification_type=NotificationCategory.document, priority=NotificationPriority.medium,
+    )
     import asyncio
     try:
         asyncio.ensure_future(manager.notify_document("uploaded", document_id, filename, user_id, task_id=task_id))
@@ -117,7 +139,24 @@ def create_document_notification(db: Session, user_id: int, document_id: int, fi
 
 
 def create_system_notification(db: Session, user_id: int, message: str):
-    return create_notification(db, user_id, message, NotificationType.system)
+    return create_notification(
+        db, user_id, message, NotificationType.system,
+        notification_type=None, priority=NotificationPriority.medium,
+    )
+
+
+def create_escalation_notification(db: Session, user_id: int, approval_id: int, task_title: str):
+    message = f"Approval #{approval_id} escalated for: {task_title}"
+    notification = create_notification(
+        db, user_id, message, NotificationType.approval_action,
+        notification_type=NotificationCategory.escalation, priority=NotificationPriority.high,
+    )
+    import asyncio
+    try:
+        asyncio.ensure_future(manager.notify_approval("escalated", approval_id, 0, task_title, target_user_id=user_id))
+    except RuntimeError:
+        pass
+    return notification
 
 
 def get_notifications(

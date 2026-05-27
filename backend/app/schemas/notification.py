@@ -15,10 +15,26 @@ class NotificationCategory(str, Enum):
     ai_alert = "ai_alert"
 
 
+class NotificationTypeEnum(str, Enum):
+    task = "task"
+    approval = "approval"
+    escalation = "escalation"
+    comment = "comment"
+    document = "document"
+
+
+class NotificationPriorityEnum(str, Enum):
+    low = "low"
+    medium = "medium"
+    high = "high"
+
+
 class NotificationCreate(BaseModel):
     user_id: int
     message: str = Field(..., min_length=1, max_length=500)
     type: NotificationCategory = NotificationCategory.system
+    notification_type: Optional[NotificationTypeEnum] = None
+    priority: NotificationPriorityEnum = NotificationPriorityEnum.medium
 
 
 class NotificationOut(BaseModel):
@@ -26,6 +42,8 @@ class NotificationOut(BaseModel):
     user_id: int
     message: str
     type: NotificationCategory
+    notification_type: Optional[NotificationTypeEnum] = None
+    priority: NotificationPriorityEnum = NotificationPriorityEnum.medium
     is_read: bool
     created_at: datetime
 
@@ -60,3 +78,14 @@ class NotificationStats(BaseModel):
 class BulkReadRequest(BaseModel):
     notification_ids: list[int] = Field(..., min_length=1)
 
+
+class NotificationFilter(BaseModel):
+    type: Optional[NotificationCategory] = None
+    notification_type: Optional[NotificationTypeEnum] = None
+    priority: Optional[NotificationPriorityEnum] = None
+    is_read: Optional[bool] = None
+    q: Optional[str] = None
+    sort_by: Optional[str] = None
+    sort_order: str = "desc"
+    page: int = 1
+    size: int = 20
