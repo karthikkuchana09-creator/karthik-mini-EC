@@ -8,3 +8,5 @@ export const getTenantPerformance = (hours = 24) => api.get('/monitoring/tenant-
 export const triggerUsageAggregation = () => api.post('/monitoring/scheduler/trigger/usage-aggregation');
 export const triggerSubscriptionChecks = () => api.post('/monitoring/scheduler/trigger/subscription-checks');
 export const triggerWebhookRetries = () => api.post('/monitoring/scheduler/trigger/webhook-retries');
+
+export const toggleSlaRule = (id, active) => api.patch(`/sla-rules/${id}`, { is_active: active });

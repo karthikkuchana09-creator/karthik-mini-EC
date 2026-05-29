@@ -1,4 +1,11 @@
 export { default as queryClient } from './queryClient';
+export { tokenService } from './tokenService';
+export { slaService } from './slaService';
+export { approvalService } from './approvalService';
+export { taskService } from './taskService';
+export { notificationService } from './notificationService';
+export { auditService } from './auditService';
+
 export {
   tasksKeys,
   useTasks,

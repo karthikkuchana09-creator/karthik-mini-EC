@@ -1,4 +1,4 @@
-export default function Card({ children, className = '', hover = false, padding = 'md' }) {
+export default function Card({ children, className = '', hover = false, padding = 'md', accent = false }) {
   const paddingMap = {
     none: '',
     sm: 'p-4',
@@ -8,9 +8,9 @@ export default function Card({ children, className = '', hover = false, padding 
 
   return (
     <div
-      className={`bg-white rounded-xl border border-gray-200 shadow-sm ${
-        hover ? 'hover:shadow-md hover:border-gray-300 transition-all duration-200' : ''
-      } ${paddingMap[padding]} ${className}`}
+      className={`bg-white rounded-xl border border-gray-200 shadow-card ${
+        hover ? 'hover:shadow-card-hover hover:border-gray-300 cursor-pointer transition-all duration-200' : ''
+      } ${accent ? 'border-l-4 border-l-indigo-500' : ''} ${paddingMap[padding]} ${className}`}
     >
       {children}
     </div>

@@ -1,6 +1,6 @@
 import { QueryClient } from '@tanstack/react-query';
-import { getErrorMessage } from '../utils/errorHandler';
-import toast from 'react-hot-toast';
+import { getErrorMessage, isValidationError } from '../utils/errorHandler';
+import { toastMessages } from '../utils/toastMessages';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -15,8 +15,12 @@ const queryClient = new QueryClient({
     mutations: {
       retry: 0,
       onError: (error) => {
-        const message = getErrorMessage(error);
-        toast.error(message);
+        if (isValidationError(error)) {
+          toastMessages.error.validation(error);
+        } else {
+          const message = getErrorMessage(error);
+          toastMessages.error.default(message);
+        }
       },
     },
   },

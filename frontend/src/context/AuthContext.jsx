@@ -2,24 +2,15 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import toast from 'react-hot-toast';
-import { storage } from '../utils/secureStorage';
-import { isTokenExpired, getTokenExpiry } from '../utils/jwt';
+import { tokenService } from '../services/tokenService';
 
 const AuthContext = createContext(null);
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 
-function getAutoLogoutDelay(token) {
-  const exp = getTokenExpiry(token);
-  if (!exp) return null;
-  const now = Math.floor(Date.now() / 1000);
-  const remaining = (exp - now) * 1000;
-  return Math.max(0, remaining - 30000);
-}
-
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(() => storage.getUser());
-  const [token, setToken] = useState(() => storage.getToken());
+  const [user, setUser] = useState(() => tokenService.getUser());
+  const [token, setToken] = useState(() => tokenService.getAccessToken());
   const [loading, setLoading] = useState(true);
   const logoutTimerRef = useRef(null);
   const navigate = useNavigate();
@@ -27,7 +18,7 @@ export function AuthProvider({ children }) {
   const clearAuth = useCallback(() => {
     setUser(null);
     setToken(null);
-    storage.clearAuth();
+    tokenService.clearAuth();
   }, []);
 
   const logout = useCallback((reason) => {
@@ -39,7 +30,7 @@ export function AuthProvider({ children }) {
   const scheduleAutoLogout = useCallback((newToken) => {
     if (logoutTimerRef.current) clearTimeout(logoutTimerRef.current);
     if (!newToken) return;
-    const delay = getAutoLogoutDelay(newToken);
+    const delay = tokenService.getAutoLogoutDelay(newToken);
     if (delay === null || delay <= 0) {
       logout('Session expired. Please login again.');
       return;
@@ -52,21 +43,23 @@ export function AuthProvider({ children }) {
   const login = useCallback((userData, accessToken, refreshToken) => {
     setUser(userData);
     setToken(accessToken);
-    storage.setUser(userData);
-    storage.setToken(accessToken);
-    if (refreshToken) storage.setRefreshToken(refreshToken);
+    tokenService.setUser(userData);
+    tokenService.setAccessToken(accessToken);
+    if (refreshToken) tokenService.setRefreshToken(refreshToken);
     scheduleAutoLogout(accessToken);
   }, [scheduleAutoLogout]);
 
   useEffect(() => {
-    if (token) {
-      if (isTokenExpired(token)) {
-        const rt = storage.getRefreshToken();
-        if (rt && !isTokenExpired(rt)) {
+    const currentToken = tokenService.getAccessToken();
+    if (currentToken) {
+      if (tokenService.isTokenExpired(currentToken)) {
+        const rt = tokenService.getRefreshToken();
+        if (rt && !tokenService.isTokenExpired(rt)) {
           axios.post(`${API_URL}/auth/refresh`, { refresh_token: rt })
             .then((res) => {
               const { access_token, refresh_token: newRt } = res.data;
-              login(storage.getUser(), access_token, newRt || rt);
+              const storedUser = tokenService.getUser();
+              login(storedUser, access_token, newRt || rt);
             })
             .catch(() => logout('Session expired. Please login again.'))
             .finally(() => setLoading(false));
@@ -75,7 +68,7 @@ export function AuthProvider({ children }) {
           setLoading(false);
         }
       } else {
-        scheduleAutoLogout(token);
+        scheduleAutoLogout(currentToken);
         setLoading(false);
       }
     } else {
@@ -98,7 +91,7 @@ export function AuthProvider({ children }) {
     };
   }, []);
 
-  const isAuthenticated = !!token && !isTokenExpired(token);
+  const isAuthenticated = !!token && !tokenService.isTokenExpired(token);
 
   return (
     <AuthContext.Provider value={{

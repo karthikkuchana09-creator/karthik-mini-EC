@@ -1,6 +1,6 @@
 from pydantic import BaseModel, field_validator
 from typing import Optional
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from app.core.validators import validate_safe_text
 from app.core.sanitizer import sanitize_text
 
@@ -28,14 +28,14 @@ class ApprovalDelegationCreate(BaseModel):
     @field_validator("start_date")
     @classmethod
     def validate_start_date(cls, v):
-        if v < datetime.utcnow():
+        if v.replace(tzinfo=None) < datetime.utcnow().replace(tzinfo=None):
             raise ValueError("start_date must be in the future")
         return v
 
     @field_validator("end_date")
     @classmethod
     def validate_end_date(cls, v, info):
-        if v < datetime.utcnow():
+        if v.replace(tzinfo=None) < datetime.utcnow().replace(tzinfo=None):
             raise ValueError("end_date must be in the future")
         return v
 
@@ -43,7 +43,7 @@ class ApprovalDelegationCreate(BaseModel):
     @classmethod
     def validate_date_range(cls, v, info):
         start = info.data.get("start_date")
-        if start and v <= start:
+        if start and v.replace(tzinfo=None) <= start.replace(tzinfo=None):
             raise ValueError("end_date must be after start_date")
         return v
 

@@ -30,6 +30,26 @@ def create_delegation_endpoint(
     return create_delegation(db, data, user)
 
 
+@router.get("", response_model=Page[ApprovalDelegationResponse])
+def list_all_delegations_endpoint(
+    delegator_id: Optional[int] = Query(None),
+    delegatee_id: Optional[int] = Query(None),
+    is_active: Optional[bool] = Query(None),
+    q: Optional[str] = Query(None),
+    sort_by: Optional[str] = Query(None),
+    sort_order: str = Query("desc"),
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+    user=Depends(require_permission(Permissions.approval_delegation_read)),
+):
+    filters = ApprovalDelegationFilter(
+        delegator_id=delegator_id, delegatee_id=delegatee_id, is_active=is_active,
+        q=q, sort_by=sort_by, sort_order=sort_order, page=page, size=size,
+    )
+    return list_delegations_filtered(db, filters)
+
+
 @router.get("/me", response_model=Page[ApprovalDelegationResponse])
 def list_my_delegations_endpoint(
     delegator_id: Optional[int] = Query(None),

@@ -7,6 +7,7 @@ export function useRolePermissions() {
   const isAdmin = role === 'admin';
   const isManager = role === 'manager';
   const isEmployee = role === 'employee';
+  const isAuditor = role === 'auditor';
   const isAdminOrManager = isAdmin || isManager;
 
   return {
@@ -14,6 +15,7 @@ export function useRolePermissions() {
     isAdmin,
     isManager,
     isEmployee,
+    isAuditor,
     isAdminOrManager,
 
     canCreateTask: isAdminOrManager,
@@ -27,7 +29,7 @@ export function useRolePermissions() {
 
     canViewAIInsights: isAdminOrManager,
     canViewPersonalInsights: true,
-    canViewAuditLogs: isAdmin,
+    canViewAuditLogs: isAdmin || isAuditor,
     canViewTeamDocuments: isAdminOrManager,
     canUploadDocuments: true,
     canDownloadDocuments: true,

@@ -3,7 +3,7 @@ import { Outlet } from 'react-router-dom';
 import { WebSocketProvider } from '../context/WebSocketContext';
 import { NotificationProvider } from '../context/NotificationContext';
 import Navbar from './Navbar';
-import Sidebar from './Sidebar';
+import Sidebar from './layout/Sidebar';
 import { useIsMobile } from '../hooks/useMediaQuery';
 
 function Layout() {

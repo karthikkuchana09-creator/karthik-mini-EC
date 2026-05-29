@@ -29,7 +29,11 @@ def _deactivate_expired(db: Session):
         d.is_active = False
         logger.info("Auto-deactivated expired delegation id=%d", d.id)
     if expired:
-        db.commit()
+        try:
+            db.commit()
+        except Exception:
+            db.rollback()
+            logger.exception("Failed to auto-deactivate expired delegations")
 
 
 def create_delegation(
