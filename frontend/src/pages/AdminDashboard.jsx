@@ -147,16 +147,16 @@ function AdminDashboard() {
         aiSummaryData, usersData, auditStatsData, auditLogsData,
         documentsData, notifData,
       ] = await Promise.all([
-        adminApi.getSummary(),
-        adminApi.getTaskDistribution(),
-        adminApi.getApprovalStats(),
-        adminApi.getPerformance(),
-        adminApi.getAISummary(),
-        adminApi.getUsers(),
-        adminApi.getAuditStats(),
-        adminApi.getAuditLogs({ size: 8 }),
-        adminApi.getDocuments({ size: 1 }),
-        adminApi.getNotifications(),
+        adminApi.getSummary().catch(() => null),
+        adminApi.getTaskDistribution().catch(() => null),
+        adminApi.getApprovalStats().catch(() => null),
+        adminApi.getPerformance().catch(() => null),
+        adminApi.getAISummary().catch(() => null),
+        adminApi.getUsers().catch(() => null),
+        adminApi.getAuditStats().catch(() => null),
+        adminApi.getAuditLogs({ size: 8 }).catch(() => null),
+        adminApi.getDocuments({ size: 1 }).catch(() => null),
+        adminApi.getNotifications().catch(() => null),
       ]);
 
       setSummary(summaryData);

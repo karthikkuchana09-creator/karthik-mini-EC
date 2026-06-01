@@ -13,6 +13,7 @@ class NotificationCategory(str, Enum):
     document_upload = "document_upload"
     system = "system"
     ai_alert = "ai_alert"
+    sla_breach = "sla_breach"
 
 
 class NotificationTypeEnum(str, Enum):
@@ -21,6 +22,7 @@ class NotificationTypeEnum(str, Enum):
     escalation = "escalation"
     comment = "comment"
     document = "document"
+    sla = "sla"
 
 
 class NotificationPriorityEnum(str, Enum):
@@ -89,3 +91,4 @@ class NotificationFilter(BaseModel):
     sort_order: str = "desc"
     page: int = 1
     size: int = 20
+

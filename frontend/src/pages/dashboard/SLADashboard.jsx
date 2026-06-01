@@ -86,13 +86,13 @@ export default function SLADashboard() {
 
     const activeCount = active.length;
     const breachedCount = breached.length;
-    const completedRecords = active.filter((r) => r.completed_at || r.status === 'completed');
+    const completedRecords = active.filter((r) => r.completed_time || r.status === 'completed');
     const escalatedRecords = [...active, ...breached].filter((r) => r.escalated || r.status === 'escalated');
     const completedCount = completedRecords.length;
     const escalatedCount = escalatedRecords.length;
 
     const all = [
-      ...active.map((r) => ({ ...r, _status: r.completed_at || r.status === 'completed' ? 'completed' : r.escalated || r.status === 'escalated' ? 'escalated' : 'active' })),
+      ...active.map((r) => ({ ...r, _status: r.completed_time || r.status === 'completed' ? 'completed' : r.escalated || r.status === 'escalated' ? 'escalated' : 'active' })),
       ...breached.filter((r) => !active.some((a) => a.id === r.id)).map((r) => ({ ...r, _status: r.escalated || r.status === 'escalated' ? 'escalated' : 'breached' })),
     ];
 
@@ -104,7 +104,7 @@ export default function SLADashboard() {
   }, [activeQuery.data, breachedQuery.data]);
 
   const moduleOptions = useMemo(() => {
-    const modules = [...new Set(allRecords.map((r) => r.module).filter(Boolean))];
+    const modules = [...new Set(allRecords.map((r) => r.module_name).filter(Boolean))];
     return modules.map((m) => ({ value: m, label: m }));
   }, [allRecords]);
 
@@ -116,7 +116,7 @@ export default function SLADashboard() {
     }
 
     if (filters.module) {
-      list = list.filter((r) => r.module === filters.module);
+      list = list.filter((r) => r.module_name === filters.module);
     }
 
     return list;
@@ -129,7 +129,7 @@ export default function SLADashboard() {
   const columns = useMemo(() => [
     {
       Header: 'Module',
-      accessor: 'module',
+      accessor: 'module_name',
       sortable: true,
     },
     {
@@ -150,8 +150,8 @@ export default function SLADashboard() {
               {style.label}
             </span>
             <SLABadge
-              deadline={row.original.due_time || row.original.deadline}
-              completedAt={row.original.completed_at || row.original.completedAt}
+              deadline={row.original.due_time}
+              completedAt={row.original.completed_time}
               status={value === 'completed' ? 'done' : undefined}
             />
           </div>
@@ -172,7 +172,7 @@ export default function SLADashboard() {
     },
     {
       Header: 'Completed Time',
-      accessor: 'completed_at',
+      accessor: 'completed_time',
       sortable: true,
       Cell: ({ value }) => value ? new Date(value).toLocaleString() : '-',
     },
@@ -188,13 +188,12 @@ export default function SLADashboard() {
       Cell: ({ row }) => (
         <button
           onClick={() => {
-            const mod = row.original.module;
+            const mod = row.original.module_name;
             const rid = row.original.record_id;
             if (mod && rid) {
-              slaApi.getSlaTrackingRecord(mod, rid).then((res) => {
-                const record = res.data;
+              slaApi.getSlaTrackingRecord(mod, rid).then((record) => {
                 const msg = [
-                  `Module: ${record.module}`,
+                  `Module: ${record.module_name}`,
                   `Status: ${record._status || record.status}`,
                   record.breach_reason ? `Reason: ${record.breach_reason}` : null,
                 ].filter(Boolean).join('\n');

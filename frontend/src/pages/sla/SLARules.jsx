@@ -101,7 +101,7 @@ export default function SLARules() {
   const rules = useMemo(() => {
     const list = Array.isArray(data) ? data : data?.items || data?.rules || [];
     return list.filter((r) => {
-      if (filters.module && r.module !== filters.module) return false;
+      if (filters.module && r.module_name !== filters.module) return false;
       if (filters.priority && r.priority !== filters.priority) return false;
       return true;
     });
@@ -109,7 +109,7 @@ export default function SLARules() {
 
   const moduleOptions = useMemo(() => {
     const raw = Array.isArray(data) ? data : data?.items || data?.rules || [];
-    const modules = [...new Set(raw.map((r) => r.module).filter(Boolean))];
+    const modules = [...new Set(raw.map((r) => r.module_name).filter(Boolean))];
     return modules.map((m) => ({ value: m, label: m }));
   }, [data]);
 
@@ -129,7 +129,7 @@ export default function SLARules() {
     },
     {
       Header: 'Module',
-      accessor: 'module',
+      accessor: 'module_name',
       sortable: true,
     },
     {
@@ -228,7 +228,7 @@ export default function SLARules() {
   function handleEdit(rule) {
     setEditingRule(rule);
     setForm({
-      module: rule.module || '',
+      module: rule.module_name || '',
       priority: rule.priority || 'medium',
       allowed_hours: rule.allowed_hours ?? '',
       escalation_enabled: rule.escalation_enabled ?? false,
@@ -263,7 +263,7 @@ export default function SLARules() {
     if (!validateForm()) return;
 
     const payload = {
-      module: form.module.trim(),
+      module_name: form.module.trim(),
       priority: form.priority,
       allowed_hours: Number(form.allowed_hours),
       escalation_enabled: form.escalation_enabled,
@@ -463,7 +463,7 @@ export default function SLARules() {
         onClose={() => setDeleteConfirm(null)}
         onConfirm={() => deleteConfirm && deleteMutation.mutate(deleteConfirm.id)}
         title="Delete SLA Rule"
-        message={`Are you sure you want to delete SLA rule "${deleteConfirm?.module}"? This action cannot be undone.`}
+        message={`Are you sure you want to delete SLA rule "${deleteConfirm?.module_name}"? This action cannot be undone.`}
         confirmText="Delete"
         variant="danger"
         loading={deleteMutation.isPending}
