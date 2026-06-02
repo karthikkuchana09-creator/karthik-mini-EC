@@ -57,32 +57,32 @@ class User(Base):
         onupdate=func.now()
     )
 
-    created_tasks: Mapped[list[Task]] = relationship(
+    created_tasks: Mapped[list["Task"]] = relationship(
         "Task",
         foreign_keys="Task.created_by_id",
         back_populates="creator"
     )
 
-    assigned_tasks: Mapped[list[Task]] = relationship(
+    assigned_tasks: Mapped[list["Task"]] = relationship(
         "Task",
         foreign_keys="Task.assigned_to_id",
         back_populates="assignee"
     )
 
-    updated_tasks: Mapped[list[Task]] = relationship(
+    updated_tasks: Mapped[list["Task"]] = relationship(
         "Task",
         foreign_keys="Task.updated_by",
         back_populates="updater"
     )
 
-    documents: Mapped[list[Document]] = relationship("Document", back_populates="uploader")
+    documents: Mapped[list["Document"]] = relationship("Document", back_populates="uploader")
 
-    refresh_tokens: Mapped[list[RefreshToken]] = relationship(back_populates="user")
-    password_reset_tokens: Mapped[list[PasswordResetToken]] = relationship(back_populates="user")
-    sent_invitations: Mapped[list[OrganizationInvitation]] = relationship(back_populates="inviter")
+    refresh_tokens: Mapped[list["RefreshToken"]] = relationship(back_populates="user")
+    password_reset_tokens: Mapped[list["PasswordResetToken"]] = relationship(back_populates="user")
+    sent_invitations: Mapped[list["OrganizationInvitation"]] = relationship(back_populates="inviter")
 
-    sla_rules: Mapped[list[SLARule]] = relationship("SLARule", back_populates="creator")
+    sla_rules: Mapped[list["SLARule"]] = relationship("SLARule", back_populates="creator")
 
-    notification_preferences: Mapped[Optional[NotificationPreference]] = relationship(
+    notification_preferences: Mapped[Optional["NotificationPreference"]] = relationship(
         "NotificationPreference", back_populates="user", uselist=False
     )
