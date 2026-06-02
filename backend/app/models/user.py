@@ -1,10 +1,20 @@
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 from datetime import datetime
 from sqlalchemy import String, Integer, Boolean, DateTime, Enum, ForeignKey
 from sqlalchemy.sql import func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
 import enum
+
+
+if TYPE_CHECKING:
+    from app.models.task import Task
+    from app.models.document import Document
+    from app.models.refresh_token import RefreshToken
+    from app.models.password_reset_token import PasswordResetToken
+    from app.models.organization import OrganizationInvitation
+    from app.models.sla_rule import SLARule
+    from app.models.notification_preference import NotificationPreference
 
 
 class UserRole(str, enum.Enum):
@@ -47,32 +57,32 @@ class User(Base):
         onupdate=func.now()
     )
 
-    created_tasks: Mapped[list["Task"]] = relationship(
+    created_tasks: Mapped[list[Task]] = relationship(
         "Task",
         foreign_keys="Task.created_by_id",
         back_populates="creator"
     )
 
-    assigned_tasks: Mapped[list["Task"]] = relationship(
+    assigned_tasks: Mapped[list[Task]] = relationship(
         "Task",
         foreign_keys="Task.assigned_to_id",
         back_populates="assignee"
     )
 
-    updated_tasks: Mapped[list["Task"]] = relationship(
+    updated_tasks: Mapped[list[Task]] = relationship(
         "Task",
         foreign_keys="Task.updated_by",
         back_populates="updater"
     )
 
-    documents: Mapped[list["Document"]] = relationship("Document", back_populates="uploader")
+    documents: Mapped[list[Document]] = relationship("Document", back_populates="uploader")
 
-    refresh_tokens: Mapped[list["RefreshToken"]] = relationship(back_populates="user")
-    password_reset_tokens: Mapped[list["PasswordResetToken"]] = relationship(back_populates="user")
-    sent_invitations: Mapped[list["OrganizationInvitation"]] = relationship(back_populates="inviter")
+    refresh_tokens: Mapped[list[RefreshToken]] = relationship(back_populates="user")
+    password_reset_tokens: Mapped[list[PasswordResetToken]] = relationship(back_populates="user")
+    sent_invitations: Mapped[list[OrganizationInvitation]] = relationship(back_populates="inviter")
 
-    sla_rules: Mapped[list["SLARule"]] = relationship("SLARule", back_populates="creator")
+    sla_rules: Mapped[list[SLARule]] = relationship("SLARule", back_populates="creator")
 
-    notification_preferences: Mapped[Optional["NotificationPreference"]] = relationship(
+    notification_preferences: Mapped[Optional[NotificationPreference]] = relationship(
         "NotificationPreference", back_populates="user", uselist=False
     )
