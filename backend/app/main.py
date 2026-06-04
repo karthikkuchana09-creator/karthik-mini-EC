@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi_pagination import add_pagination
-from app.routes import auth, tasks, users, comments, approvals, dashboard, documents, audit_logs, notifications, ai, leaves, organizations, subscription, credits, usage, payments, webhooks, billing, super_admin, monitoring, sla_rules, sla_tracking, approval_escalations, approval_delegations, notification_preferences as notification_prefs_router
+from app.routes import auth, tasks, users, comments, approvals, dashboard, documents, audit_logs, notifications, ai, leaves, organizations, subscription, credits, usage, payments, webhooks, billing, super_admin, monitoring, sla_rules, sla_tracking, approval_escalations, approval_delegations, notification_preferences as notification_prefs_router, tenants
 from app.websocket.routes import router as ws_router
 from app.websocket.manager import manager
 from app.websocket.pubsub import ws_pubsub
@@ -96,6 +96,7 @@ app.include_router(sla_tracking.router)
 app.include_router(approval_escalations.router)
 app.include_router(approval_delegations.router)
 app.include_router(notification_prefs_router.router)
+app.include_router(tenants.router)
 
 add_pagination(app)
 logger.info("Application started")

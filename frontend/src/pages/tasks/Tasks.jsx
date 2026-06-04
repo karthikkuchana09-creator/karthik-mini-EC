@@ -12,9 +12,11 @@ import SLABadge from '../../components/common/SLABadge';
 import { FiPlus, FiClipboard } from 'react-icons/fi';
 import { BTN_PRIMARY } from '../../config/ui';
 import * as tasksApi from '../../api/tasks';
+import { useAuth } from '../../context/AuthContext';
 
 export default function Tasks() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [filters, setFilters] = useState({});
 
   const { data: tasks, isLoading, error, refetch } = useQuery({
@@ -170,11 +172,11 @@ export default function Tasks() {
       <PageHeader
         title="Tasks"
         subtitle="Browse and manage all tasks with SLA tracking"
-        actions={
+        actions={user?.role !== 'employee' && (
           <button onClick={() => navigate('/tasks/create')} className={BTN_PRIMARY}>
             <FiPlus className="w-4 h-4" /> New Task
           </button>
-        }
+        )}
       />
 
       <div className="mb-6">

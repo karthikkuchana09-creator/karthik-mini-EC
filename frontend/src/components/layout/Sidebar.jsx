@@ -33,6 +33,7 @@ const menuItems = [
   { to: '/kanban', label: 'Kanban Board', icon: FiLayout, roles: ['admin', 'manager', 'employee'] },
   { to: '/tasks', label: 'Tasks', icon: FiCheckSquare, roles: ['admin', 'manager', 'employee'] },
   { to: '/approvals', label: 'Approvals', icon: FiCheckCircle, roles: ['admin', 'manager'] },
+  { to: '/my-approvals', label: 'My Approvals', icon: FiCheckCircle, roles: ['employee'] },
   { to: '/approvals/escalations', label: 'Approval Escalations', icon: FiArrowUpCircle, roles: ['admin', 'manager', 'auditor'] },
   { to: '/approvals/delegations', label: 'Approval Delegations', icon: FiUsers, roles: ['admin', 'manager'] },
   { to: '/sla-dashboard', label: 'SLA Dashboard', icon: FiActivity, roles: ['admin', 'manager', 'auditor'] },

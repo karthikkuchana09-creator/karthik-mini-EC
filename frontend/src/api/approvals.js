@@ -5,6 +5,16 @@ export const getApprovals = async () => {
   return response.data;
 };
 
+export const createApproval = async (data) => {
+  const response = await api.post('/approvals', data);
+  return response.data;
+};
+
+export const getApprovalHistory = async (approvalId) => {
+  const response = await api.get(`/approvals/${approvalId}/history`);
+  return response.data;
+};
+
 export const updateApproval = async (approvalId, action, comment = '') => {
   const response = await api.patch(`/approvals/${approvalId}/action`, { action, comment });
   return response.data;

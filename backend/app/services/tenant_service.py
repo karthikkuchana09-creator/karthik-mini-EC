@@ -1,10 +1,116 @@
+import re
 from typing import Optional
-from sqlalchemy.orm import Session
 from sqlalchemy import select, func
+from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
+from app.models.tenant import Tenant, TenantStatus
 from app.models.organization import Organization, SubscriptionPlan
 from app.models.organization_settings import OrganizationSettings
+from app.schemas.tenant import TenantCreate, TenantUpdate
 from app.core.tenant import TenantResolver
+from app.core.log import get_logger
+
+logger = get_logger("tenant_service")
+
+
+# ── Tenant model CRUD (new) ─────────────────────────────────────────
+
+
+def _generate_slug(name: str) -> str:
+    slug = name.lower().strip()
+    slug = re.sub(r"[^a-z0-9\s-]", "", slug)
+    slug = re.sub(r"[\s-]+", "-", slug)
+    slug = slug.strip("-")
+    return slug
+
+
+def _make_unique_slug(db: Session, base_slug: str) -> str:
+    slug = base_slug
+    counter = 1
+    while db.scalar(select(Tenant).where(Tenant.slug == slug)):
+        slug = f"{base_slug}-{counter}"
+        counter += 1
+    return slug
+
+
+def create_tenant(db: Session, data: TenantCreate):
+    existing_email = db.scalar(select(Tenant).where(Tenant.contact_email == data.contact_email))
+    if existing_email:
+        raise HTTPException(status_code=400, detail="Contact email already in use")
+
+    base_slug = _generate_slug(data.name)
+    slug = _make_unique_slug(db, base_slug)
+
+    tenant = Tenant(
+        name=data.name,
+        slug=slug,
+        contact_email=data.contact_email,
+        phone=data.phone,
+        address=data.address,
+        industry=data.industry,
+    )
+    db.add(tenant)
+    db.commit()
+    db.refresh(tenant)
+    logger.info("Created tenant id=%d slug=%s", tenant.id, tenant.slug)
+    return tenant
+
+
+def get_tenant(db: Session, tenant_id: int):
+    tenant = db.scalar(select(Tenant).where(Tenant.id == tenant_id))
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+    return tenant
+
+
+def update_tenant(db: Session, tenant_id: int, data: TenantUpdate):
+    tenant = get_tenant(db, tenant_id)
+
+    if data.contact_email is not None and data.contact_email != tenant.contact_email:
+        existing = db.scalar(
+            select(Tenant).where(Tenant.contact_email == data.contact_email, Tenant.id != tenant_id)
+        )
+        if existing:
+            raise HTTPException(status_code=400, detail="Contact email already in use")
+        tenant.contact_email = data.contact_email
+
+    if data.name is not None and data.name != tenant.name:
+        base_slug = _generate_slug(data.name)
+        tenant.slug = _make_unique_slug(db, base_slug)
+        tenant.name = data.name
+
+    if data.phone is not None:
+        tenant.phone = data.phone
+    if data.address is not None:
+        tenant.address = data.address
+    if data.industry is not None:
+        tenant.industry = data.industry
+
+    db.commit()
+    db.refresh(tenant)
+    logger.info("Updated tenant id=%d", tenant.id)
+    return tenant
+
+
+def activate_tenant(db: Session, tenant_id: int):
+    tenant = get_tenant(db, tenant_id)
+    tenant.status = TenantStatus.ACTIVE
+    db.commit()
+    db.refresh(tenant)
+    logger.info("Activated tenant id=%d", tenant.id)
+    return tenant
+
+
+def suspend_tenant(db: Session, tenant_id: int):
+    tenant = get_tenant(db, tenant_id)
+    tenant.status = TenantStatus.SUSPENDED
+    db.commit()
+    db.refresh(tenant)
+    logger.info("Suspended tenant id=%d", tenant.id)
+    return tenant
+
+
+# ── Legacy Organization-based TenantService (kept for auth_service) ──
 
 
 class TenantService:

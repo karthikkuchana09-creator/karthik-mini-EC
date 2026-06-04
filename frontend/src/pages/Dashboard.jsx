@@ -242,19 +242,119 @@ function Dashboard() {
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
-        {STAT_ICONS.map((stat) => (
-          <StatCard
-            key={stat.key}
-            title={stat.label}
-            value={stat.key === 'overdue_tasks' ? getOverdueValue(summary) : (summary?.[stat.key] ?? 0)}
-            gradient={stat.color}
-          />
-        ))}
+        {STAT_ICONS.map((stat) => {
+          if (!isAdminOrManager && stat.key === 'total_tasks') {
+            return (
+              <StatCard
+                key="my_tasks"
+                title="My Tasks"
+                value={summary?.my_tasks ?? 0}
+                gradient={stat.color}
+              />
+            );
+          }
+          if (!isAdminOrManager && stat.key === 'pending_approvals') {
+            return (
+              <StatCard
+                key="my_pending_approvals"
+                title="Pending Approvals"
+                value={summary?.my_pending_approvals ?? 0}
+                gradient={stat.color}
+              />
+            );
+          }
+          if (!isAdminOrManager && stat.key === 'overdue_tasks') {
+            return (
+              <StatCard
+                key="my_overdue_tasks"
+                title="Overdue Tasks"
+                value={summary?.my_overdue_tasks ?? 0}
+                gradient={stat.color}
+              />
+            );
+          }
+          if (!isAdminOrManager && stat.key === 'completed_tasks') {
+            return (
+              <StatCard
+                key="my_completed_tasks"
+                title="Completed"
+                value={summary?.my_completed ?? 0}
+                gradient={stat.color}
+              />
+            );
+          }
+          return (
+            <StatCard
+              key={stat.key}
+              title={stat.label}
+              value={stat.key === 'overdue_tasks' ? getOverdueValue(summary) : (summary?.[stat.key] ?? 0)}
+              gradient={stat.color}
+            />
+          );
+        })}
       </div>
 
       <div className="mb-8">
         {isAdminOrManager ? <AIInsights /> : <PersonalInsights summary={summary} />}
       </div>
+
+      {!isAdminOrManager && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          <ChartCard title="SLA Status" accentColor="from-rose-400 to-pink-500">
+            {summary?.sla_pie?.length > 0 ? (
+              <ResponsiveContainer width="100%" height={280}>
+                <PieChart>
+                  <Pie data={summary.sla_pie} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={4} dataKey="count" nameKey="name" stroke="none">
+                    {summary.sla_pie.map((_, index) => (
+                      <Cell key={index} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: '#fff',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '12px',
+                      boxShadow: '0 8px 25px -4px rgba(0,0,0,0.1)',
+                      fontSize: '12px',
+                      padding: '8px 12px',
+                    }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-[280px] text-gray-400 text-sm">No SLA data</div>
+            )}
+          </ChartCard>
+
+          <ChartCard title="Upcoming Deadlines" accentColor="from-blue-400 to-cyan-500">
+            {summary?.upcoming_deadlines?.length > 0 ? (
+              <div className="divide-y divide-gray-100 -mx-6">
+                {summary.upcoming_deadlines.map((task) => (
+                  <div key={task.id} className="flex items-center justify-between px-6 py-3 hover:bg-gray-50/50 transition-colors">
+                    <div className="flex-1 min-w-0 mr-4">
+                      <p className="text-sm font-medium text-gray-900 truncate">{task.title}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        Due {new Date(task.due_date).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                      task.status === 'done' ? 'bg-green-50 text-green-700' :
+                      task.status === 'in_progress' ? 'bg-blue-50 text-blue-700' :
+                      task.status === 'review' ? 'bg-purple-50 text-purple-700' :
+                      'bg-gray-50 text-gray-600'
+                    }`}>
+                      {task.status.replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex items-center justify-center h-[280px] text-gray-400 text-sm">No upcoming deadlines</div>
+            )}
+          </ChartCard>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         <ChartCard title="Activity Feed" accentColor="from-violet-400 to-purple-500">
@@ -263,60 +363,62 @@ function Dashboard() {
         <NotificationsPanel />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <ChartCard title="Task Distribution">
-          {Array.isArray(distribution) && distribution.length > 0 ? (
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={distribution}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#fff',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '12px',
-                    boxShadow: '0 8px 25px -4px rgba(0,0,0,0.1)',
-                    fontSize: '12px',
-                    padding: '8px 12px',
-                  }}
-                  cursor={{ fill: 'rgba(99, 102, 241, 0.06)' }}
-                />
-                <Bar dataKey="count" fill="#4f46e5" radius={[8, 8, 0, 0]} barSize={36} />
-              </BarChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="flex items-center justify-center h-[300px] text-gray-400 text-sm">No data available</div>
-          )}
-        </ChartCard>
+      {isAdminOrManager && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <ChartCard title="Task Distribution">
+            {Array.isArray(distribution) && distribution.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={distribution}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: '#fff',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '12px',
+                      boxShadow: '0 8px 25px -4px rgba(0,0,0,0.1)',
+                      fontSize: '12px',
+                      padding: '8px 12px',
+                    }}
+                    cursor={{ fill: 'rgba(99, 102, 241, 0.06)' }}
+                  />
+                  <Bar dataKey="count" fill="#4f46e5" radius={[8, 8, 0, 0]} barSize={36} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-[300px] text-gray-400 text-sm">No data available</div>
+            )}
+          </ChartCard>
 
-        <ChartCard title="Status Analytics" accentColor="from-emerald-400 to-teal-500">
-          {statusData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie data={statusData} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={4} dataKey="value" stroke="none">
-                  {statusData.map((_, index) => (
-                    <Cell key={index} fill={PIE_COLORS[index % PIE_COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#fff',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '12px',
-                    boxShadow: '0 8px 25px -4px rgba(0,0,0,0.1)',
-                    fontSize: '12px',
-                    padding: '8px 12px',
-                  }}
-                />
-                <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
-              </PieChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="flex items-center justify-center h-[300px] text-gray-400 text-sm">No data available</div>
-          )}
-        </ChartCard>
-      </div>
+          <ChartCard title="Status Analytics" accentColor="from-emerald-400 to-teal-500">
+            {statusData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie data={statusData} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={4} dataKey="value" stroke="none">
+                    {statusData.map((_, index) => (
+                      <Cell key={index} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: '#fff',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '12px',
+                      boxShadow: '0 8px 25px -4px rgba(0,0,0,0.1)',
+                      fontSize: '12px',
+                      padding: '8px 12px',
+                    }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-[300px] text-gray-400 text-sm">No data available</div>
+            )}
+          </ChartCard>
+        </div>
+      )}
     </div>
   );
 }

@@ -13,7 +13,7 @@ logger = get_logger("dashboard_service")
 
 
 @cached(prefix="dashboard:summary", ttl=lambda: settings.CACHE_TTL_DASHBOARD, exclude_args=[0])
-def get_summary(db: Session):
+def get_summary(db: Session, user_id: int = None):
     task_counts = db.execute(select(
         func.coalesce(func.count(Task.id), 0).label("total"),
         func.coalesce(func.sum(case((Task.status == "done", 1), else_=0)), 0).label("completed"),
@@ -24,15 +24,61 @@ def get_summary(db: Session):
         Approval.status == "pending"
     ))
 
-    logger.info("Dashboard summary: total=%d completed=%d pending=%d approvals=%d",
-                task_counts.total, task_counts.completed, task_counts.pending, pending_approvals)
-
-    return {
+    result = {
         "total_tasks": task_counts.total,
         "completed_tasks": task_counts.completed,
         "pending_tasks": task_counts.pending,
         "pending_approvals": pending_approvals,
     }
+
+    if user_id:
+        my_task_counts = db.execute(select(
+            func.coalesce(func.count(Task.id), 0).label("total"),
+            func.coalesce(func.sum(case((Task.status == "done", 1), else_=0)), 0).label("completed"),
+            func.coalesce(func.sum(case((Task.status != "done", 1), else_=0)), 0).label("pending"),
+        ).where(Task.assigned_to_id == user_id)).one()
+
+        result["my_tasks"] = my_task_counts.total
+        result["my_completed"] = my_task_counts.completed
+        result["my_pending"] = my_task_counts.pending
+        result["my_pending_approvals"] = db.scalar(select(func.count(Approval.id)).where(
+            Approval.requested_by == user_id, Approval.status == "pending"
+        )) or 0
+
+        sla_rows = db.execute(
+            select(Task.sla_status, func.count(Task.id).label("count"))
+            .where(Task.assigned_to_id == user_id, Task.sla_status.isnot(None))
+            .group_by(Task.sla_status)
+        ).all()
+        result["sla_pie"] = [{"name": r.sla_status.replace("_", " ").title(), "count": r.count} for r in sla_rows]
+
+        upcoming = db.execute(
+            select(Task.id, Task.title, Task.due_date, Task.status)
+            .where(
+                Task.assigned_to_id == user_id,
+                Task.due_date.isnot(None),
+                Task.due_date >= func.now(),
+                Task.status != "done",
+            )
+            .order_by(Task.due_date.asc())
+            .limit(10)
+        ).all()
+        result["upcoming_deadlines"] = [
+            {"id": r.id, "title": r.title, "due_date": r.due_date.isoformat(), "status": r.status}
+            for r in upcoming
+        ]
+
+        result["my_overdue_tasks"] = db.scalar(select(func.count(Task.id)).where(
+            Task.assigned_to_id == user_id,
+            Task.status != "done",
+            Task.due_date.isnot(None),
+            Task.due_date < func.now(),
+        )) or 0
+
+    logger.info("Dashboard summary: total=%d completed=%d pending=%d approvals=%d",
+                task_counts.total, task_counts.completed, task_counts.pending, pending_approvals)
+
+    return result
 
 
 @cached(prefix="dashboard:distribution", ttl=lambda: settings.CACHE_TTL_DASHBOARD, exclude_args=[0])

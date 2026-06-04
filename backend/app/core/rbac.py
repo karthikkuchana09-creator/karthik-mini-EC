@@ -91,6 +91,13 @@ class Permissions:
 
     notification_preference_manage = "notification_preference:manage"
 
+    tenant_create = "tenant:create"
+    tenant_list = "tenant:list"
+    tenant_read = "tenant:read"
+    tenant_update = "tenant:update"
+    tenant_activate = "tenant:activate"
+    tenant_suspend = "tenant:suspend"
+
     super_admin_all = "super_admin:*"
 
 
@@ -168,6 +175,13 @@ ROLE_PERMISSIONS = {
         Permissions.approval_delegation_update,
 
         Permissions.notification_preference_manage,
+
+        Permissions.tenant_create,
+        Permissions.tenant_list,
+        Permissions.tenant_read,
+        Permissions.tenant_update,
+        Permissions.tenant_activate,
+        Permissions.tenant_suspend,
     },
     "manager": {
         Permissions.task_create,
@@ -215,6 +229,7 @@ ROLE_PERMISSIONS = {
         Permissions.task_create,
         Permissions.task_read,
         Permissions.task_update_status,
+        Permissions.approval_create,
         Permissions.approval_read,
         Permissions.approval_read_history,
         Permissions.dashboard_view,
@@ -226,6 +241,7 @@ ROLE_PERMISSIONS = {
         Permissions.ai_use,
         Permissions.leave_create,
         Permissions.leave_read,
+        Permissions.audit_view,
 
         Permissions.sla_tracking_read,
     },

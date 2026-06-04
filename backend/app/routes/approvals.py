@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends
+from typing import Optional
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from fastapi_pagination import Page
 from app.schemas.approval import ApprovalCreate, ApprovalAction, ApprovalOut
@@ -6,9 +7,9 @@ from app.routes.deps import get_db, rate_limit
 from app.core.rbac import require_permission, Permissions
 from app.core.subscription_access import require_feature
 from app.core.config import settings
-from app.repository.approval_repository import list_all_approvals
 from app.services.approval_service import (
     create_approval,
+    get_approvals,
     take_approval_action,
     get_approval_history
 )
@@ -32,8 +33,13 @@ def get_approvals_endpoint(
     db: Session = Depends(get_db),
     user=Depends(require_permission(Permissions.approval_read)),
     _=Depends(rate_limit(settings.RATE_LIMIT_DEFAULT, settings.RATE_LIMIT_DEFAULT_WINDOW, "approvals")),
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
+    sort_by: Optional[str] = None,
+    sort_order: str = Query("desc", pattern="^(asc|desc)$"),
+    search: Optional[str] = None,
 ):
-    return list_all_approvals(db)
+    return get_approvals(db, user, page, size, sort_by, sort_order, search)
 
 
 @router.patch("/{approval_id}/action")

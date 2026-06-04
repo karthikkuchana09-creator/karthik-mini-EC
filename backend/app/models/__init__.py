@@ -22,3 +22,4 @@ from .credit import UsageCredit, CreditTransaction
 from .payment import RazorpayPayment, RazorpaySubscriptionLink, RazorpayInvoice
 from .invoice import Invoice, FailedPaymentLog
 from .notification_preference import NotificationPreference
+from .tenant import Tenant, TenantStatus

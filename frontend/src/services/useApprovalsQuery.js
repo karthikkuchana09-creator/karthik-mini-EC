@@ -23,6 +23,21 @@ export function useApprovalHistory(id) {
   });
 }
 
+export function useCreateApproval() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data) => approvalsApi.createApproval(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: approvalKeys.all });
+      toast.success('Approval request submitted');
+    },
+    onError: (err) => {
+      toast.error(err.response?.data?.detail || 'Failed to submit approval');
+    },
+  });
+}
+
 export function useUpdateApproval() {
   const queryClient = useQueryClient();
 

@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 from fastapi_pagination import Page
@@ -8,6 +9,7 @@ from app.core.rbac import require_permission, Permissions
 from app.core.subscription_access import check_create_limit
 from app.services.task_service import (
     create_task,
+    get_tasks,
     get_kanban_view,
     get_task_by_id,
     update_task,
@@ -15,7 +17,6 @@ from app.services.task_service import (
     assign_task,
     update_task_status,
 )
-from app.repository.task_repository import list_all_tasks
 from app.models.task import Task
 from app.websocket.manager import manager
 from app.websocket.kanban import build_kanban_task_data, KanbanAction, detect_conflict
@@ -37,8 +38,13 @@ def create_task_endpoint(
 def list_tasks(
     db: Session = Depends(get_db),
     user=Depends(get_current_user),
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
+    sort_by: Optional[str] = None,
+    sort_order: str = Query("desc", pattern="^(asc|desc)$"),
+    search: Optional[str] = None,
 ):
-    return list_all_tasks(db)
+    return get_tasks(db, user, page, size, sort_by, sort_order, search)
 
 
 @router.get("/kanban")
@@ -46,7 +52,7 @@ def get_kanban_endpoint(
     db: Session = Depends(get_db),
     user=Depends(require_permission(Permissions.task_read))
 ):
-    return get_kanban_view(db)
+    return get_kanban_view(db, user)
 
 
 @router.get("/{task_id}")

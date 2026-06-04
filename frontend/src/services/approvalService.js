@@ -5,6 +5,10 @@ export const approvalService = {
     return api.get('/approvals', { params }).then((r) => r.data);
   },
 
+  createApproval(data) {
+    return api.post('/approvals', data).then((r) => r.data);
+  },
+
   getApproval(id) {
     return api.get(`/approvals/${id}`).then((r) => r.data);
   },

@@ -42,6 +42,7 @@ const TeamIntelligence = lazy(() => import('../pages/TeamIntelligence'));
 const EmployeeProductivity = lazy(() => import('../pages/EmployeeProductivity'));
 const DelayRiskMonitor = lazy(() => import('../pages/DelayRiskMonitor'));
 const AIAnalyticsDashboard = lazy(() => import('../pages/AIAnalyticsDashboard'));
+const EmployeeApprovals = lazy(() => import('../pages/approvals/EmployeeApprovals'));
 
 function PageLoader() {
   return (
@@ -99,6 +100,7 @@ export default function AppRoutes() {
         <Route path="/tasks-v2" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager', 'employee']}><TasksPage /></ProtectedRouteWrapper>} />
         <Route path="/tasks-v2/:id" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager', 'employee']}><TaskDetailsPage /></ProtectedRouteWrapper>} />
         <Route path="/approvals" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager']}><Approvals /></ProtectedRouteWrapper>} />
+        <Route path="/my-approvals" element={<ProtectedRouteWrapper allowedRoles={['employee']}><EmployeeApprovals /></ProtectedRouteWrapper>} />
         <Route path="/approvals/:id/history" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager']}><ApprovalHistory /></ProtectedRouteWrapper>} />
         <Route path="/approval-escalations" element={<ProtectedRouteWrapper allowedRoles={['admin']}><ApprovalEscalations /></ProtectedRouteWrapper>} />
         <Route path="/approvals/escalations" element={<ProtectedRouteWrapper allowedRoles={['admin']}><ApprovalEscalations /></ProtectedRouteWrapper>} />

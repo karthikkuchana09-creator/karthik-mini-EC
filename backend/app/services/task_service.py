@@ -127,9 +127,20 @@ def get_tasks(
     return result
 
 
-def get_kanban_view(db: Session):
-    tasks = db.execute(select(Task)).scalars().all()
-    logger.debug("Kanban view: %d total tasks", len(tasks))
+def get_kanban_view(db: Session, current_user=None):
+    query = select(Task)
+
+    if current_user:
+        if current_user.role == "employee":
+            query = query.where(Task.assigned_to_id == current_user.id)
+        elif current_user.role == "manager":
+            query = query.where(
+                (Task.created_by_id == current_user.id) |
+                (Task.assigned_to_id == current_user.id)
+            )
+
+    tasks = db.execute(query).scalars().all()
+    logger.debug("Kanban view: %d tasks for user_id=%s", len(tasks), current_user.id if current_user else "all")
 
     return {
         "todo": [t for t in tasks if t.status == "todo"],

@@ -281,11 +281,11 @@ export default function DataTable({
                       ${idx % 2 === 1 ? 'bg-gray-50/30' : ''}
                     `}
                   >
-                    {columns.map((col) => {
-                      const value = getNestedValue(row, col.accessor);
+                    {columns.map((col, idx) => {
+                      const value = col.accessor ? getNestedValue(row, col.accessor) : undefined;
                       return (
                         <td
-                          key={col.accessor}
+                          key={col.accessor || col.id || idx}
                           className={`px-5 py-4 text-sm text-gray-700 whitespace-nowrap ${col.cellClassName || ''}`}
                         >
                           {col.Cell ? <col.Cell value={value} row={{ original: row, ...row }} /> : (value ?? '-')}

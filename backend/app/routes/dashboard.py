@@ -20,7 +20,7 @@ def get_summary_endpoint(
     db: Session = Depends(get_db),
     user=Depends(require_permission(Permissions.dashboard_view))
 ):
-    return get_summary(db)
+    return get_summary(db, user_id=user.id)
 
 
 @router.get("/task-distribution")

@@ -20,6 +20,7 @@ const pageTitles = {
   '/tasks/create': 'Create Task',
   '/kanban': 'Kanban Board',
   '/approvals': 'Approvals',
+  '/my-approvals': 'My Approvals',
   '/approvals/escalations': 'Approval Escalations',
   '/approvals/delegations': 'Approval Delegations',
   '/notifications': 'Notifications',
@@ -65,6 +66,7 @@ function getPageTitle(pathname) {
     return 'Task Details';
   }
   if (pathname.startsWith('/approvals/')) return 'Approvals';
+  if (pathname.startsWith('/my-approvals')) return 'My Approvals';
   return 'Dashboard';
 }
 

@@ -84,6 +84,7 @@ export const ROUTE_PERMISSIONS = {
   '/tasks/:id': { allowedRoles: Object.values(ROLES), requiredPermissions: [] },
   '/kanban': { allowedRoles: [ROLES.ADMIN, ROLES.MANAGER, ROLES.EMPLOYEE], requiredPermissions: [] },
   '/approvals': { allowedRoles: [ROLES.ADMIN, ROLES.MANAGER], requiredPermissions: ['canApprove'] },
+  '/my-approvals': { allowedRoles: [ROLES.EMPLOYEE], requiredPermissions: [] },
   '/approvals/escalations': { allowedRoles: [ROLES.ADMIN], requiredPermissions: ['canManageEscalations'] },
   '/approval-escalations': { allowedRoles: [ROLES.ADMIN], requiredPermissions: ['canManageEscalations'] },
   '/approvals/delegations': { allowedRoles: [ROLES.ADMIN, ROLES.MANAGER], requiredPermissions: ['canManageDelegations'] },

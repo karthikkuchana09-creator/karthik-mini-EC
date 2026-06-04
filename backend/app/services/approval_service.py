@@ -94,33 +94,8 @@ def get_approvals(
             order_fn = desc if sort_order == "desc" else asc
             query = query.order_by(order_fn(column))
 
-    result = fastapi_paginate(db, query, Params(page=page, size=size))
-
-    enriched = []
-    for a in result.items:
-        requester = a.requester
-        enriched.append({
-            "id": a.id,
-            "title": a.title,
-            "description": a.description,
-            "requested_by": {
-                "id": requester.id,
-                "name": requester.name,
-                "email": requester.email,
-            } if requester else None,
-            "status": a.status,
-            "current_level": a.current_level,
-            "is_escalated": a.is_escalated,
-            "sla_status": a.sla_status,
-            "sla_due_time": a.sla_due_time.isoformat() if a.sla_due_time else None,
-            "current_escalation_to": a.current_escalation_to,
-            "created_at": a.created_at.isoformat() if a.created_at else None,
-            "updated_at": a.updated_at.isoformat() if a.updated_at else None,
-        })
-
-    result.items = enriched
-    logger.debug("Fetched %d approvals for user_id=%d", len(enriched), current_user.id)
-    return result
+    logger.debug("Fetched approvals for user_id=%d", current_user.id)
+    return fastapi_paginate(db, query, Params(page=page, size=size))
 
 
 def take_approval_action(db: Session, approval_id: int, action_data: ApprovalAction, current_user):
