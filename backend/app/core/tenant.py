@@ -12,6 +12,7 @@ from app.models.organization import Organization
 from app.core.security import decode_token
 from app.core.config import settings
 from app.core.log import get_logger
+from app.models.tenant import Tenant
 
 logger = get_logger("tenant")
 
@@ -306,6 +307,24 @@ def get_current_tenant_info(request: Request) -> Optional[TenantInfo]:
     return getattr(request.state, "tenant_info", None)
 
 
+def get_current_tenant(request: Request, db: Session) -> Optional[Tenant]:
+    tenant_id = get_current_tenant_id(request)
+    if tenant_id is None:
+        return None
+    return db.execute(select(Tenant).where(Tenant.id == tenant_id)).scalar_one_or_none()
+
+
+def require_current_tenant(request: Request, db: Session) -> Tenant:
+    tenant_id = require_active_tenant(request)
+    tenant = db.execute(select(Tenant).where(Tenant.id == tenant_id)).scalar_one_or_none()
+    if not tenant:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Tenant not found",
+        )
+    return tenant
+
+
 def require_tenant(request: Request) -> int:
     tenant_id = get_current_tenant_id(request)
     if tenant_id is None:
@@ -373,7 +392,7 @@ def get_active_tenant_db(request: Request):
         db.close()
 
 
-class TenantQuery:
+class TenantAwareQuery:
     def __init__(self, model, db: Session, tenant_id: int):
         self.model = model
         self.db = db
@@ -386,6 +405,9 @@ class TenantQuery:
     def get(self, ident):
         return self.db.execute(self._stmt().where(self.model.id == ident)).scalar_one_or_none()
 
+    def first(self):
+        return self.db.execute(self._stmt().limit(1)).scalar_one_or_none()
+
     def all(self):
         return self.db.execute(self._stmt().order_by(self.model.id)).scalars().all()
 
@@ -394,3 +416,12 @@ class TenantQuery:
 
     def paginate(self, skip: int = 0, limit: int = 100):
         return self.db.execute(self._stmt().offset(skip).limit(limit)).scalars().all()
+
+    def filter(self, *criterion):
+        stmt = self._stmt()
+        for c in criterion:
+            stmt = stmt.where(c)
+        return self.db.execute(stmt).scalars().all()
+
+
+

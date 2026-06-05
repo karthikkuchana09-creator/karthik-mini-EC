@@ -98,6 +98,35 @@ class Permissions:
     tenant_activate = "tenant:activate"
     tenant_suspend = "tenant:suspend"
 
+    tenant_onboard = "tenant:onboard"
+    tenant_onboarding_read = "tenant:onboarding_read"
+    tenant_onboarding_admin_create = "tenant:onboarding_admin_create"
+
+    tenant_collaboration_settings_read = "tenant:collaboration_settings_read"
+    tenant_collaboration_settings_update = "tenant:collaboration_settings_update"
+
+    tenant_collaboration_usage_read = "tenant:collaboration_usage_read"
+    tenant_collaboration_usage_recalculate = "tenant:collaboration_usage_recalculate"
+
+    workspace_create = "workspace:create"
+    workspace_read = "workspace:read"
+    workspace_update = "workspace:update"
+    workspace_archive = "workspace:archive"
+    workspace_restore = "workspace:restore"
+
+    workspace_member_add = "workspace_member:add"
+    workspace_member_list = "workspace_member:list"
+    workspace_member_update_role = "workspace_member:update_role"
+    workspace_member_remove = "workspace_member:remove"
+
+    channel_create = "channel:create"
+    channel_read = "channel:read"
+    channel_update = "channel:update"
+    channel_archive = "channel:archive"
+    channel_restore = "channel:restore"
+    channel_join = "channel:join"
+    channel_leave = "channel:leave"
+
     super_admin_all = "super_admin:*"
 
 

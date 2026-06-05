@@ -15,6 +15,11 @@ if TYPE_CHECKING:
     from app.models.organization import OrganizationInvitation
     from app.models.sla_rule import SLARule
     from app.models.notification_preference import NotificationPreference
+    from app.models.tenant_onboarding import TenantOnboarding
+    from app.models.workspace import Workspace
+    from app.models.workspace_member import WorkspaceMember
+    from app.models.channel import Channel
+    from app.models.channel_member import ChannelMember
 
 
 class UserRole(str, enum.Enum):
@@ -85,4 +90,21 @@ class User(Base):
 
     notification_preferences: Mapped[Optional["NotificationPreference"]] = relationship(
         "NotificationPreference", back_populates="user", uselist=False
+    )
+
+    onboarding_record: Mapped[Optional["TenantOnboarding"]] = relationship(
+        "TenantOnboarding", back_populates="admin_user", uselist=False
+    )
+
+    workspaces: Mapped[list["Workspace"]] = relationship(
+        "Workspace", back_populates="creator"
+    )
+    workspace_memberships: Mapped[list["WorkspaceMember"]] = relationship(
+        "WorkspaceMember", back_populates="user"
+    )
+    created_channels: Mapped[list["Channel"]] = relationship(
+        "Channel", back_populates="creator"
+    )
+    channel_memberships: Mapped[list["ChannelMember"]] = relationship(
+        "ChannelMember", back_populates="user"
     )

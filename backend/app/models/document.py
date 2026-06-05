@@ -1,15 +1,18 @@
-from sqlalchemy import String, DateTime, ForeignKey, Text, func
+from sqlalchemy import String, DateTime, ForeignKey, Text, func, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from typing import Optional
 from datetime import datetime
 from app.db.base import Base
+from app.models.mixins.tenant_mixin import TenantMixin
 
 
-class Document(Base):
+class Document(TenantMixin, Base):
     __tablename__ = "documents"
+    __tenant_fk__ = "organizations.id"
+    __tenant_fk_ondelete__ = "SET NULL"
+    __tenant_nullable__ = True
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    tenant_id: Mapped[Optional[int]] = mapped_column(ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True)
     file_name: Mapped[str] = mapped_column(String(255), nullable=False)
     file_path: Mapped[str] = mapped_column(Text, nullable=False)
     version: Mapped[int] = mapped_column(default=1, nullable=False)

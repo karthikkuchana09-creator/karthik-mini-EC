@@ -1,10 +1,17 @@
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 from datetime import datetime
 from sqlalchemy import String, Integer, DateTime, Text, Enum as SAEnum
 from sqlalchemy.sql import func
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 import enum
 from app.db.base import Base
+
+if TYPE_CHECKING:
+    from app.models.tenant_onboarding import TenantOnboarding
+    from app.models.tenant_collaboration_settings import TenantCollaborationSettings
+    from app.models.tenant_collaboration_usage import TenantCollaborationUsage
+    from app.models.workspace import Workspace
+    from app.models.channel import Channel
 
 
 class TenantStatus(str, enum.Enum):
@@ -27,3 +34,13 @@ class Tenant(Base):
     status: Mapped[TenantStatus] = mapped_column(SAEnum(TenantStatus), default=TenantStatus.ACTIVE)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    onboarding: Mapped[Optional["TenantOnboarding"]] = relationship(back_populates="tenant", uselist=False)
+    collaboration_settings: Mapped[Optional["TenantCollaborationSettings"]] = relationship(
+        back_populates="tenant", uselist=False
+    )
+    collaboration_usage: Mapped[Optional["TenantCollaborationUsage"]] = relationship(
+        back_populates="tenant", uselist=False
+    )
+    workspaces: Mapped[list["Workspace"]] = relationship(back_populates="tenant")
+    channels: Mapped[list["Channel"]] = relationship(back_populates="tenant")

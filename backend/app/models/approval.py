@@ -4,13 +4,16 @@ from sqlalchemy import String, Integer, Boolean, Text, DateTime, ForeignKey, Ind
 from sqlalchemy.sql import func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
+from app.models.mixins.tenant_mixin import TenantMixin
 
 
-class Approval(Base):
+class Approval(TenantMixin, Base):
     __tablename__ = "approvals"
+    __tenant_fk__ = "organizations.id"
+    __tenant_fk_ondelete__ = "SET NULL"
+    __tenant_nullable__ = True
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    tenant_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True)
     title: Mapped[str] = mapped_column(String(255))
     description: Mapped[Optional[str]] = mapped_column(Text)
 

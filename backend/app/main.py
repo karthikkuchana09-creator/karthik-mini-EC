@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi_pagination import add_pagination
-from app.routes import auth, tasks, users, comments, approvals, dashboard, documents, audit_logs, notifications, ai, leaves, organizations, subscription, credits, usage, payments, webhooks, billing, super_admin, monitoring, sla_rules, sla_tracking, approval_escalations, approval_delegations, notification_preferences as notification_prefs_router, tenants
+from app.routes import auth, tasks, users, comments, approvals, dashboard, documents, audit_logs, notifications, ai, leaves, organizations, subscription, credits, usage, payments, webhooks, billing, super_admin, monitoring, sla_rules, sla_tracking, approval_escalations, approval_delegations, notification_preferences as notification_prefs_router, tenants, tenant_onboarding, tenant_collaboration_settings, tenant_collaboration_usage, workspaces, workspace_members, channels, workspace_channels, channel_members, saas_dashboard
 from app.websocket.routes import router as ws_router
 from app.websocket.manager import manager
 from app.websocket.pubsub import ws_pubsub
@@ -97,6 +97,15 @@ app.include_router(approval_escalations.router)
 app.include_router(approval_delegations.router)
 app.include_router(notification_prefs_router.router)
 app.include_router(tenants.router)
+app.include_router(tenant_onboarding.router)
+app.include_router(tenant_collaboration_settings.router)
+app.include_router(tenant_collaboration_usage.router)
+app.include_router(workspaces.router)
+app.include_router(workspace_members.router)
+app.include_router(channels.router)
+app.include_router(workspace_channels.router)
+app.include_router(channel_members.router)
+app.include_router(saas_dashboard.router)
 
 add_pagination(app)
 logger.info("Application started")

@@ -3,7 +3,7 @@ from logging.config import fileConfig
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 from app.db.base import Base
-from app.models import user, task, document, audit_log, notification, ai, refresh_token, password_reset_token, leave, comment, approval, approval_history, approval_escalation, approval_delegation, organization, organization_settings, invitation, subscription, sla_rule, sla_tracking, notification_preference, tenant
+from app.models import user, task, document, audit_log, notification, ai, refresh_token, password_reset_token, leave, comment, approval, approval_history, approval_escalation, approval_delegation, organization, organization_settings, invitation, subscription, sla_rule, sla_tracking, notification_preference, tenant, tenant_onboarding, tenant_collaboration_settings, tenant_collaboration_usage, workspace, workspace_member, channel, channel_member
 
 from alembic import context
 

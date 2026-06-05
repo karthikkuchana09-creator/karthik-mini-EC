@@ -15,6 +15,8 @@ from app.core.tenant import (
     tenant_filter,
     TenantInfo,
     get_current_tenant_info,
+    get_current_tenant,
+    require_current_tenant,
 )
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
@@ -47,6 +49,21 @@ def get_active_tenant_db(request: Request):
         yield db
     finally:
         db.close()
+
+
+def get_current_tenant_dep(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    from app.models.tenant import Tenant
+    return get_current_tenant(request, db)
+
+
+def get_require_current_tenant_dep(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    return require_current_tenant(request, db)
 
 
 def get_current_user(
