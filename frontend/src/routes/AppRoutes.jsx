@@ -43,6 +43,15 @@ const EmployeeProductivity = lazy(() => import('../pages/EmployeeProductivity'))
 const DelayRiskMonitor = lazy(() => import('../pages/DelayRiskMonitor'));
 const AIAnalyticsDashboard = lazy(() => import('../pages/AIAnalyticsDashboard'));
 const EmployeeApprovals = lazy(() => import('../pages/approvals/EmployeeApprovals'));
+const TenantManagement = lazy(() => import('../pages/tenants/TenantManagement'));
+const TenantOnboarding = lazy(() => import('../pages/tenants/TenantOnboarding'));
+const TenantCollaborationSettings = lazy(() => import('../pages/tenants/TenantCollaborationSettings'));
+const TenantUsageDashboard = lazy(() => import('../pages/tenants/TenantUsageDashboard'));
+const Workspaces = lazy(() => import('../pages/workspace/Workspaces'));
+const WorkspaceDetail = lazy(() => import('../pages/workspace/WorkspaceDetail'));
+const WorkspaceMembers = lazy(() => import('../pages/workspace/WorkspaceMembers'));
+const Channels = lazy(() => import('../pages/channel/Channels'));
+const ChannelDetail = lazy(() => import('../pages/channel/ChannelDetail'));
 
 function PageLoader() {
   return (
@@ -114,6 +123,15 @@ export default function AppRoutes() {
         <Route path="/admin/audit-logs" element={<ProtectedRouteWrapper allowedRoles={['admin', 'auditor']}><AuditLogs /></ProtectedRouteWrapper>} />
         <Route path="/sla-rules" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager']}><SLARules /></ProtectedRouteWrapper>} />
         <Route path="/admin" element={<ProtectedRouteWrapper allowedRoles={['admin']}><Admin /></ProtectedRouteWrapper>} />
+        <Route path="/admin/tenants" element={<ProtectedRouteWrapper allowedRoles={['admin']}><TenantManagement /></ProtectedRouteWrapper>} />
+        <Route path="/admin/tenants/onboarding" element={<ProtectedRouteWrapper allowedRoles={['admin']}><TenantOnboarding /></ProtectedRouteWrapper>} />
+        <Route path="/admin/tenants/:id/settings" element={<ProtectedRouteWrapper allowedRoles={['admin']}><TenantCollaborationSettings /></ProtectedRouteWrapper>} />
+        <Route path="/admin/tenants/:id/usage" element={<ProtectedRouteWrapper allowedRoles={['admin']}><TenantUsageDashboard /></ProtectedRouteWrapper>} />
+        <Route path="/workspaces" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager']}><Workspaces /></ProtectedRouteWrapper>} />
+        <Route path="/workspaces/:id" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager']}><WorkspaceDetail /></ProtectedRouteWrapper>} />
+        <Route path="/workspaces/:id/members" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager']}><WorkspaceMembers /></ProtectedRouteWrapper>} />
+        <Route path="/channels" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager', 'employee']}><Channels /></ProtectedRouteWrapper>} />
+        <Route path="/channels/:id" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager', 'employee']}><ChannelDetail /></ProtectedRouteWrapper>} />
         <Route path="/organization" element={<ProtectedRouteWrapper><OrganizationManagement /></ProtectedRouteWrapper>} />
         <Route path="/pricing" element={<ProtectedRouteWrapper><PricingPage /></ProtectedRouteWrapper>} />
         <Route path="/credits" element={<ProtectedRouteWrapper><CreditDashboard /></ProtectedRouteWrapper>} />

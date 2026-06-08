@@ -26,50 +26,96 @@ import {
   FiUsers as FiUsersGroup,
   FiZap,
   FiStar,
+  FiLayers,
+  FiHash,
+  FiServer,
 } from 'react-icons/fi';
 
-const menuItems = [
-  { to: '/dashboard', label: 'Dashboard', icon: FiHome, roles: ['admin', 'manager', 'employee'] },
-  { to: '/kanban', label: 'Kanban Board', icon: FiLayout, roles: ['admin', 'manager', 'employee'] },
-  { to: '/tasks', label: 'Tasks', icon: FiCheckSquare, roles: ['admin', 'manager', 'employee'] },
-  { to: '/approvals', label: 'Approvals', icon: FiCheckCircle, roles: ['admin', 'manager'] },
-  { to: '/my-approvals', label: 'My Approvals', icon: FiCheckCircle, roles: ['employee'] },
-  { to: '/approvals/escalations', label: 'Approval Escalations', icon: FiArrowUpCircle, roles: ['admin', 'manager', 'auditor'] },
-  { to: '/approvals/delegations', label: 'Approval Delegations', icon: FiUsers, roles: ['admin', 'manager'] },
-  { to: '/sla-dashboard', label: 'SLA Dashboard', icon: FiActivity, roles: ['admin', 'manager', 'auditor'] },
-  { to: '/sla-rules', label: 'SLA Rules', icon: FiTarget, roles: ['admin'] },
-  { to: '/leaves/apply', label: 'Apply Leave', icon: FiCalendar, roles: ['admin', 'manager', 'employee'] },
-  { to: '/notifications', label: 'Notifications', icon: FiBell, roles: ['admin', 'manager', 'employee', 'auditor'] },
-  { to: '/notifications/preferences', label: 'Notification Prefs', icon: FiSliders, roles: ['admin', 'manager', 'employee', 'auditor'] },
-  { to: '/documents', label: 'Documents', icon: FiFile, roles: ['admin', 'manager', 'employee'] },
-  { to: '/organization', label: 'Organization', icon: FiGrid, roles: ['admin', 'manager'] },
-  { to: '/audit-logs', label: 'Audit Logs', icon: FiShield, roles: ['admin', 'auditor'] },
-  { to: '/admin-dashboard', label: 'Admin Dashboard', icon: FiTrendingUp, roles: ['admin'] },
-  { to: '/super-admin-dashboard', label: 'Super Admin', icon: FiStar, roles: ['admin'] },
-  { to: '/admin-monitoring', label: 'Monitoring', icon: FiBarChart2, roles: ['admin'] },
-  { to: '/manager-dashboard', label: 'Manager Dashboard', icon: FiTrendingUp, roles: ['manager'] },
-  { to: '/admin', label: 'Admin', icon: FiSettings, roles: ['admin'] },
-  { to: '/ai-analytics', label: 'AI Analytics', icon: FiCpu, roles: ['admin', 'manager'] },
-  { to: '/team-intelligence', label: 'Team Intelligence', icon: FiUsersGroup, roles: ['admin', 'manager'] },
-  { to: '/employee-productivity', label: 'Employee Productivity', icon: FiZap, roles: ['admin', 'manager'] },
-  { to: '/delay-risk-monitor', label: 'Delay Risk Monitor', icon: FiActivity, roles: ['admin', 'manager'] },
-  { to: '/pricing', label: 'Pricing', icon: FiDollarSign, roles: ['admin', 'manager'] },
-  { to: '/credits', label: 'Credits', icon: FiCreditCard, roles: ['admin', 'manager', 'employee'] },
+const sections = [
+  {
+    label: 'MAIN',
+    roles: ['admin', 'manager', 'employee'],
+    items: [
+      { to: '/dashboard', label: 'Dashboard', icon: FiHome, roles: ['admin', 'manager', 'employee'] },
+      { to: '/delay-risk-monitor', label: 'Analytics', icon: FiBarChart2, roles: ['admin', 'manager'] },
+      { to: '/ai-analytics', label: 'AI Insights', icon: FiCpu, roles: ['admin', 'manager'] },
+    ],
+  },
+  {
+    label: 'WORK MANAGEMENT',
+    roles: ['admin', 'manager', 'employee'],
+    items: [
+      { to: '/tasks', label: 'Tasks', icon: FiCheckSquare, roles: ['admin', 'manager', 'employee'] },
+      { to: '/kanban', label: 'Kanban Board', icon: FiLayout, roles: ['admin', 'manager', 'employee'] },
+      { to: '/approvals', label: 'Approvals', icon: FiCheckCircle, roles: ['admin', 'manager'] },
+      { to: '/my-approvals', label: 'My Approvals', icon: FiCheckCircle, roles: ['employee'] },
+      { to: '/leaves/apply', label: 'Leave Requests', icon: FiCalendar, roles: ['admin', 'manager', 'employee'] },
+    ],
+  },
+  {
+    label: 'WORKFLOW & SLA',
+    roles: ['admin', 'manager', 'auditor'],
+    items: [
+      { to: '/sla-dashboard', label: 'SLA Dashboard', icon: FiActivity, roles: ['admin', 'manager', 'auditor'] },
+      { to: '/sla-rules', label: 'SLA Rules', icon: FiTarget, roles: ['admin'] },
+      { to: '/approvals/escalations', label: 'Approval Escalations', icon: FiArrowUpCircle, roles: ['admin', 'manager', 'auditor'] },
+      { to: '/approvals/delegations', label: 'Approval Delegations', icon: FiUsers, roles: ['admin', 'manager'] },
+    ],
+  },
+  {
+    label: 'COLLABORATION',
+    roles: ['admin', 'manager', 'employee'],
+    items: [
+      { to: '/workspaces', label: 'Workspaces', icon: FiLayers, roles: ['admin', 'manager'] },
+      { to: '/channels', label: 'Channels', icon: FiHash, roles: ['admin', 'manager', 'employee'] },
+      { to: '/documents', label: 'Documents', icon: FiFile, roles: ['admin', 'manager', 'employee'] },
+      { to: '/notifications', label: 'Notifications', icon: FiBell, roles: ['admin', 'manager', 'employee', 'auditor'] },
+    ],
+  },
+  {
+    label: 'ORGANIZATION',
+    roles: ['admin', 'manager'],
+    items: [
+      { to: '/organization', label: 'Organization', icon: FiGrid, roles: ['admin', 'manager'] },
+      { to: '/team-intelligence', label: 'Team Intelligence', icon: FiUsersGroup, roles: ['admin', 'manager'] },
+      { to: '/manager-dashboard', label: 'Manager Dashboard', icon: FiTrendingUp, roles: ['manager'] },
+      { to: '/employee-productivity', label: 'Employee Productivity', icon: FiZap, roles: ['admin', 'manager'] },
+    ],
+  },
+  {
+    label: 'ADMINISTRATION',
+    roles: ['admin', 'auditor'],
+    items: [
+      { to: '/audit-logs', label: 'Audit Logs', icon: FiShield, roles: ['admin', 'auditor'] },
+      { to: '/notifications/preferences', label: 'Notification Preferences', icon: FiSliders, roles: ['admin', 'manager', 'employee', 'auditor'] },
+    ],
+  },
+  {
+    label: 'SUPER ADMIN',
+    roles: ['admin'],
+    items: [
+      { to: '/admin/tenants', label: 'Tenants', icon: FiServer, roles: ['admin'] },
+      { to: '/admin/tenants/onboarding', label: 'Tenant Onboarding', icon: FiUsers, roles: ['admin'] },
+      { to: '/super-admin-dashboard', label: 'Super Admin', icon: FiStar, roles: ['admin'] },
+      { to: '/admin-dashboard', label: 'Admin Dashboard', icon: FiTrendingUp, roles: ['admin'] },
+      { to: '/admin-monitoring', label: 'Monitoring', icon: FiBarChart2, roles: ['admin'] },
+      { to: '/admin', label: 'Admin', icon: FiSettings, roles: ['admin'] },
+    ],
+  },
+  {
+    label: 'BILLING',
+    roles: ['admin', 'manager', 'employee'],
+    items: [
+      { to: '/pricing', label: 'Pricing', icon: FiDollarSign, roles: ['admin', 'manager'] },
+      { to: '/credits', label: 'Credits', icon: FiCreditCard, roles: ['admin', 'manager', 'employee'] },
+    ],
+  },
 ];
-
-const roleAccessMap = menuItems.reduce((map, item) => {
-  item.roles.forEach((role) => {
-    if (!map[role]) map[role] = [];
-    map[role].push(item.to);
-  });
-  return map;
-}, {});
 
 export default function Sidebar({ open, collapsed, onClose, onToggleCollapse }) {
   const { user, logout } = useAuth();
   const role = user?.role || '';
-
-  const visibleItems = menuItems.filter((item) => item.roles.includes(role));
+  const userInitial = user?.name?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || '?';
 
   return (
     <>
@@ -88,68 +134,76 @@ export default function Sidebar({ open, collapsed, onClose, onToggleCollapse }) 
           <div className={`overflow-hidden transition-all duration-300 ${
             collapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'
           }`}>
-            <span className="text-base font-bold text-white tracking-tight whitespace-nowrap">Enterprise</span>
-            <p className="text-[10px] text-gray-400 font-medium leading-none mt-0.5">Management Console</p>
+            <span className="text-base font-bold text-white tracking-tight whitespace-nowrap">Mini Enterprise</span>
+            <p className="text-[10px] text-gray-400 font-medium leading-none mt-0.5">Enterprise Workspace</p>
           </div>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto py-5 px-2 space-y-1 scrollbar-hide">
-          {visibleItems.length === 0 && (
-            <p className="text-xs text-gray-500 text-center px-2 py-8">No menu items available</p>
-          )}
-
-          {visibleItems.map((item) => {
-            const Icon = item.icon;
+        <nav className="flex-1 overflow-y-auto py-5 px-2 space-y-4 scrollbar-hide">
+          {sections.map((section) => {
+            const visible = section.items.filter((item) => item.roles.includes(role));
+            if (visible.length === 0) return null;
             return (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                end={item.to === '/dashboard'}
-                onClick={onClose}
-                className={({ isActive }) =>
-                  `group relative flex items-center rounded-xl text-sm font-medium transition-all duration-200 ${
-                    collapsed ? 'justify-center w-full h-10' : 'gap-3 px-3 py-2.5'
-                  } ${
-                    isActive
-                      ? 'bg-indigo-600/20 text-indigo-300 shadow-sm shadow-indigo-500/10'
-                      : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/60'
-                  }`
-                }
-              >
-                {({ isActive }) => (
-                  <>
-                    {isActive && !collapsed && (
-                      <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-indigo-400 rounded-r-full shadow-sm shadow-indigo-400/40" />
-                    )}
-
-                    {isActive && collapsed && (
-                      <span className="absolute inset-0 rounded-xl ring-1 ring-indigo-500/40" />
-                    )}
-
-                    <Icon className={`w-5 h-5 shrink-0 transition-transform duration-200 ${
-                      isActive ? '' : 'group-hover:scale-110'
-                    }`} />
-
-                    <span className={`truncate transition-all duration-300 ${
-                      collapsed ? 'w-0 opacity-0 overflow-hidden' : 'w-auto opacity-100'
-                    }`}>
-                      {item.label}
+              <div key={section.label}>
+                {!collapsed && (
+                  <div className="px-3 mb-1.5">
+                    <span className="text-[10px] font-semibold text-gray-500 tracking-[0.12em] uppercase">
+                      {section.label}
                     </span>
-
-                    {isActive && !collapsed && (
-                      <span className="ml-auto w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse opacity-60" />
-                    )}
-
-                    {collapsed && (
-                      <div className="absolute left-full ml-3 px-2.5 py-1.5 bg-gray-800 text-gray-200 text-xs font-medium rounded-lg shadow-xl border border-gray-700 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap z-50 pointer-events-none">
-                        {item.label}
-                        <div className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-gray-800" />
-                      </div>
-                    )}
-                  </>
+                  </div>
                 )}
-              </NavLink>
+                <div className="space-y-0.5">
+                  {visible.map((item) => {
+                    const Icon = item.icon;
+                    return (
+                      <NavLink
+                        key={item.to}
+                        to={item.to}
+                        end={item.to === '/dashboard'}
+                        onClick={onClose}
+                        className={({ isActive }) =>
+                          `group relative flex items-center rounded-xl text-sm font-medium transition-all duration-200 ${
+                            collapsed ? 'justify-center w-full h-10' : 'gap-3 px-3 py-2.5'
+                          } ${
+                            isActive
+                              ? 'bg-indigo-600/20 text-indigo-300 shadow-sm shadow-indigo-500/10'
+                              : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/60'
+                          }`
+                        }
+                      >
+                        {({ isActive }) => (
+                          <>
+                            {isActive && !collapsed && (
+                              <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-indigo-400 rounded-r-full shadow-sm shadow-indigo-400/40" />
+                            )}
+                            {isActive && collapsed && (
+                              <span className="absolute inset-0 rounded-xl ring-1 ring-indigo-500/40" />
+                            )}
+                            <Icon className={`w-5 h-5 shrink-0 transition-transform duration-200 ${
+                              isActive ? '' : 'group-hover:scale-110'
+                            }`} />
+                            <span className={`truncate transition-all duration-300 ${
+                              collapsed ? 'w-0 opacity-0 overflow-hidden' : 'w-auto opacity-100'
+                            }`}>
+                              {item.label}
+                            </span>
+                            {isActive && !collapsed && (
+                              <span className="ml-auto w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse opacity-60" />
+                            )}
+                            {collapsed && (
+                              <div className="absolute left-full ml-3 px-2.5 py-1.5 bg-gray-800 text-gray-200 text-xs font-medium rounded-lg shadow-xl border border-gray-700 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap z-50 pointer-events-none">
+                                {item.label}
+                                <div className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-gray-800" />
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </NavLink>
+                    );
+                  })}
+                </div>
+              </div>
             );
           })}
         </nav>
@@ -174,6 +228,17 @@ export default function Sidebar({ open, collapsed, onClose, onToggleCollapse }) 
             </div>
           </div>
 
+          {/* Logout */}
+          {!collapsed && (
+            <button
+              onClick={logout}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-500 hover:text-red-400 hover:bg-red-500/10 transition-all duration-200"
+            >
+              <FiLogOut className="w-4 h-4 shrink-0" />
+              <span>Logout</span>
+            </button>
+          )}
+
           {/* Collapse toggle */}
           <button
             onClick={onToggleCollapse}
@@ -191,17 +256,6 @@ export default function Sidebar({ open, collapsed, onClose, onToggleCollapse }) 
               Collapse
             </span>
           </button>
-
-          {/* Logout button */}
-          {!collapsed && (
-            <button
-              onClick={logout}
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-500 hover:text-red-400 hover:bg-red-500/10 transition-all duration-200"
-            >
-              <FiLogOut className="w-4 h-4 shrink-0" />
-              <span>Logout</span>
-            </button>
-          )}
         </div>
       </aside>
 

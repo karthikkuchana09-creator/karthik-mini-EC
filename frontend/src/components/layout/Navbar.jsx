@@ -42,6 +42,10 @@ const pageTitles = {
   '/delay-risk-monitor': 'Delay Risk Monitor',
   '/employee-productivity': 'Employee Productivity',
   '/team-intelligence': 'Team Intelligence',
+  '/workspaces': 'Workspaces',
+  '/channels': 'Channels',
+  '/admin/tenants': 'Tenant Management',
+  '/admin/tenants/onboarding': 'Tenant Onboarding',
 };
 
 const roleBadgeColor = {
