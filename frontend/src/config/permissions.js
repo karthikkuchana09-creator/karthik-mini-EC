@@ -95,6 +95,7 @@ export const ROUTE_PERMISSIONS = {
   '/admin-dashboard': { allowedRoles: [ROLES.ADMIN], requiredPermissions: ['canAccessAdmin'] },
   '/admin-monitoring': { allowedRoles: [ROLES.ADMIN], requiredPermissions: ['canAccessAdmin'] },
   '/super-admin-dashboard': { allowedRoles: [ROLES.ADMIN], requiredPermissions: ['canAccessAdmin'] },
+  '/saas-dashboard': { allowedRoles: [ROLES.ADMIN], requiredPermissions: ['canAccessAdmin'] },
   '/manager-dashboard': { allowedRoles: [ROLES.ADMIN, ROLES.MANAGER], requiredPermissions: [] },
   '/documents': { allowedRoles: Object.values(ROLES), requiredPermissions: [] },
   '/notifications': { allowedRoles: Object.values(ROLES), requiredPermissions: [] },

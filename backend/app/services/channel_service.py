@@ -128,6 +128,24 @@ def list_channels_by_workspace(
     return list(db.scalars(stmt).all())
 
 
+def list_channels(
+    db: Session,
+    tenant_id: int,
+    workspace_id: Optional[int] = None,
+    include_archived: bool = False,
+) -> list[Channel]:
+    stmt = select(Channel).where(Channel.tenant_id == tenant_id)
+
+    if workspace_id is not None:
+        stmt = stmt.where(Channel.workspace_id == workspace_id)
+
+    if not include_archived:
+        stmt = stmt.where(Channel.is_archived == False)
+
+    stmt = stmt.order_by(Channel.created_at.asc())
+    return list(db.scalars(stmt).all())
+
+
 def get_channel(db: Session, channel_id: int) -> Channel:
     return _get_channel_or_404(db, channel_id)
 

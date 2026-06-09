@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Literal, Optional
 from datetime import datetime
 from pydantic import BaseModel, Field
 
@@ -8,7 +8,8 @@ WorkspaceMemberRoleEnum = Literal[
 
 
 class WorkspaceMemberAddRequest(BaseModel):
-    user_id: int = Field(..., gt=0)
+    user_id: Optional[int] = Field(None, gt=0)
+    email: str = ""
     role: WorkspaceMemberRoleEnum = "MEMBER"
 
 

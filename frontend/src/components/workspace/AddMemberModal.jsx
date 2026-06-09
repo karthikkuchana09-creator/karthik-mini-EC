@@ -1,24 +1,29 @@
 import { useState, useEffect } from 'react';
 import Modal from '../ui/Modal';
 
-const ROLES = ['Workspace Admin', 'Moderator', 'Member', 'Viewer'];
+const ROLES = [
+  { value: 'WORKSPACE_ADMIN', label: 'Workspace Admin' },
+  { value: 'MODERATOR', label: 'Moderator' },
+  { value: 'MEMBER', label: 'Member' },
+  { value: 'VIEWER', label: 'Viewer' },
+];
 const ROLE_DESCRIPTIONS = {
-  'Workspace Admin': 'Full access to manage workspace settings and members',
-  Moderator: 'Can manage content and moderate discussions',
-  Member: 'Can participate in workspace activities',
-  Viewer: 'Read-only access to workspace content',
+  WORKSPACE_ADMIN: 'Full access to manage workspace settings and members',
+  MODERATOR: 'Can manage content and moderate discussions',
+  MEMBER: 'Can participate in workspace activities',
+  VIEWER: 'Read-only access to workspace content',
 };
 
 export default function AddMemberModal({ isOpen, onClose, onSubmit, existingMemberEmails = [] }) {
   const [email, setEmail] = useState('');
-  const [role, setRole] = useState('Member');
+  const [role, setRole] = useState('MEMBER');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
       setEmail('');
-      setRole('Member');
+      setRole('MEMBER');
       setError('');
       setLoading(false);
     }
@@ -76,9 +81,9 @@ export default function AddMemberModal({ isOpen, onClose, onSubmit, existingMemb
           <div className="grid grid-cols-2 gap-2 mt-1">
             {ROLES.map((r) => (
               <label
-                key={r}
+                key={r.value}
                 className={`flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${
-                  role === r
+                  role === r.value
                     ? 'border-indigo-500 bg-indigo-50/50'
                     : 'border-gray-200 hover:border-gray-300'
                 }`}
@@ -86,19 +91,19 @@ export default function AddMemberModal({ isOpen, onClose, onSubmit, existingMemb
                 <input
                   type="radio"
                   name="role"
-                  value={r}
-                  checked={role === r}
-                  onChange={() => setRole(r)}
+                  value={r.value}
+                  checked={role === r.value}
+                  onChange={() => setRole(r.value)}
                   className="sr-only"
                 />
                 <div className={`mt-0.5 w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                  role === r ? 'border-indigo-500' : 'border-gray-300'
+                  role === r.value ? 'border-indigo-500' : 'border-gray-300'
                 }`}>
-                  {role === r && <div className="w-2 h-2 rounded-full bg-indigo-500" />}
+                  {role === r.value && <div className="w-2 h-2 rounded-full bg-indigo-500" />}
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-gray-900">{r}</p>
-                  <p className="text-[10px] text-gray-400 mt-0.5 leading-relaxed">{ROLE_DESCRIPTIONS[r]}</p>
+                  <p className="text-sm font-medium text-gray-900">{r.label}</p>
+                  <p className="text-[10px] text-gray-400 mt-0.5 leading-relaxed">{ROLE_DESCRIPTIONS[r.value]}</p>
                 </div>
               </label>
             ))}

@@ -96,7 +96,8 @@ const sections = [
     items: [
       { to: '/admin/tenants', label: 'Tenants', icon: FiServer, roles: ['admin'] },
       { to: '/admin/tenants/onboarding', label: 'Tenant Onboarding', icon: FiUsers, roles: ['admin'] },
-      { to: '/super-admin-dashboard', label: 'Super Admin', icon: FiStar, roles: ['admin'] },
+      { to: '/super-admin-dashboard', label: 'Platform Overview', icon: FiStar, roles: ['admin'] },
+      { to: '/saas-dashboard', label: 'SaaS Dashboard', icon: FiGrid, roles: ['admin'] },
       { to: '/admin-dashboard', label: 'Admin Dashboard', icon: FiTrendingUp, roles: ['admin'] },
       { to: '/admin-monitoring', label: 'Monitoring', icon: FiBarChart2, roles: ['admin'] },
       { to: '/admin', label: 'Admin', icon: FiSettings, roles: ['admin'] },

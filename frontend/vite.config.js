@@ -40,7 +40,7 @@ export default defineConfig(({ mode }) => {
       proxy: env.VITE_API_URL
         ? undefined
         : {
-            '^/(auth|tasks|users|comments|approvals?|dashboard|documents|audit-logs|notifications?|ai|leaves|organizations|subscription|credits|usage|payments|webhooks|billing|super-admin|monitoring|sla-|notification-preferences|admin/dashboard|admin/organizations|admin/revenue|admin/subscriptions|admin/users|admin/api-usage|admin/ai-usage|ws|docs|openapi.json|redoc)': {
+            '^/(auth|tasks|users|comments|approvals?|dashboard|documents|audit-logs|notifications?|ai|leaves|organizations|subscription|credits|usage|payments|webhooks|billing|super-admin|monitoring|sla-|notification-preferences|admin/dashboard|admin/organizations|admin/revenue|admin/subscriptions|admin/users|admin/api-usage|admin/ai-usage|saas/dashboard|tenants|workspaces?|channels?|ws|docs|openapi.json|redoc)': {
               target: 'http://127.0.0.1:8000',
               changeOrigin: true,
               ws: true,

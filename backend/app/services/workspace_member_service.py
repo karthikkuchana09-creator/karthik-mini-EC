@@ -69,16 +69,34 @@ def _check_member_limit(db: Session, workspace_id: int) -> None:
         )
 
 
+def _resolve_user_id(db: Session, data: WorkspaceMemberAddRequest) -> int:
+    if data.user_id is not None:
+        return data.user_id
+    if data.email:
+        user = db.scalar(select(User).where(User.email == data.email))
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"User with email '{data.email}' not found",
+            )
+        return user.id
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Either user_id or email must be provided",
+    )
+
+
 def add_member(
     db: Session, workspace_id: int, data: WorkspaceMemberAddRequest,
 ) -> WorkspaceMember:
+    user_id = _resolve_user_id(db, data)
     workspace = _get_workspace_or_404(db, workspace_id)
-    _validate_user_tenant(db, data.user_id, workspace)
+    _validate_user_tenant(db, user_id, workspace)
 
     existing = db.scalar(
         select(WorkspaceMember).where(
             WorkspaceMember.workspace_id == workspace_id,
-            WorkspaceMember.user_id == data.user_id,
+            WorkspaceMember.user_id == user_id,
         )
     )
     if existing:
@@ -93,7 +111,7 @@ def add_member(
         db.refresh(existing)
         logger.info(
             "Reactivated workspace member workspace_id=%d user_id=%d",
-            workspace_id, data.user_id,
+            workspace_id, user_id,
         )
         return existing
 
@@ -101,7 +119,7 @@ def add_member(
 
     member = WorkspaceMember(
         workspace_id=workspace_id,
-        user_id=data.user_id,
+        user_id=user_id,
         role=WorkspaceMemberRole(data.role),
         tenant_id=workspace.tenant_id,
     )
@@ -110,7 +128,7 @@ def add_member(
     db.refresh(member)
     logger.info(
         "Added workspace member workspace_id=%d user_id=%d role=%s",
-        workspace_id, data.user_id, data.role,
+        workspace_id, user_id, data.role,
     )
     return member
 

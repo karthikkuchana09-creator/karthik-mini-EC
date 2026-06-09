@@ -50,6 +50,7 @@ export default function Channels() {
       const chWithMember = chList.map((ch) => ({
         ...ch,
         _is_member: ch.is_member ?? false,
+        status: ch.is_archived ? 'archived' : 'active',
       }));
       setChannels(chWithMember);
       setUserChannelIds(new Set(chWithMember.filter((ch) => ch._is_member).map((ch) => ch.id)));
