@@ -18,8 +18,12 @@ if TYPE_CHECKING:
     from app.models.tenant_onboarding import TenantOnboarding
     from app.models.workspace import Workspace
     from app.models.workspace_member import WorkspaceMember
+    from app.models.workspace_message import WorkspaceMessage
     from app.models.channel import Channel
     from app.models.channel_member import ChannelMember
+    from app.models.channel_message import ChannelMessage
+    from app.models.task_document import TaskDocument
+    from app.models.approval_document import ApprovalDocument
 
 
 class UserRole(str, enum.Enum):
@@ -107,4 +111,16 @@ class User(Base):
     )
     channel_memberships: Mapped[list["ChannelMember"]] = relationship(
         "ChannelMember", back_populates="user"
+    )
+    workspace_messages: Mapped[list["WorkspaceMessage"]] = relationship(
+        "WorkspaceMessage", back_populates="sender"
+    )
+    channel_messages: Mapped[list["ChannelMessage"]] = relationship(
+        "ChannelMessage", back_populates="sender"
+    )
+    task_documents: Mapped[list["TaskDocument"]] = relationship(
+        "TaskDocument", back_populates="uploader"
+    )
+    approval_documents: Mapped[list["ApprovalDocument"]] = relationship(
+        "ApprovalDocument", back_populates="uploader"
     )

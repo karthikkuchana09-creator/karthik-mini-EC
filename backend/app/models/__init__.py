@@ -29,5 +29,9 @@ from .tenant_collaboration_settings import TenantCollaborationSettings
 from .tenant_collaboration_usage import TenantCollaborationUsage
 from .workspace import Workspace, WorkspaceVisibility
 from .workspace_member import WorkspaceMember, WorkspaceMemberRole
+from .workspace_message import WorkspaceMessage
 from .channel import Channel, ChannelType
 from .channel_member import ChannelMember
+from .channel_message import ChannelMessage
+from .task_document import TaskDocument
+from .approval_document import ApprovalDocument

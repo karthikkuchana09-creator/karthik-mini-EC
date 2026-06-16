@@ -1,10 +1,15 @@
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 from datetime import datetime
 from sqlalchemy import String, Integer, Boolean, Text, DateTime, ForeignKey, Index
 from sqlalchemy.sql import func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
 from app.models.mixins.tenant_mixin import TenantMixin
+
+if TYPE_CHECKING:
+    from app.models.workspace import Workspace
+    from app.models.channel import Channel
+    from app.models.approval_document import ApprovalDocument
 
 
 class Approval(TenantMixin, Base):
@@ -27,6 +32,9 @@ class Approval(TenantMixin, Base):
     sla_due_time: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     current_escalation_to: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"), nullable=True, index=True)
 
+    workspace_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("workspaces.id", ondelete="SET NULL"), nullable=True, index=True)
+    channel_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("channels.id", ondelete="SET NULL"), nullable=True, index=True)
+
     created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), onupdate=func.now())
 
@@ -36,3 +44,6 @@ class Approval(TenantMixin, Base):
     )
 
     requester: Mapped["User"] = relationship("User", foreign_keys=[requested_by])
+    workspace: Mapped[Optional["Workspace"]] = relationship(back_populates="approvals")
+    channel: Mapped[Optional["Channel"]] = relationship(back_populates="approvals")
+    approval_documents: Mapped[list["ApprovalDocument"]] = relationship(back_populates="approval")

@@ -12,6 +12,9 @@ if TYPE_CHECKING:
     from app.models.workspace import Workspace
     from app.models.user import User
     from app.models.channel_member import ChannelMember
+    from app.models.task import Task
+    from app.models.approval import Approval
+    from app.models.channel_message import ChannelMessage
 
 
 class ChannelType(str, enum.Enum):
@@ -49,3 +52,6 @@ class Channel(TenantMixin, Base):
     workspace: Mapped["Workspace"] = relationship(back_populates="channels")
     creator: Mapped["User"] = relationship(back_populates="created_channels")
     members: Mapped[list["ChannelMember"]] = relationship(back_populates="channel")
+    tasks: Mapped[list["Task"]] = relationship(back_populates="channel")
+    approvals: Mapped[list["Approval"]] = relationship(back_populates="channel")
+    channel_messages: Mapped[list["ChannelMessage"]] = relationship(back_populates="channel")
