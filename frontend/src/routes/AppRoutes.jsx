@@ -49,10 +49,26 @@ const TenantCollaborationSettings = lazy(() => import('../pages/tenants/TenantCo
 const TenantUsageDashboard = lazy(() => import('../pages/tenants/TenantUsageDashboard'));
 const SaaSDashboard = lazy(() => import('../pages/SaaSDashboard'));
 const Workspaces = lazy(() => import('../pages/workspace/Workspaces'));
-const WorkspaceDetail = lazy(() => import('../pages/workspace/WorkspaceDetail'));
 const WorkspaceMembers = lazy(() => import('../pages/workspace/WorkspaceMembers'));
 const Channels = lazy(() => import('../pages/channel/Channels'));
-const ChannelDetail = lazy(() => import('../pages/channel/ChannelDetail'));
+
+
+// Phase 10B — Workspace & Channel Communication
+const WorkspaceList = lazy(() => import('../pages/workspaces/WorkspaceList'));
+const WorkspaceDetails = lazy(() => import('../pages/workspaces/WorkspaceDetails'));
+const WorkspaceMessages = lazy(() => import('../pages/workspaces/WorkspaceMessages'));
+const WorkspaceMsgTasks = lazy(() => import('../pages/workspaces/WorkspaceTasks'));
+const WorkspaceMsgDocs = lazy(() => import('../pages/workspaces/WorkspaceDocuments'));
+const WorkspaceMsgMembers = lazy(() => import('../pages/workspaces/WorkspaceMembers'));
+const WorkspaceMsgChannels = lazy(() => import('../pages/workspaces/WorkspaceChannels'));
+const ChannelDetails = lazy(() => import('../pages/channels/ChannelDetails'));
+const ChannelMsg = lazy(() => import('../pages/channels/ChannelMessages'));
+const ChannelMsgTasks = lazy(() => import('../pages/channels/ChannelTasks'));
+const ChannelMsgDocs = lazy(() => import('../pages/channels/ChannelDocuments'));
+const WorkspaceTaskDetailPage = lazy(() => import('../pages/tasks/WorkspaceTaskDetails'));
+const ChannelTaskDetailPage = lazy(() => import('../pages/tasks/ChannelTaskDetails'));
+const TaskDocPage = lazy(() => import('../pages/tasks/TaskDocuments'));
+const ApprovalDocPage = lazy(() => import('../pages/approvals/ApprovalDocuments'));
 
 function PageLoader() {
   return (
@@ -130,10 +146,30 @@ export default function AppRoutes() {
         <Route path="/admin/tenants/:id/settings" element={<ProtectedRouteWrapper allowedRoles={['admin']}><TenantCollaborationSettings /></ProtectedRouteWrapper>} />
         <Route path="/admin/tenants/:id/usage" element={<ProtectedRouteWrapper allowedRoles={['admin']}><TenantUsageDashboard /></ProtectedRouteWrapper>} />
         <Route path="/workspaces" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager']}><Workspaces /></ProtectedRouteWrapper>} />
-        <Route path="/workspaces/:id" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager']}><WorkspaceDetail /></ProtectedRouteWrapper>} />
+        <Route path="/workspaces/:workspaceId" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager']}><WorkspaceDetails /></ProtectedRouteWrapper>} />
+        <Route path="/workspaces/:workspaceId/tasks/:taskId" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager', 'employee']}><WorkspaceTaskDetailPage /></ProtectedRouteWrapper>} />
         <Route path="/workspaces/:id/members" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager']}><WorkspaceMembers /></ProtectedRouteWrapper>} />
         <Route path="/channels" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager', 'employee']}><Channels /></ProtectedRouteWrapper>} />
-        <Route path="/channels/:id" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager', 'employee']}><ChannelDetail /></ProtectedRouteWrapper>} />
+        <Route path="/channels/:channelId" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager', 'employee']}><ChannelDetails /></ProtectedRouteWrapper>} />
+        <Route path="/channels/:channelId/tasks/:taskId" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager', 'employee']}><ChannelTaskDetailPage /></ProtectedRouteWrapper>} />
+
+        {/* Phase 10B — Workspace & Channel Communication */}
+        <Route path="/workspace-list" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager']}><WorkspaceList /></ProtectedRouteWrapper>} />
+        <Route path="/workspace-list/:id" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager']}><WorkspaceDetails /></ProtectedRouteWrapper>} />
+        <Route path="/workspace-list/:id/messages" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager', 'employee']}><WorkspaceMessages /></ProtectedRouteWrapper>} />
+        <Route path="/workspace-list/:id/tasks" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager', 'employee']}><WorkspaceMsgTasks /></ProtectedRouteWrapper>} />
+        <Route path="/workspace-list/:id/documents" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager', 'employee']}><WorkspaceMsgDocs /></ProtectedRouteWrapper>} />
+        <Route path="/workspace-list/:id/members" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager']}><WorkspaceMsgMembers /></ProtectedRouteWrapper>} />
+        <Route path="/workspace-list/:id/channels" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager', 'employee']}><WorkspaceMsgChannels /></ProtectedRouteWrapper>} />
+        <Route path="/workspace-list/:workspaceId/tasks/:taskId" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager', 'employee']}><WorkspaceTaskDetailPage /></ProtectedRouteWrapper>} />
+        <Route path="/workspace-list/:workspaceId/tasks/:taskId/documents" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager', 'employee']}><TaskDocPage /></ProtectedRouteWrapper>} />
+        <Route path="/channel-list/:id" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager', 'employee']}><ChannelDetails /></ProtectedRouteWrapper>} />
+        <Route path="/channel-list/:id/messages" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager', 'employee']}><ChannelMsg /></ProtectedRouteWrapper>} />
+        <Route path="/channel-list/:id/tasks" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager', 'employee']}><ChannelMsgTasks /></ProtectedRouteWrapper>} />
+        <Route path="/channel-list/:id/documents" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager', 'employee']}><ChannelMsgDocs /></ProtectedRouteWrapper>} />
+        <Route path="/channel-list/:channelId/tasks/:taskId" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager', 'employee']}><ChannelTaskDetailPage /></ProtectedRouteWrapper>} />
+        <Route path="/channel-list/:channelId/tasks/:taskId/documents" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager', 'employee']}><TaskDocPage /></ProtectedRouteWrapper>} />
+        <Route path="/approvals/:approvalId/documents" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager']}><ApprovalDocPage /></ProtectedRouteWrapper>} />
         <Route path="/organization" element={<ProtectedRouteWrapper><OrganizationManagement /></ProtectedRouteWrapper>} />
         <Route path="/pricing" element={<ProtectedRouteWrapper><PricingPage /></ProtectedRouteWrapper>} />
         <Route path="/credits" element={<ProtectedRouteWrapper><CreditDashboard /></ProtectedRouteWrapper>} />

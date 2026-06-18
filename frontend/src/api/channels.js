@@ -44,3 +44,8 @@ export const leaveChannel = async (channelId) => {
   const response = await api.post(`/channels/${channelId}/leave`);
   return response.data;
 };
+
+export const getChannelMembers = async (channelId, params = {}) => {
+  const response = await api.get(`/channels/${channelId}/members`, { params });
+  return response.data;
+};

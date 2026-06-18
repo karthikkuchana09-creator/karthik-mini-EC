@@ -8,7 +8,6 @@ import {
   FiCheckCircle,
   FiArrowUpCircle,
   FiUsers,
-  FiBell,
   FiShield,
   FiChevronLeft,
   FiLogOut,
@@ -34,9 +33,9 @@ import {
 const sections = [
   {
     label: 'MAIN',
-    roles: ['admin', 'manager', 'employee'],
+    roles: ['admin', 'manager', 'employee', 'viewer'],
     items: [
-      { to: '/dashboard', label: 'Dashboard', icon: FiHome, roles: ['admin', 'manager', 'employee'] },
+      { to: '/dashboard', label: 'Dashboard', icon: FiHome, roles: ['admin', 'manager', 'employee', 'viewer'] },
       { to: '/delay-risk-monitor', label: 'Analytics', icon: FiBarChart2, roles: ['admin', 'manager'] },
       { to: '/ai-analytics', label: 'AI Insights', icon: FiCpu, roles: ['admin', 'manager'] },
     ],
@@ -47,7 +46,6 @@ const sections = [
     items: [
       { to: '/tasks', label: 'Tasks', icon: FiCheckSquare, roles: ['admin', 'manager', 'employee'] },
       { to: '/kanban', label: 'Kanban Board', icon: FiLayout, roles: ['admin', 'manager', 'employee'] },
-      { to: '/approvals', label: 'Approvals', icon: FiCheckCircle, roles: ['admin', 'manager'] },
       { to: '/my-approvals', label: 'My Approvals', icon: FiCheckCircle, roles: ['employee'] },
       { to: '/leaves/apply', label: 'Leave Requests', icon: FiCalendar, roles: ['admin', 'manager', 'employee'] },
     ],
@@ -63,13 +61,29 @@ const sections = [
     ],
   },
   {
-    label: 'COLLABORATION',
-    roles: ['admin', 'manager', 'employee'],
+    label: 'WORKSPACE COLLABORATION',
+    roles: ['admin', 'manager', 'employee', 'viewer'],
     items: [
-      { to: '/workspaces', label: 'Workspaces', icon: FiLayers, roles: ['admin', 'manager'] },
+      { to: '/workspace-list', label: 'Workspaces', icon: FiLayers, roles: ['admin', 'manager', 'employee'] },
+      { to: '/tasks', label: 'My Workspace Tasks', icon: FiCheckSquare, roles: ['admin', 'manager', 'employee'] },
+      { to: '/documents', label: 'Workspace Documents', icon: FiFile, roles: ['admin', 'manager', 'employee', 'viewer'] },
+    ],
+  },
+  {
+    label: 'CHANNEL COLLABORATION',
+    roles: ['admin', 'manager', 'employee', 'viewer'],
+    items: [
       { to: '/channels', label: 'Channels', icon: FiHash, roles: ['admin', 'manager', 'employee'] },
-      { to: '/documents', label: 'Documents', icon: FiFile, roles: ['admin', 'manager', 'employee'] },
-      { to: '/notifications', label: 'Notifications', icon: FiBell, roles: ['admin', 'manager', 'employee', 'auditor'] },
+      { to: '/tasks', label: 'My Channel Tasks', icon: FiCheckSquare, roles: ['admin', 'manager', 'employee'] },
+      { to: '/documents', label: 'Channel Documents', icon: FiFile, roles: ['admin', 'manager', 'employee', 'viewer'] },
+    ],
+  },
+  {
+    label: 'APPROVALS',
+    roles: ['admin', 'manager'],
+    items: [
+      { to: '/approvals', label: 'Approvals', icon: FiCheckCircle, roles: ['admin', 'manager'] },
+      { to: '/approvals', label: 'Approval Documents', icon: FiFile, roles: ['admin', 'manager'] },
     ],
   },
   {
