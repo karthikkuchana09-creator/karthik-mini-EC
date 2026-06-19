@@ -25,7 +25,7 @@ def create_approval_endpoint(
     _=Depends(require_feature("approvals")),
     __=Depends(rate_limit(settings.RATE_LIMIT_DEFAULT, settings.RATE_LIMIT_DEFAULT_WINDOW, "approvals")),
 ):
-    return create_approval(db, data, user)
+    return create_approval(db, data, user, tenant_id=user.tenant_id)
 
 
 @router.get("", response_model=Page[ApprovalOut])
@@ -39,7 +39,7 @@ def get_approvals_endpoint(
     sort_order: str = Query("desc", pattern="^(asc|desc)$"),
     search: Optional[str] = None,
 ):
-    return get_approvals(db, user, page, size, sort_by, sort_order, search)
+    return get_approvals(db, user, tenant_id=user.tenant_id, page=page, size=size, sort_by=sort_by, sort_order=sort_order, search=search)
 
 
 @router.patch("/{approval_id}/action")
@@ -50,7 +50,7 @@ def take_action_endpoint(
     user=Depends(require_permission(Permissions.approval_act)),
     _=Depends(rate_limit(settings.RATE_LIMIT_DEFAULT, settings.RATE_LIMIT_DEFAULT_WINDOW, "approvals")),
 ):
-    return take_approval_action(db, approval_id, data, user)
+    return take_approval_action(db, approval_id, data, user, tenant_id=user.tenant_id)
 
 
 @router.get("/{approval_id}/history")
@@ -60,4 +60,4 @@ def get_history_endpoint(
     user=Depends(require_permission(Permissions.approval_read_history)),
     _=Depends(rate_limit(settings.RATE_LIMIT_DEFAULT, settings.RATE_LIMIT_DEFAULT_WINDOW, "approvals")),
 ):
-    return get_approval_history(db, approval_id)
+    return get_approval_history(db, approval_id, tenant_id=user.tenant_id)

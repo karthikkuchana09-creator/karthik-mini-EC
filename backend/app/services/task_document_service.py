@@ -13,6 +13,7 @@ from app.core.file_validator import validate_uploaded_file, MAX_FILE_SIZE_BYTES,
 from app.utils.file_helpers import unique_filename, safe_join
 from app.services.audit_log_service import log_action
 from app.services.phase10_notification_helper import notify_task_document_uploaded
+from app.core.tenant import tenant_filter
 from app.core.log import get_logger
 
 logger = get_logger("task_document_service")
@@ -23,8 +24,10 @@ UPLOAD_DIR = os.path.join(
 )
 
 
-def _get_task_or_404(db: Session, task_id: int) -> Task:
-    task = db.scalar(select(Task).where(Task.id == task_id))
+def _get_task_or_404(db: Session, task_id: int, tenant_id: int | None = None) -> Task:
+    tid = tenant_id or None
+    query = tenant_filter(select(Task), Task, tid).where(Task.id == task_id)
+    task = db.scalar(query)
     if not task:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
     return task
@@ -48,8 +51,10 @@ def upload_task_document(
     user: User,
     ip_address: str | None = None,
     user_agent: str | None = None,
+    tenant_id: int | None = None,
 ) -> TaskDocument:
-    task = _get_task_or_404(db, task_id)
+    tid = tenant_id or getattr(user, "tenant_id", None)
+    task = _get_task_or_404(db, task_id, tenant_id=tid)
 
     if not _can_manage_documents(task, user):
         raise HTTPException(
@@ -82,6 +87,7 @@ def upload_task_document(
         mime_type=file.content_type or "application/octet-stream",
         uploaded_by=user.id,
         document_type=data.document_type,
+        tenant_id=tid,
     )
     db.add(document)
     db.commit()
@@ -107,8 +113,10 @@ def list_task_documents(
     db: Session,
     task_id: int,
     user: User,
+    tenant_id: int | None = None,
 ):
-    task = _get_task_or_404(db, task_id)
+    tid = tenant_id or getattr(user, "tenant_id", None)
+    task = _get_task_or_404(db, task_id, tenant_id=tid)
     if not _can_manage_documents(task, user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -121,9 +129,11 @@ def download_task_document(
     db: Session,
     document_id: int,
     user: User,
+    tenant_id: int | None = None,
 ):
+    tid = tenant_id or getattr(user, "tenant_id", None)
     document = db.scalar(
-        select(TaskDocument)
+        tenant_filter(select(TaskDocument), TaskDocument, tid)
         .options(selectinload(TaskDocument.task))
         .where(TaskDocument.id == document_id)
     )
@@ -156,9 +166,11 @@ def delete_task_document(
     user: User,
     ip_address: str | None = None,
     user_agent: str | None = None,
+    tenant_id: int | None = None,
 ):
+    tid = tenant_id or getattr(user, "tenant_id", None)
     document = db.scalar(
-        select(TaskDocument)
+        tenant_filter(select(TaskDocument), TaskDocument, tid)
         .options(selectinload(TaskDocument.task))
         .where(TaskDocument.id == document_id)
     )

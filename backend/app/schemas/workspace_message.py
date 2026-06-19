@@ -50,6 +50,8 @@ class WorkspaceMessageResponse(BaseModel):
     sender_id: int
     content: str
     message_type: str
+    is_pinned: bool = False
+    pinned_at: Optional[datetime] = None
     edited_at: Optional[datetime] = None
     deleted_at: Optional[datetime] = None
     created_at: datetime

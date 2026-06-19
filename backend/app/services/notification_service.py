@@ -27,6 +27,7 @@ def create_notification(
     type: NotificationType = NotificationType.system,
     notification_type: str | None = None,
     priority: str = NotificationPriority.medium,
+    tenant_id: int | None = None,
 ):
     notification = Notification(
         user_id=user_id,
@@ -34,6 +35,7 @@ def create_notification(
         type=type,
         notification_type=notification_type,
         priority=priority,
+        tenant_id=tenant_id,
     )
     db.add(notification)
     db.commit()

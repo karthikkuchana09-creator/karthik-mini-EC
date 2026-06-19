@@ -92,7 +92,7 @@ export default function WorkspaceMembers() {
     { label: 'Channels', path: `/workspaces/${workspaceId}/channels` },
   ];
 
-  const ROLE_OPTIONS = ['admin', 'manager', 'member', 'viewer'];
+  const ROLE_OPTIONS = ['WORKSPACE_ADMIN', 'MODERATOR', 'MEMBER', 'VIEWER'];
 
   if (error && !loading) {
     return (
@@ -176,12 +176,12 @@ export default function WorkspaceMembers() {
                     <p className="text-xs text-gray-400 truncate">{member.email}</p>
                   </div>
                   <select
-                    value={member.role || 'member'}
+                    value={member.role || 'MEMBER'}
                     onChange={(e) => handleRoleChange(member, e.target.value)}
                     className="select text-xs max-w-[110px]"
                   >
                     {ROLE_OPTIONS.map((role) => (
-                      <option key={role} value={role}>{role.charAt(0).toUpperCase() + role.slice(1)}</option>
+                      <option key={role} value={role}>{role === 'WORKSPACE_ADMIN' ? 'Admin' : role.charAt(0) + role.slice(1).toLowerCase()}</option>
                     ))}
                   </select>
                   <button onClick={() => handleRemove(member)} className="text-xs text-gray-400 hover:text-red-500 transition-colors px-2">Remove</button>

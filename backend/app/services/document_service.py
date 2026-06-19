@@ -9,6 +9,7 @@ from fastapi_pagination.ext.sqlalchemy import paginate as fastapi_paginate
 from app.models.document import Document
 from app.models.task import Task
 from app.core.log import get_logger
+from app.core.tenant import tenant_filter
 from app.utils.file_helpers import allowed_file, MAX_FILE_SIZE, unique_filename, safe_join
 from app.services.audit_log_service import log_action
 from app.services.notification_service import create_document_notification
@@ -21,12 +22,14 @@ UPLOAD_DIR = os.path.join(
 )
 
 
-def _next_version(db: Session, file_name: str, task_id: int | None) -> int:
+def _next_version(db: Session, file_name: str, task_id: int | None, tenant_id: int | None = None) -> int:
     filters = [Document.file_name == file_name]
     if task_id is not None:
         filters.append(Document.task_id == task_id)
     else:
         filters.append(Document.task_id.is_(None))
+    if tenant_id is not None:
+        filters.append(Document.tenant_id == tenant_id)
 
     max_ver = db.scalar(
         select(func.coalesce(func.max(Document.version), 0))
@@ -40,6 +43,7 @@ def upload_document(
     file: UploadFile,
     current_user,
     task_id: int | None = None,
+    tenant_id: int | None = None,
 ):
     if not file.filename or not file.filename.strip():
         raise HTTPException(400, "Filename is required")
@@ -73,7 +77,9 @@ def upload_document(
     with open(file_path, "wb") as f:
         f.write(content)
 
-    version = _next_version(db, file.filename, task_id)
+    version = _next_version(db, file.filename, task_id, tid)
+
+    tid = tenant_id or getattr(current_user, "tenant_id", None)
 
     document = Document(
         file_name=file.filename,
@@ -81,6 +87,7 @@ def upload_document(
         version=version,
         uploaded_by=current_user.id,
         task_id=task_id,
+        tenant_id=tid,
     )
 
     db.add(document)
@@ -107,9 +114,10 @@ def upload_document(
     return document
 
 
-def get_document(db: Session, document_id: int, current_user):
+def get_document(db: Session, document_id: int, current_user, tenant_id: int | None = None):
     logger.debug("Fetching document id=%d by user_id=%d", document_id, current_user.id)
-    doc = db.scalar(select(Document).where(Document.id == document_id))
+    tid = tenant_id or getattr(current_user, "tenant_id", None)
+    doc = db.scalar(tenant_filter(select(Document), Document, tid).where(Document.id == document_id))
 
     if not doc:
         raise HTTPException(404, "Document not found")
@@ -120,9 +128,9 @@ def get_document(db: Session, document_id: int, current_user):
     return doc
 
 
-def download_document(db: Session, document_id: int, current_user):
+def download_document(db: Session, document_id: int, current_user, tenant_id: int | None = None):
     logger.debug("Downloading document id=%d by user_id=%d", document_id, current_user.id)
-    doc = get_document(db, document_id, current_user)
+    doc = get_document(db, document_id, current_user, tenant_id=tenant_id)
 
     if not os.path.exists(doc.file_path):
         raise HTTPException(404, "File not found on disk")
@@ -142,13 +150,15 @@ def get_documents(
     db: Session,
     current_user,
     task_id: Optional[int] = None,
+    tenant_id: int | None = None,
     page: int = 1,
     size: int = 20,
     sort_by: Optional[str] = None,
     sort_order: str = "desc",
 ):
     logger.debug("Fetching documents for user_id=%d", current_user.id)
-    query = select(Document)
+    tid = tenant_id or getattr(current_user, "tenant_id", None)
+    query = tenant_filter(select(Document), Document, tid)
 
     if current_user.role.value != "admin":
         query = query.where(Document.uploaded_by == current_user.id)
@@ -165,9 +175,12 @@ def get_documents(
     return fastapi_paginate(db, query)
 
 
-def get_task_documents(db: Session, task_id: int, current_user):
+def get_task_documents(db: Session, task_id: int, current_user, tenant_id: int | None = None):
     logger.debug("Fetching task documents task_id=%d by user_id=%d", task_id, current_user.id)
+    tid = tenant_id or getattr(current_user, "tenant_id", None)
     filters = [Document.task_id == task_id]
+    if tid is not None:
+        filters.append(Document.tenant_id == tid)
 
     if current_user.role.value != "admin":
         filters.append(Document.uploaded_by == current_user.id)
@@ -187,12 +200,15 @@ def get_task_documents(db: Session, task_id: int, current_user):
     }
 
 
-def get_document_versions(db: Session, file_name: str, task_id: int | None, current_user):
+def get_document_versions(db: Session, file_name: str, task_id: int | None, current_user, tenant_id: int | None = None):
     logger.debug(
         "Fetching versions for file_name=%s task_id=%s by user_id=%d",
         file_name, task_id, current_user.id
     )
+    tid = tenant_id or getattr(current_user, "tenant_id", None)
     filters = [Document.file_name == file_name]
+    if tid is not None:
+        filters.append(Document.tenant_id == tid)
     if task_id is not None:
         filters.append(Document.task_id == task_id)
     else:
@@ -208,9 +224,10 @@ def get_document_versions(db: Session, file_name: str, task_id: int | None, curr
     ).scalars().all()
 
 
-def delete_document(db: Session, document_id: int, current_user):
+def delete_document(db: Session, document_id: int, current_user, tenant_id: int | None = None):
     logger.info("Deleting document id=%d by user_id=%d", document_id, current_user.id)
-    doc = db.scalar(select(Document).where(Document.id == document_id))
+    tid = tenant_id or getattr(current_user, "tenant_id", None)
+    doc = db.scalar(tenant_filter(select(Document), Document, tid).where(Document.id == document_id))
 
     if not doc:
         raise HTTPException(404, "Document not found")

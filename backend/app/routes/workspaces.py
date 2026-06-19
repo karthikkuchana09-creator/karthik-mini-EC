@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
 from app.schemas.workspace import WorkspaceCreate, WorkspaceUpdate, WorkspaceResponse
 from app.routes.deps import get_db
-from app.core.tenant import get_current_tenant_id
+from app.core.tenant import get_current_tenant_table_id, get_current_tenant_id
 from app.services.workspace_service import (
     create_workspace,
     list_workspaces,
@@ -32,7 +32,7 @@ def list_workspaces_endpoint(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=200),
 ):
-    tenant_id = get_current_tenant_id(request)
+    tenant_id = get_current_tenant_table_id(request)
     return list_workspaces(db, tenant_id, include_archived, skip, limit)
 
 
@@ -42,7 +42,7 @@ def get_workspace_endpoint(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    tenant_id = get_current_tenant_id(request)
+    tenant_id = get_current_tenant_table_id(request)
     return get_workspace(db, workspace_id, tenant_id)
 
 
@@ -53,7 +53,7 @@ def update_workspace_endpoint(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    tenant_id = get_current_tenant_id(request)
+    tenant_id = get_current_tenant_table_id(request)
     return update_workspace(db, workspace_id, tenant_id, data)
 
 
@@ -63,7 +63,7 @@ def archive_workspace_endpoint(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    tenant_id = get_current_tenant_id(request)
+    tenant_id = get_current_tenant_table_id(request)
     return archive_workspace(db, workspace_id, tenant_id)
 
 
@@ -73,5 +73,5 @@ def restore_workspace_endpoint(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    tenant_id = get_current_tenant_id(request)
+    tenant_id = get_current_tenant_table_id(request)
     return restore_workspace(db, workspace_id, tenant_id)

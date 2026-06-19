@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import * as workspaceApi from '../../api/workspaces';
-import * as documentsApi from '../../api/documents';
+import * as taskDocumentsApi from '../../api/taskDocuments';
 import { getErrorMessage } from '../../utils/errorHandler';
 import { formatTimestamp } from '../../utils/format';
 
@@ -24,7 +24,7 @@ export default function WorkspaceDocuments() {
     try {
       const [ws, docs] = await Promise.all([
         workspaceApi.getWorkspace(workspaceId),
-        documentsApi.getTaskDocuments(workspaceId),
+        taskDocumentsApi.getTaskDocuments(workspaceId),
       ]);
       setWorkspace(ws);
       setDocuments(Array.isArray(docs) ? docs : docs?.documents || []);
@@ -52,7 +52,7 @@ export default function WorkspaceDocuments() {
     const formData = new FormData();
     formData.append('file', file);
     try {
-      const uploaded = await documentsApi.uploadDocument(formData);
+      const uploaded = await taskDocumentsApi.uploadTaskDocument(workspaceId, formData);
       setDocuments((prev) => [...prev, uploaded]);
       toast.success('Document uploaded');
     } catch (err) {
@@ -66,7 +66,7 @@ export default function WorkspaceDocuments() {
   const handleDelete = async (docId) => {
     setDocuments((prev) => prev.filter((d) => d.id !== docId));
     try {
-      await documentsApi.deleteDocument(docId);
+      await taskDocumentsApi.deleteTaskDocument(docId);
       toast.success('Document deleted');
     } catch (err) {
       fetchData();
@@ -173,7 +173,7 @@ export default function WorkspaceDocuments() {
                     <p className="text-xs text-gray-400">{formatTimestamp(doc.created_at)}</p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <a href={doc.download_url || documentsApi.getDocumentDownloadUrl?.(doc.id) || '#'} className="text-xs text-indigo-600 hover:text-indigo-800 font-medium">Download</a>
+                    <a href={doc.download_url || taskDocumentsApi.getTaskDocumentDownloadUrl(doc.id)} className="text-xs text-indigo-600 hover:text-indigo-800 font-medium">Download</a>
                     <button onClick={() => handleDelete(doc.id)} className="text-xs text-gray-400 hover:text-red-500 transition-colors">Delete</button>
                   </div>
                 </div>

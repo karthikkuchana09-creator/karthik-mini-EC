@@ -33,7 +33,7 @@ def upload_task_document_endpoint(
     data = TaskDocumentUpload(document_type=document_type)
     ip_address = request.client.host if request.client else None
     user_agent = request.headers.get("user-agent")
-    return upload_task_document(db, task_id, file, data, user, ip_address, user_agent)
+    return upload_task_document(db, task_id, file, data, user, ip_address, user_agent, tenant_id=user.tenant_id)
 
 
 @router.get(
@@ -45,7 +45,7 @@ def list_task_documents_endpoint(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    return list_task_documents(db, task_id, user)
+    return list_task_documents(db, task_id, user, tenant_id=user.tenant_id)
 
 
 @router.get(
@@ -56,7 +56,7 @@ def download_task_document_endpoint(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    return download_task_document(db, document_id, user)
+    return download_task_document(db, document_id, user, tenant_id=user.tenant_id)
 
 
 @router.delete(
@@ -70,4 +70,4 @@ def delete_task_document_endpoint(
 ):
     ip_address = request.client.host if request.client else None
     user_agent = request.headers.get("user-agent")
-    return delete_task_document(db, document_id, user, ip_address, user_agent)
+    return delete_task_document(db, document_id, user, ip_address, user_agent, tenant_id=user.tenant_id)

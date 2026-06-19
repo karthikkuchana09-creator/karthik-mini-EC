@@ -31,7 +31,7 @@ def create_task_endpoint(
     user=Depends(require_permission(Permissions.task_create)),
     _=Depends(check_create_limit("tasks")),
 ):
-    return create_task(db, task, user)
+    return create_task(db, task, user, tenant_id=user.tenant_id)
 
 
 @router.get("", response_model=Page[TaskOut])
@@ -44,7 +44,7 @@ def list_tasks(
     sort_order: str = Query("desc", pattern="^(asc|desc)$"),
     search: Optional[str] = None,
 ):
-    return get_tasks(db, user, page, size, sort_by, sort_order, search)
+    return get_tasks(db, user, tenant_id=user.tenant_id, page=page, size=size, sort_by=sort_by, sort_order=sort_order, search=search)
 
 
 @router.get("/kanban")
@@ -52,7 +52,7 @@ def get_kanban_endpoint(
     db: Session = Depends(get_db),
     user=Depends(require_permission(Permissions.task_read))
 ):
-    return get_kanban_view(db, user)
+    return get_kanban_view(db, user, tenant_id=user.tenant_id)
 
 
 @router.get("/{task_id}")
@@ -61,7 +61,7 @@ def get_task_endpoint(
     db: Session = Depends(get_db),
     user=Depends(require_permission(Permissions.task_read))
 ):
-    return get_task_by_id(db, task_id, user)
+    return get_task_by_id(db, task_id, user, tenant_id=user.tenant_id)
 
 
 @router.put("/{task_id}")
@@ -71,7 +71,7 @@ def update_task_endpoint(
     db: Session = Depends(get_db),
     user=Depends(require_permission(Permissions.task_update))
 ):
-    return update_task(db, task_id, updated, user)
+    return update_task(db, task_id, updated, user, tenant_id=user.tenant_id)
 
 
 @router.delete("/{task_id}")
@@ -80,7 +80,7 @@ def delete_task_endpoint(
     db: Session = Depends(get_db),
     user=Depends(require_permission(Permissions.task_delete))
 ):
-    return delete_task(db, task_id, user)
+    return delete_task(db, task_id, user, tenant_id=user.tenant_id)
 
 
 @router.patch("/{task_id}/assign")
@@ -90,7 +90,7 @@ def assign_task_endpoint(
     db: Session = Depends(get_db),
     user=Depends(require_permission(Permissions.task_assign))
 ):
-    return assign_task(db, task_id, assigned_to_id, user)
+    return assign_task(db, task_id, assigned_to_id, user, tenant_id=user.tenant_id)
 
 
 @router.patch("/{task_id}/status")
@@ -117,7 +117,7 @@ def update_task_status_endpoint(
             "server_task": build_kanban_task_data(task).model_dump(),
         }
 
-    result = update_task_status(db, task_id, body.status, user)
+    result = update_task_status(db, task_id, body.status, user, tenant_id=user.tenant_id)
     return {"conflict": False, "message": "Status updated", "task": result}
 
 

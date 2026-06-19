@@ -145,6 +145,19 @@ def get_current_active_tenant_user(
     return get_current_user(request, token, db)
 
 
+def require_tenant_id(
+    request: Request,
+    user: User = Depends(get_current_user),
+) -> int:
+    tenant_id = getattr(request.state, "tenant_id", None) or user.tenant_id
+    if tenant_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Tenant ID is required for this operation",
+        )
+    return tenant_id
+
+
 def require_tenant_access(
     request: Request,
     user: User = Depends(get_current_user),

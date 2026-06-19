@@ -29,7 +29,7 @@ def get_user(
     db: Session = Depends(get_db),
     user=Depends(require_permission(Permissions.user_read)),
 ):
-    return get_user_by_id(db, user_id)
+    return get_user_by_id(db, user_id, tenant_id=user.tenant_id)
 
 
 @router.put("/{user_id}")
@@ -39,7 +39,7 @@ def update_user_endpoint(
     db: Session = Depends(get_db),
     user=Depends(require_permission(Permissions.user_update)),
 ):
-    return update_user(db, user_id, data)
+    return update_user(db, user_id, data, tenant_id=user.tenant_id)
 
 
 @router.patch("/{user_id}/toggle-active")
@@ -48,7 +48,7 @@ def toggle_active_endpoint(
     db: Session = Depends(get_db),
     user=Depends(require_permission(Permissions.user_toggle_active)),
 ):
-    return toggle_user_active(db, user_id)
+    return toggle_user_active(db, user_id, tenant_id=user.tenant_id)
 
 
 @router.delete("/{user_id}")
@@ -57,4 +57,4 @@ def delete_user_endpoint(
     db: Session = Depends(get_db),
     user=Depends(require_permission(Permissions.user_delete)),
 ):
-    return delete_user(db, user_id)
+    return delete_user(db, user_id, tenant_id=user.tenant_id)

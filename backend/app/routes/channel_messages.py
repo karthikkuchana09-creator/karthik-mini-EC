@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 from app.routes.deps import get_db, get_current_user
+from app.core.tenant import get_current_tenant_table_id
 from app.schemas.channel_message import (
     ChannelMessageCreate,
     ChannelMessageUpdate,
@@ -12,6 +13,8 @@ from app.services.channel_message_service import (
     list_messages,
     update_message,
     delete_message,
+    pin_message,
+    unpin_message,
 )
 from fastapi_pagination import Page
 
@@ -30,9 +33,10 @@ def create_channel_message(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
+    tenant_table_id = get_current_tenant_table_id(request)
     ip_address = request.client.host if request.client else None
     user_agent = request.headers.get("user-agent")
-    return create_message(db, channel_id, data, user, ip_address, user_agent)
+    return create_message(db, channel_id, data, user, tenant_table_id, ip_address, user_agent)
 
 
 @router.get(
@@ -41,10 +45,12 @@ def create_channel_message(
 )
 def list_channel_messages(
     channel_id: int,
+    request: Request,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    return list_messages(db, channel_id, user)
+    tenant_table_id = get_current_tenant_table_id(request)
+    return list_messages(db, channel_id, user, tenant_table_id)
 
 
 @router.put(
@@ -75,3 +81,35 @@ def delete_channel_message(
     ip_address = request.client.host if request.client else None
     user_agent = request.headers.get("user-agent")
     return delete_message(db, message_id, user, ip_address, user_agent)
+
+
+@router.patch(
+    "/channels/{channel_id}/messages/{message_id}/pin",
+    response_model=ChannelMessageResponse,
+)
+def pin_channel_message(
+    channel_id: int,
+    message_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    ip_address = request.client.host if request.client else None
+    user_agent = request.headers.get("user-agent")
+    return pin_message(db, channel_id, message_id, user, ip_address, user_agent)
+
+
+@router.patch(
+    "/channels/{channel_id}/messages/{message_id}/unpin",
+    response_model=ChannelMessageResponse,
+)
+def unpin_channel_message(
+    channel_id: int,
+    message_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    ip_address = request.client.host if request.client else None
+    user_agent = request.headers.get("user-agent")
+    return unpin_message(db, channel_id, message_id, user, ip_address, user_agent)

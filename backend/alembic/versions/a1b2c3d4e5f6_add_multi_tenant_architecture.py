@@ -1,7 +1,7 @@
 """add multi-tenant architecture (organizations, tenant_id columns)
 
 Revision ID: a1b2c3d4e5f6
-Revises: v0w1x2y3z4a5
+Revises: b1466106fae4
 Create Date: 2026-05-20 15:30:00.000000
 
 """
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import mysql
 
 revision: str = 'a1b2c3d4e5f6'
-down_revision: Union[str, Sequence[str], None] = 'v0w1x2y3z4a5'
+down_revision: Union[str, Sequence[str], None] = 'b1466106fae4'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

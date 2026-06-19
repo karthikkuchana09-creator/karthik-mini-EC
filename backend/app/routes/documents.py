@@ -26,7 +26,7 @@ def upload_document_endpoint(
     db: Session = Depends(get_db),
     user=Depends(require_permission(Permissions.document_upload)),
 ):
-    result = upload_document(db, file, user, task_id)
+    result = upload_document(db, file, user, task_id, tenant_id=user.tenant_id)
     if file.size:
         deduct_feature_credits(db, user, "document_upload_per_mb")
     return result
@@ -38,7 +38,7 @@ def list_documents_endpoint(
     db: Session = Depends(get_db),
     user=Depends(require_permission(Permissions.document_read)),
 ):
-    return list_all_documents(db, task_id=task_id)
+    return list_all_documents(db, task_id=task_id, tenant_id=user.tenant_id)
 
 
 @router.get("/task/{task_id}", response_model=TaskDocumentsOut)
@@ -47,7 +47,7 @@ def list_task_documents_endpoint(
     db: Session = Depends(get_db),
     user=Depends(require_permission(Permissions.document_read)),
 ):
-    return get_task_documents(db, task_id, user)
+    return get_task_documents(db, task_id, user, tenant_id=user.tenant_id)
 
 
 @router.get("/versions", response_model=list[DocumentOut])
@@ -57,7 +57,7 @@ def list_versions_endpoint(
     db: Session = Depends(get_db),
     user=Depends(require_permission(Permissions.document_read)),
 ):
-    return get_document_versions(db, file_name, task_id, user)
+    return get_document_versions(db, file_name, task_id, user, tenant_id=user.tenant_id)
 
 
 @router.get("/{document_id}", response_model=DocumentOut)
@@ -66,7 +66,7 @@ def get_document_endpoint(
     db: Session = Depends(get_db),
     user=Depends(require_permission(Permissions.document_read)),
 ):
-    return get_document(db, document_id, user)
+    return get_document(db, document_id, user, tenant_id=user.tenant_id)
 
 
 @router.get("/{document_id}/download")
@@ -75,7 +75,7 @@ def download_document_endpoint(
     db: Session = Depends(get_db),
     user=Depends(require_permission(Permissions.document_read)),
 ):
-    return download_document(db, document_id, user)
+    return download_document(db, document_id, user, tenant_id=user.tenant_id)
 
 
 @router.delete("/{document_id}")
@@ -84,4 +84,4 @@ def delete_document_endpoint(
     db: Session = Depends(get_db),
     user=Depends(require_permission(Permissions.document_delete)),
 ):
-    return delete_document(db, document_id, user)
+    return delete_document(db, document_id, user, tenant_id=user.tenant_id)

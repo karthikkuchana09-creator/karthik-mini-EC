@@ -6,10 +6,11 @@ from app.models.workspace_message import WorkspaceMessage
 from app.models.user import User
 from app.schemas.workspace_message import WorkspaceMessageCreate, WorkspaceMessageUpdate
 from app.repository.workspace_message_repository import list_messages_by_workspace
-from app.services.workspace_membership_service import validate_workspace_member, validate_workspace_admin
+from app.services.workspace_membership_service import validate_workspace_member, validate_workspace_admin, validate_workspace_moderator
 from app.services.audit_log_service import log_action
 from app.services.phase10_notification_helper import process_mentions
 from app.core.log import get_logger
+from app.core.tenant import tenant_filter, TenantInfo
 
 logger = get_logger("workspace_message_service")
 
@@ -19,17 +20,22 @@ def create_message(
     workspace_id: int,
     data: WorkspaceMessageCreate,
     user: User,
+    tenant_table_id: int | None = None,
     ip_address: str | None = None,
     user_agent: str | None = None,
 ) -> WorkspaceMessage:
     validate_workspace_member(db, workspace_id, user)
+
+    if tenant_table_id is None:
+        info = TenantInfo.resolve_from_db(db, org_id=user.tenant_id)
+        tenant_table_id = info.tenant_table_id if info else user.tenant_id
 
     message = WorkspaceMessage(
         workspace_id=workspace_id,
         sender_id=user.id,
         content=data.content,
         message_type=data.message_type,
-        tenant_id=getattr(user, "tenant_id", None),
+        tenant_id=tenant_table_id,
     )
     db.add(message)
     db.commit()
@@ -52,9 +58,18 @@ def list_messages(
     db: Session,
     workspace_id: int,
     user: User,
+    tenant_table_id: int | None = None,
 ):
     validate_workspace_member(db, workspace_id, user)
-    return list_messages_by_workspace(db, workspace_id)
+    if tenant_table_id is None:
+        info = TenantInfo.resolve_from_db(db, org_id=user.tenant_id)
+        tenant_table_id = info.tenant_table_id if info else user.tenant_id
+    return list_messages_by_workspace(db, workspace_id, tenant_table_id)
+
+
+def _tenant_table_id(db: Session, user: User) -> int | None:
+    info = TenantInfo.resolve_from_db(db, org_id=user.tenant_id)
+    return info.tenant_table_id if info else user.tenant_id
 
 
 def update_message(
@@ -65,7 +80,8 @@ def update_message(
     ip_address: str | None = None,
     user_agent: str | None = None,
 ) -> WorkspaceMessage:
-    message = db.scalar(select(WorkspaceMessage).where(WorkspaceMessage.id == message_id))
+    tid = _tenant_table_id(db, user)
+    message = db.scalar(tenant_filter(select(WorkspaceMessage), WorkspaceMessage, tid).where(WorkspaceMessage.id == message_id))
     if not message:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Message not found")
     if message.deleted_at is not None:
@@ -106,7 +122,8 @@ def delete_message(
     ip_address: str | None = None,
     user_agent: str | None = None,
 ) -> dict:
-    message = db.scalar(select(WorkspaceMessage).where(WorkspaceMessage.id == message_id))
+    tid = _tenant_table_id(db, user)
+    message = db.scalar(tenant_filter(select(WorkspaceMessage), WorkspaceMessage, tid).where(WorkspaceMessage.id == message_id))
     if not message:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Message not found")
     if message.deleted_at is not None:
@@ -127,3 +144,67 @@ def delete_message(
     )
     logger.info("Message %d soft-deleted by user %d", message_id, user.id)
     return {"message": "Message deleted"}
+
+
+def pin_message(
+    db: Session,
+    workspace_id: int,
+    message_id: int,
+    user: User,
+    ip_address: str | None = None,
+    user_agent: str | None = None,
+) -> WorkspaceMessage:
+    validate_workspace_moderator(db, workspace_id, user)
+
+    tid = _tenant_table_id(db, user)
+    message = db.scalar(tenant_filter(select(WorkspaceMessage), WorkspaceMessage, tid).where(
+        WorkspaceMessage.id == message_id, WorkspaceMessage.workspace_id == workspace_id
+    ))
+    if not message:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Message not found")
+    if message.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot pin a deleted message")
+
+    message.is_pinned = True
+    message.pinned_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(message)
+
+    log_action(
+        db, user.id, "pin", "workspace_message", message_id,
+        module_name="workspace_message", action_type="pin", record_id=message_id,
+        ip_address=ip_address, user_agent=user_agent,
+    )
+    logger.info("Message %d pinned in workspace %d by user %d", message_id, workspace_id, user.id)
+    return message
+
+
+def unpin_message(
+    db: Session,
+    workspace_id: int,
+    message_id: int,
+    user: User,
+    ip_address: str | None = None,
+    user_agent: str | None = None,
+) -> WorkspaceMessage:
+    validate_workspace_moderator(db, workspace_id, user)
+
+    tid = _tenant_table_id(db, user)
+    message = db.scalar(tenant_filter(select(WorkspaceMessage), WorkspaceMessage, tid).where(
+        WorkspaceMessage.id == message_id, WorkspaceMessage.workspace_id == workspace_id
+    ))
+    if not message:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Message not found")
+
+    message.is_pinned = False
+    message.pinned_at = None
+    db.commit()
+    db.refresh(message)
+
+    log_action(
+        db, user.id, "unpin", "workspace_message", message_id,
+        module_name="workspace_message", action_type="unpin", record_id=message_id,
+        ip_address=ip_address, user_agent=user_agent,
+    )
+    logger.info("Message %d unpinned in workspace %d by user %d", message_id, workspace_id, user.id)
+    return message

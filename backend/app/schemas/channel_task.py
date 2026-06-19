@@ -69,5 +69,51 @@ class ChannelTaskResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class ChannelTaskUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    priority: Optional[TaskPriority] = None
+    due_date: Optional[datetime] = None
+
+    @field_validator("title", mode="before")
+    @classmethod
+    def clean_title(cls, v):
+        if isinstance(v, str):
+            return sanitize_text(v, max_length=TITLE_MAX_LENGTH)
+        return v
+
+    @field_validator("title")
+    @classmethod
+    def validate_title_length(cls, v):
+        if v:
+            return string_length(1, TITLE_MAX_LENGTH)(v)
+        return v
+
+    @field_validator("description", mode="before")
+    @classmethod
+    def clean_description(cls, v):
+        if isinstance(v, str):
+            return sanitize_text(v, max_length=DESCRIPTION_MAX_LENGTH)
+        return v
+
+    @field_validator("description")
+    @classmethod
+    def validate_description_safe(cls, v):
+        if v:
+            return validate_safe_text(v)
+        return v
+
+    @field_validator("due_date")
+    @classmethod
+    def validate_due_date(cls, v):
+        if v:
+            return validate_future_datetime(v)
+        return v
+
+
+class ChannelTaskStatusUpdate(BaseModel):
+    status: TaskStatus
+
+
 class ChannelTaskAssign(BaseModel):
     assigned_to_id: int

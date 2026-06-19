@@ -11,6 +11,7 @@ from datetime import datetime
 from app.core.workflow import validate_transition
 from app.core.log import get_logger
 from app.core.cache import cache_delete_pattern
+from app.core.tenant import tenant_filter
 from app.services.audit_log_service import log_action
 from app.services.notification_service import (
     create_task_assignment_notification,
@@ -52,7 +53,7 @@ def _invalidate_task_caches():
         asyncio.run(cache_delete_pattern("ai:summary:*"))
 
 
-def create_task(db: Session, task_data: TaskCreate, current_user):
+def create_task(db: Session, task_data: TaskCreate, current_user, tenant_id: int | None = None):
     logger.info("Creating task: title=%s assigned_to=%d by user_id=%d",
                 task_data.title, task_data.assigned_to_id, current_user.id)
 
@@ -61,6 +62,8 @@ def create_task(db: Session, task_data: TaskCreate, current_user):
         logger.warning("Task creation failed: assigned user not found user_id=%d", task_data.assigned_to_id)
         raise HTTPException(404, "Assigned user not found")
 
+    tid = tenant_id or getattr(current_user, "tenant_id", None)
+
     new_task = Task(
         title=task_data.title,
         description=task_data.description,
@@ -68,7 +71,8 @@ def create_task(db: Session, task_data: TaskCreate, current_user):
         priority=task_data.priority,
         due_date=task_data.due_date,
         created_by_id=current_user.id,
-        assigned_to_id=task_data.assigned_to_id
+        assigned_to_id=task_data.assigned_to_id,
+        tenant_id=tid,
     )
 
     db.add(new_task)
@@ -90,6 +94,7 @@ def create_task(db: Session, task_data: TaskCreate, current_user):
 def get_tasks(
     db: Session,
     current_user,
+    tenant_id: int | None = None,
     page: int = 1,
     size: int = 20,
     sort_by: Optional[str] = None,
@@ -97,7 +102,8 @@ def get_tasks(
     search: Optional[str] = None,
 ):
     logger.debug("Fetching tasks for user_id=%d role=%s", current_user.id, current_user.role)
-    query = select(Task).options(joinedload(Task.assignee))
+    tid = tenant_id or getattr(current_user, "tenant_id", None)
+    query = tenant_filter(select(Task).options(joinedload(Task.assignee)), Task, tid)
 
     if current_user.role == "admin":
         pass
@@ -127,8 +133,9 @@ def get_tasks(
     return result
 
 
-def get_kanban_view(db: Session, current_user=None):
-    query = select(Task)
+def get_kanban_view(db: Session, current_user=None, tenant_id: int | None = None):
+    tid = tenant_id or getattr(current_user, "tenant_id", None) if current_user else None
+    query = tenant_filter(select(Task), Task, tid)
 
     if current_user:
         if current_user.role == "employee":
@@ -150,12 +157,13 @@ def get_kanban_view(db: Session, current_user=None):
     }
 
 
-def get_task_by_id(db: Session, task_id: int, current_user):
+def get_task_by_id(db: Session, task_id: int, current_user, tenant_id: int | None = None):
     logger.debug("Fetching task id=%d by user_id=%d", task_id, current_user.id)
-    task = db.scalar(select(Task).options(
+    tid = tenant_id or getattr(current_user, "tenant_id", None)
+    task = db.scalar(tenant_filter(select(Task).options(
         joinedload(Task.assignee),
         joinedload(Task.creator)
-    ).where(Task.id == task_id))
+    ).where(Task.id == task_id), Task, tid))
 
     if not task:
         logger.warning("Task not found id=%d", task_id)
@@ -168,9 +176,10 @@ def get_task_by_id(db: Session, task_id: int, current_user):
     return jsonable_encoder(task)
 
 
-def update_task(db: Session, task_id: int, task_data: TaskUpdate, current_user):
+def update_task(db: Session, task_id: int, task_data: TaskUpdate, current_user, tenant_id: int | None = None):
     logger.info("Updating task id=%d by user_id=%d", task_id, current_user.id)
-    task = db.scalar(select(Task).where(Task.id == task_id))
+    tid = tenant_id or getattr(current_user, "tenant_id", None)
+    task = db.scalar(tenant_filter(select(Task), Task, tid).where(Task.id == task_id))
 
     if not task:
         logger.warning("Task update failed: not found id=%d", task_id)
@@ -217,9 +226,10 @@ def update_task(db: Session, task_id: int, task_data: TaskUpdate, current_user):
     return jsonable_encoder(task)
 
 
-def delete_task(db: Session, task_id: int, current_user):
+def delete_task(db: Session, task_id: int, current_user, tenant_id: int | None = None):
     logger.info("Deleting task id=%d", task_id)
-    task = db.scalar(select(Task).where(Task.id == task_id))
+    tid = tenant_id or getattr(current_user, "tenant_id", None)
+    task = db.scalar(tenant_filter(select(Task), Task, tid).where(Task.id == task_id))
 
     if not task:
         logger.warning("Task delete failed: not found id=%d", task_id)
@@ -237,9 +247,10 @@ def delete_task(db: Session, task_id: int, current_user):
     return {"message": "Task deleted"}
 
 
-def assign_task(db: Session, task_id: int, assigned_to_id: int, current_user):
+def assign_task(db: Session, task_id: int, assigned_to_id: int, current_user, tenant_id: int | None = None):
     logger.info("Assigning task id=%d to user_id=%d", task_id, assigned_to_id)
-    task = db.scalar(select(Task).where(Task.id == task_id))
+    tid = tenant_id or getattr(current_user, "tenant_id", None)
+    task = db.scalar(tenant_filter(select(Task), Task, tid).where(Task.id == task_id))
 
     if not task:
         logger.warning("Task assign failed: task not found id=%d", task_id)
@@ -273,9 +284,10 @@ def assign_task(db: Session, task_id: int, assigned_to_id: int, current_user):
     return {"message": "Task assigned successfully"}
 
 
-def update_task_status(db: Session, task_id: int, new_status: str, current_user):
+def update_task_status(db: Session, task_id: int, new_status: str, current_user, tenant_id: int | None = None):
     logger.info("Updating task id=%d status to %s by user_id=%d", task_id, new_status, current_user.id)
-    task = db.scalar(select(Task).where(Task.id == task_id))
+    tid = tenant_id or getattr(current_user, "tenant_id", None)
+    task = db.scalar(tenant_filter(select(Task), Task, tid).where(Task.id == task_id))
 
     if not task:
         logger.warning("Status update failed: task not found id=%d", task_id)

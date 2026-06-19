@@ -40,16 +40,17 @@ PUBLIC_PATHS = (
 
 
 class TenantInfo:
-    def __init__(self, id: int, slug: str, name: str, is_active: bool):
+    def __init__(self, id: int, slug: str, name: str, is_active: bool, tenant_table_id: int | None = None):
         self.id = id
         self.slug = slug
         self.name = name
         self.is_active = is_active
+        self.tenant_table_id: int | None = tenant_table_id
         self.resolved_at: float = time.time()
         self.method: Optional[TenantResolutionMethod] = None
 
     def __repr__(self) -> str:
-        return f"TenantInfo(id={self.id}, slug='{self.slug}', active={self.is_active})"
+        return f"TenantInfo(id={self.id}, slug='{self.slug}', active={self.is_active}, tenant_table_id={self.tenant_table_id})"
 
 
 class TenantResolver:
@@ -82,28 +83,34 @@ class TenantResolver:
         cls._cache[key] = info
 
     @classmethod
-    def resolve_from_db(cls, db: Session, org_id: int = None, slug: str = None) -> Optional[Organization]:
+    def resolve_from_db(cls, db: Session, org_id: int = None, slug: str = None) -> Optional[TenantInfo]:
+        lookup_key = f"id:{org_id}" if org_id is not None else f"slug:{slug}"
+        cached = cls._get_cached(lookup_key)
+        if cached:
+            return cached
+
         if org_id is not None:
-            cached = cls._get_cached(f"id:{org_id}")
-            if cached:
-                return cached
             org = db.execute(select(Organization).where(Organization.id == org_id)).scalar_one_or_none()
-            if org:
-                info = TenantInfo(id=org.id, slug=org.slug, name=org.name, is_active=org.is_active)
-                cls._set_cache(f"id:{org.id}", info)
-                cls._set_cache(f"slug:{org.slug}", info)
-                return info
-        if slug is not None:
-            cached = cls._get_cached(f"slug:{slug}")
-            if cached:
-                return cached
+        elif slug is not None:
             org = db.execute(select(Organization).where(Organization.slug == slug)).scalar_one_or_none()
-            if org:
-                info = TenantInfo(id=org.id, slug=org.slug, name=org.name, is_active=org.is_active)
-                cls._set_cache(f"id:{org.id}", info)
-                cls._set_cache(f"slug:{org.slug}", info)
-                return info
-        return None
+        else:
+            return None
+
+        if not org:
+            return None
+
+        tenant_table_id = cls._resolve_tenant_table_id(db, org)
+        info = TenantInfo(id=org.id, slug=org.slug, name=org.name, is_active=org.is_active, tenant_table_id=tenant_table_id)
+        cls._set_cache(f"id:{org.id}", info)
+        cls._set_cache(f"slug:{org.slug}", info)
+        return info
+
+    @classmethod
+    def _resolve_tenant_table_id(cls, db: Session, org: Organization) -> int | None:
+        tenant = db.execute(select(Tenant).where(Tenant.slug == org.slug)).scalar_one_or_none()
+        if tenant:
+            return tenant.id
+        return org.id
 
     @classmethod
     def from_header_id(cls, request: Request, db: Session) -> Optional[TenantInfo]:
@@ -264,6 +271,7 @@ class TenantMiddleware:
             if "state" not in scope:
                 scope["state"] = {}
             scope["state"]["tenant_id"] = info.id
+            scope["state"]["tenant_table_id"] = info.tenant_table_id if info.tenant_table_id is not None else info.id
             scope["state"]["tenant_slug"] = info.slug
             scope["state"]["tenant_info"] = info
 
@@ -301,6 +309,10 @@ class TenantMiddleware:
 
 def get_current_tenant_id(request: Request) -> Optional[int]:
     return getattr(request.state, "tenant_id", None)
+
+
+def get_current_tenant_table_id(request: Request) -> Optional[int]:
+    return getattr(request.state, "tenant_table_id", None)
 
 
 def get_current_tenant_info(request: Request) -> Optional[TenantInfo]:

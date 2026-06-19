@@ -6,6 +6,7 @@ from fastapi_pagination.ext.sqlalchemy import paginate as fastapi_paginate
 from app.models.comment import Comment
 from app.models.task import Task
 from app.schemas.comment import CommentCreate
+from app.core.tenant import tenant_filter
 from app.core.log import get_logger
 from app.services.audit_log_service import log_action
 from app.services.notification_service import create_comment_notification
@@ -13,11 +14,12 @@ from app.services.notification_service import create_comment_notification
 logger = get_logger("comment_service")
 
 
-def add_comment(db: Session, task_id: int, comment_data: CommentCreate, current_user):
+def add_comment(db: Session, task_id: int, comment_data: CommentCreate, current_user, tenant_id: int | None = None):
     logger.info("Adding comment to task id=%d by user_id=%d is_internal=%s",
                 task_id, current_user.id, comment_data.is_internal)
 
-    task = db.scalar(select(Task).where(Task.id == task_id))
+    tid = tenant_id or getattr(current_user, "tenant_id", None)
+    task = db.scalar(tenant_filter(select(Task), Task, tid).where(Task.id == task_id))
 
     if not task:
         logger.warning("Comment failed: task not found id=%d", task_id)
@@ -27,7 +29,8 @@ def add_comment(db: Session, task_id: int, comment_data: CommentCreate, current_
         task_id=task_id,
         user_id=current_user.id,
         content=comment_data.content,
-        is_internal=comment_data.is_internal
+        is_internal=comment_data.is_internal,
+        tenant_id=tid,
     )
 
     db.add(comment)
@@ -50,12 +53,14 @@ def get_comments(
     db: Session,
     task_id: int,
     current_user,
+    tenant_id: int | None = None,
     page: int = 1,
     size: int = 50,
 ):
     logger.debug("Fetching comments for task id=%d by user_id=%d", task_id, current_user.id)
 
-    query = select(Comment).where(Comment.task_id == task_id)
+    tid = tenant_id or getattr(current_user, "tenant_id", None)
+    query = tenant_filter(select(Comment), Comment, tid).where(Comment.task_id == task_id)
 
     if current_user.role == "employee":
         query = query.where(Comment.is_internal == False)
@@ -65,8 +70,9 @@ def get_comments(
     return result
 
 
-def delete_all_comments(db: Session, task_id: int, current_user):
-    task = db.scalar(select(Task).where(Task.id == task_id))
+def delete_all_comments(db: Session, task_id: int, current_user, tenant_id: int | None = None):
+    tid = tenant_id or getattr(current_user, "tenant_id", None)
+    task = db.scalar(tenant_filter(select(Task), Task, tid).where(Task.id == task_id))
     if not task:
         raise HTTPException(404, "Task not found")
 

@@ -5,8 +5,7 @@ from app.schemas.comment import CommentCreate, CommentOut
 from app.routes.deps import get_db, rate_limit
 from app.core.rbac import require_permission, Permissions
 from app.core.config import settings
-from app.repository.comment_repository import list_comments_by_task
-from app.services.comment_service import add_comment, delete_all_comments
+from app.services.comment_service import add_comment, get_comments, delete_all_comments
 
 router = APIRouter(prefix="/tasks")
 
@@ -19,7 +18,7 @@ def add_comment_endpoint(
     user=Depends(require_permission(Permissions.comment_create)),
     _=Depends(rate_limit(settings.RATE_LIMIT_COMMENT, settings.RATE_LIMIT_COMMENT_WINDOW, "comment_create")),
 ):
-    return add_comment(db, task_id, data, user)
+    return add_comment(db, task_id, data, user, tenant_id=user.tenant_id)
 
 
 @router.get("/{task_id}/comments", response_model=Page[CommentOut])
@@ -29,7 +28,7 @@ def get_comments_endpoint(
     user=Depends(require_permission(Permissions.comment_read)),
     _=Depends(rate_limit(settings.RATE_LIMIT_DEFAULT, settings.RATE_LIMIT_DEFAULT_WINDOW, "comment_read")),
 ):
-    return list_comments_by_task(db, task_id)
+    return get_comments(db, task_id, user, tenant_id=user.tenant_id)
 
 
 @router.delete("/{task_id}/comments")
@@ -39,4 +38,4 @@ def delete_all_comments_endpoint(
     user=Depends(require_permission(Permissions.comment_delete)),
     _=Depends(rate_limit(settings.RATE_LIMIT_DEFAULT, settings.RATE_LIMIT_DEFAULT_WINDOW, "comment_delete")),
 ):
-    return delete_all_comments(db, task_id, user)
+    return delete_all_comments(db, task_id, user, tenant_id=user.tenant_id)

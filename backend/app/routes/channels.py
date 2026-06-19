@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
 from app.schemas.channel import ChannelCreate, ChannelUpdate, ChannelResponse
 from app.routes.deps import get_db
-from app.core.tenant import get_current_tenant_id
+from app.core.tenant import get_current_tenant_table_id
 from app.services.channel_service import (
     create_channel,
     list_channels,
@@ -23,7 +23,7 @@ def list_channels_endpoint(
     workspace_id: Optional[int] = Query(None),
     include_archived: bool = Query(False),
 ):
-    tenant_id = get_current_tenant_id(request)
+    tenant_id = get_current_tenant_table_id(request)
     return list_channels(db, tenant_id, workspace_id, include_archived)
 
 

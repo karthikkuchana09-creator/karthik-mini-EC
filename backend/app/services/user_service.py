@@ -65,16 +65,18 @@ def get_all_users(
     return result
 
 
-def get_user_by_id(db: Session, user_id: int):
+def get_user_by_id(db: Session, user_id: int, tenant_id: int | None = None):
     logger.debug("Fetching user id=%d", user_id)
-    user = db.scalar(select(User).where(User.id == user_id))
+    query = tenant_filter(select(User), User, tenant_id).where(User.id == user_id)
+    user = db.scalar(query)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return jsonable_encoder(user)
 
 
-def update_user(db: Session, user_id: int, data: UserUpdate):
-    user = db.scalar(select(User).where(User.id == user_id))
+def update_user(db: Session, user_id: int, data: UserUpdate, tenant_id: int | None = None):
+    query = tenant_filter(select(User), User, tenant_id).where(User.id == user_id)
+    user = db.scalar(query)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
@@ -109,8 +111,9 @@ def update_user(db: Session, user_id: int, data: UserUpdate):
     }
 
 
-def toggle_user_active(db: Session, user_id: int):
-    user = db.scalar(select(User).where(User.id == user_id))
+def toggle_user_active(db: Session, user_id: int, tenant_id: int | None = None):
+    query = tenant_filter(select(User), User, tenant_id).where(User.id == user_id)
+    user = db.scalar(query)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     user.is_active = not user.is_active
@@ -118,8 +121,9 @@ def toggle_user_active(db: Session, user_id: int):
     return {"id": user.id, "is_active": user.is_active}
 
 
-def delete_user(db: Session, user_id: int):
-    user = db.scalar(select(User).where(User.id == user_id))
+def delete_user(db: Session, user_id: int, tenant_id: int | None = None):
+    query = tenant_filter(select(User), User, tenant_id).where(User.id == user_id)
+    user = db.scalar(query)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     db.delete(user)
@@ -127,8 +131,9 @@ def delete_user(db: Session, user_id: int):
     return {"message": "User deleted successfully"}
 
 
-def set_subscription_role(db: Session, user_id: int, role: str) -> User:
-    user = db.scalar(select(User).where(User.id == user_id))
+def set_subscription_role(db: Session, user_id: int, role: str, tenant_id: int | None = None) -> User:
+    query = tenant_filter(select(User), User, tenant_id).where(User.id == user_id)
+    user = db.scalar(query)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     try:

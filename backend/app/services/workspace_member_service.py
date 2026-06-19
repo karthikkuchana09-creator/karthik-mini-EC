@@ -1,6 +1,6 @@
 from typing import Optional
 from sqlalchemy import select, func as sa_func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from fastapi import HTTPException, status
 from app.models.workspace import Workspace
 from app.models.workspace_member import WorkspaceMember, WorkspaceMemberRole
@@ -141,6 +141,7 @@ def list_members(
 
     stmt = (
         select(WorkspaceMember)
+        .options(selectinload(WorkspaceMember.user))
         .where(WorkspaceMember.workspace_id == workspace_id)
         .order_by(WorkspaceMember.joined_at.asc())
     )

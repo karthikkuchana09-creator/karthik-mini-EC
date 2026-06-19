@@ -19,6 +19,8 @@ from app.core.exceptions import register_exception_handlers
 from app.core.background_tasks import task_queue
 from app.core.redis_client import close as close_redis
 from app.services.enterprise_scheduler import enterprise_scheduler
+from app.services.seed_tenants import seed_example_tenants
+from app.db.session import SessionLocal
 
 setup_logging()
 logger = get_logger("main")
@@ -29,6 +31,11 @@ Base.metadata.create_all(bind=engine)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Starting up...")
+    db = SessionLocal()
+    try:
+        seed_example_tenants(db)
+    finally:
+        db.close()
     manager.start_heartbeat()
     start_ai_notification_daemon()
     task_queue.start()

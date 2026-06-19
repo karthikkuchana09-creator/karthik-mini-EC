@@ -36,14 +36,20 @@ function hashCode(str) {
 
 function TabFallback() {
   return (
-    <div className="space-y-4 py-8">
-      <div className="h-4 w-48 bg-gray-200 rounded animate-pulse" />
+    <div className="space-y-5 py-8">
+      <div className="flex gap-3">
+        <div className="h-10 w-10 bg-gray-200 rounded-xl animate-pulse" />
+        <div className="flex-1 space-y-2">
+          <div className="h-4 w-32 bg-gray-200 rounded animate-pulse" />
+          <div className="h-3 w-48 bg-gray-100 rounded animate-pulse" />
+        </div>
+      </div>
       <div className="grid grid-cols-3 gap-4">
         {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="h-24 bg-gray-100 rounded-xl animate-pulse" />
+          <div key={i} className="h-28 bg-gray-100 rounded-xl animate-pulse" />
         ))}
       </div>
-      <div className="h-32 bg-gray-100 rounded-xl animate-pulse" />
+      <div className="h-24 bg-gray-100 rounded-xl animate-pulse" />
     </div>
   );
 }
@@ -134,6 +140,7 @@ export default function WorkspaceDetails() {
 
       <div className="bg-white rounded-2xl border border-gray-200/70 shadow-sm overflow-hidden">
         <div className={`relative bg-gradient-to-br ${bannerGrad} px-6 sm:px-8 pt-8 sm:pt-10 pb-20 sm:pb-24`}>
+          <div className="absolute inset-0 opacity-[0.06]" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%23ffffff\' fill-opacity=\'1\'%3E%3Ccircle cx=\'30\' cy=\'30\' r=\'1\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")' }} />
           {isArchived && (
             <div className="absolute top-4 right-4 px-3 py-1 rounded-full bg-white/20 text-xs font-semibold text-white/90 backdrop-blur-sm">
               Archived
@@ -217,7 +224,7 @@ export default function WorkspaceDetails() {
                   className={`flex items-center gap-2 px-4 sm:px-5 py-3 rounded-t-xl text-xs sm:text-sm font-medium transition-all whitespace-nowrap ${
                     isActive
                       ? 'bg-white text-indigo-600 shadow-sm border border-gray-200/70 border-b-white -mb-px z-10'
-                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50/50 border border-transparent'
+                      : 'bg-white text-gray-500 hover:text-gray-700 hover:shadow-sm border border-transparent hover:border-gray-200/50'
                   }`}
                 >
                   <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
@@ -232,7 +239,9 @@ export default function WorkspaceDetails() {
 
         <div className="border-t border-gray-200/70 p-6 sm:p-8">
           <Suspense fallback={<TabFallback />}>
-            <ActiveComponent key={activeTab} workspaceId={wId} workspace={workspace} />
+            <div key={activeTab} className="animate-fadeSlideIn">
+              <ActiveComponent workspaceId={wId} workspace={workspace} />
+            </div>
           </Suspense>
         </div>
       </div>

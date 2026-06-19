@@ -10,6 +10,7 @@ from app.models.user import User, UserRole
 from app.schemas.approval import ApprovalCreate, ApprovalAction
 from app.core.log import get_logger
 from app.core.cache import cache_delete_pattern
+from app.core.tenant import tenant_filter
 from app.services.audit_log_service import log_action
 from app.services.notification_service import (
     create_approval_request_notification,
@@ -28,13 +29,16 @@ def _invalidate_approval_caches():
         asyncio.run(cache_delete_pattern("dashboard:*"))
 
 
-def create_approval(db: Session, approval_data: ApprovalCreate, current_user):
+def create_approval(db: Session, approval_data: ApprovalCreate, current_user, tenant_id: int | None = None):
     logger.info("Creating approval: title=%s by user_id=%d", approval_data.title, current_user.id)
+
+    tid = tenant_id or getattr(current_user, "tenant_id", None)
 
     approval = Approval(
         title=approval_data.title,
         description=approval_data.description,
-        requested_by=current_user.id
+        requested_by=current_user.id,
+        tenant_id=tid,
     )
 
     db.add(approval)
@@ -64,6 +68,7 @@ def create_approval(db: Session, approval_data: ApprovalCreate, current_user):
 def get_approvals(
     db: Session,
     current_user,
+    tenant_id: int | None = None,
     page: int = 1,
     size: int = 20,
     sort_by: Optional[str] = None,
@@ -73,7 +78,8 @@ def get_approvals(
     role = current_user.role.value if hasattr(current_user.role, "value") else str(current_user.role)
     logger.debug("Fetching approvals for user_id=%d role=%s", current_user.id, role)
 
-    query = select(Approval).options(joinedload(Approval.requester))
+    tid = tenant_id or getattr(current_user, "tenant_id", None)
+    query = tenant_filter(select(Approval).options(joinedload(Approval.requester)), Approval, tid)
 
     if role == "admin":
         pass
@@ -98,12 +104,13 @@ def get_approvals(
     return fastapi_paginate(db, query, Params(page=page, size=size))
 
 
-def take_approval_action(db: Session, approval_id: int, action_data: ApprovalAction, current_user):
+def take_approval_action(db: Session, approval_id: int, action_data: ApprovalAction, current_user, tenant_id: int | None = None):
     role = current_user.role.value if hasattr(current_user.role, "value") else str(current_user.role)
     logger.info("Approval action: id=%d action=%s by user_id=%d role=%s",
                 approval_id, action_data.action, current_user.id, role)
 
-    approval = db.scalar(select(Approval).where(Approval.id == approval_id))
+    tid = tenant_id or getattr(current_user, "tenant_id", None)
+    approval = db.scalar(tenant_filter(select(Approval), Approval, tid).where(Approval.id == approval_id))
 
     if not approval:
         logger.warning("Approval action failed: not found id=%d", approval_id)
@@ -178,10 +185,12 @@ def take_approval_action(db: Session, approval_id: int, action_data: ApprovalAct
     return {"message": "Action completed"}
 
 
-def get_approval_history(db: Session, approval_id: int):
+def get_approval_history(db: Session, approval_id: int, tenant_id: int | None = None):
     logger.debug("Fetching approval history for id=%d", approval_id)
-    history = db.execute(select(ApprovalHistory).where(
-        ApprovalHistory.approval_id == approval_id
-    )).scalars().all()
+    tid = tenant_id or None
+    query = select(ApprovalHistory).where(ApprovalHistory.approval_id == approval_id)
+    if tid is not None:
+        query = tenant_filter(query, ApprovalHistory, tid)
+    history = db.execute(query).scalars().all()
     logger.debug("Fetched %d history entries for approval id=%d", len(history), approval_id)
     return history
