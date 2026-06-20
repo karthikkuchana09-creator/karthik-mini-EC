@@ -13,7 +13,7 @@ class ChannelTaskCreate(BaseModel):
     description: Optional[str] = None
     priority: TaskPriority = "medium"
     due_date: Optional[datetime] = None
-    assigned_to_id: int
+    assigned_to_id: Optional[int] = None
 
     @field_validator("title", mode="before")
     @classmethod
@@ -60,7 +60,9 @@ class ChannelTaskResponse(BaseModel):
     sla_due_time: Optional[datetime] = None
     is_sla_breached: bool = False
     created_by_id: int
-    assigned_to_id: int
+    assigned_to_id: Optional[int] = None
+    assigned_to_name: Optional[str] = None
+    created_by_name: Optional[str] = None
     workspace_id: int
     channel_id: int
     created_at: datetime

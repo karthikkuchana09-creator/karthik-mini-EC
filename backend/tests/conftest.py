@@ -1,5 +1,5 @@
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from app.db.base import Base
 from app.models.user import User, UserRole
@@ -7,6 +7,13 @@ from app.models.task import Task
 from app.models.approval import Approval
 from app.models.approval_history import ApprovalHistory
 from app.models.comment import Comment
+from app.models.sla_tracking import SLATracking
+from app.models.workspace import Workspace
+from app.models.workspace_member import WorkspaceMember
+from app.models.tenant import Tenant
+from app.models.organization import Organization
+from app.models.document import Document
+from app.models.task_document import TaskDocument
 from app.core.security import hash_password
 from datetime import datetime
 
@@ -21,7 +28,10 @@ TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engin
 def setup_db():
     Base.metadata.create_all(bind=engine)
     yield
-    Base.metadata.drop_all(bind=engine)
+    with engine.begin() as conn:
+        conn.execute(text("SET FOREIGN_KEY_CHECKS = 0"))
+        Base.metadata.drop_all(bind=conn)
+        conn.execute(text("SET FOREIGN_KEY_CHECKS = 1"))
 
 
 @pytest.fixture

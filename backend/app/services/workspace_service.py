@@ -5,6 +5,9 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 from app.models.tenant import Tenant
 from app.models.workspace import Workspace, WorkspaceVisibility
+from app.models.workspace_member import WorkspaceMember
+from app.models.channel import Channel
+from app.models.task import Task
 from app.models.tenant_collaboration_settings import TenantCollaborationSettings
 from app.schemas.workspace import WorkspaceCreate, WorkspaceUpdate
 from app.core.log import get_logger
@@ -138,7 +141,11 @@ def list_workspaces(
 
 def get_workspace(db: Session, workspace_id: int, tenant_id: int) -> Workspace:
     _get_tenant_or_404(db, tenant_id)
-    return _get_workspace_or_404(db, workspace_id, tenant_id)
+    ws = _get_workspace_or_404(db, workspace_id, tenant_id)
+    ws.member_count = len(ws.members) if ws.members else db.scalar(select(sa_func.count(WorkspaceMember.id)).where(WorkspaceMember.workspace_id == workspace_id, WorkspaceMember.is_active == True)) or 0
+    ws.channel_count = len(ws.channels) if ws.channels else db.scalar(select(sa_func.count(Channel.id)).where(Channel.workspace_id == workspace_id)) or 0
+    ws.task_count = len(ws.tasks) if ws.tasks else db.scalar(select(sa_func.count(Task.id)).where(Task.workspace_id == workspace_id, Task.channel_id.is_(None))) or 0
+    return ws
 
 
 def update_workspace(

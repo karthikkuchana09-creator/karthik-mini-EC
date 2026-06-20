@@ -162,7 +162,7 @@ export default function WorkspaceTaskDetails() {
       <Breadcrumb
         className="mb-6"
         items={[
-          { label: 'Workspaces', to: '/workspaces' },
+          { label: 'Workspaces', to: '/workspace-list' },
           { label: 'Tasks', to: `/workspace-list/${wId}/tasks` },
           { label: task.title },
         ]}

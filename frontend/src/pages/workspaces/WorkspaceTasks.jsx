@@ -59,12 +59,12 @@ export default function WorkspaceTasks() {
         workspaceApi.getWorkspaceMembers(workspaceId),
       ]);
       setWorkspace(ws);
-      setTasks(Array.isArray(ts) ? ts : ts?.tasks || []);
+      setTasks(Array.isArray(ts) ? ts : ts?.items || ts?.tasks || []);
       setMembers(Array.isArray(ms) ? ms : ms?.members || ms?.data || []);
     } catch (err) {
       if (err?.response?.status === 404) {
         toast.error('Workspace not found');
-        navigate('/workspaces');
+        navigate('/workspace-list');
       } else {
         setError(getErrorMessage(err, 'Failed to load data'));
         toast.error(getErrorMessage(err, 'Failed to load data'));
@@ -187,8 +187,8 @@ export default function WorkspaceTasks() {
       <Breadcrumb
         className="mb-6"
         items={[
-          { label: 'Workspaces', to: '/workspaces' },
-          { label: workspace?.name || 'Workspace', to: `/workspaces/${workspaceId}` },
+          { label: 'Workspaces', to: '/workspace-list' },
+          { label: workspace?.name || 'Workspace', to: `/workspace-list/${workspaceId}` },
           { label: 'Tasks' },
         ]}
       />

@@ -56,8 +56,6 @@ def ai_summary_endpoint(
     db: Session = Depends(get_db),
     user=Depends(require_permission(Permissions.dashboard_ai_summary)),
     _=Depends(require_feature("analytics")),
-    _credits=Depends(require_credits("ai_summary")),
 ):
     result = get_enterprise_ai_summary(db)
-    deduct_feature_credits(db, user, "ai_summary")
     return result

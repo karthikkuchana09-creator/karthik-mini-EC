@@ -121,7 +121,7 @@ export default function WorkspaceList() {
           {filtered.map((ws) => {
             const cfg = STATUS_CONFIG[ws.status === 'archived' ? 'archived' : 'active'];
             return (
-              <Link key={ws.id} to={`/workspaces/${ws.id}`} className="block bg-white rounded-2xl border border-gray-200/70 shadow-sm hover:shadow-md hover:border-gray-300/80 transition-all overflow-hidden group">
+              <Link key={ws.id} to={`/workspace-list/${ws.id}`} className="block bg-white rounded-2xl border border-gray-200/70 shadow-sm hover:shadow-md hover:border-gray-300/80 transition-all overflow-hidden group">
                 <div className="h-20 bg-gradient-to-br from-indigo-500 to-indigo-600 relative">
                   {ws.status === 'archived' && (
                     <div className="absolute top-2 right-2 px-2 py-0.5 rounded-full bg-white/90 text-[10px] font-semibold text-gray-500">Archived</div>

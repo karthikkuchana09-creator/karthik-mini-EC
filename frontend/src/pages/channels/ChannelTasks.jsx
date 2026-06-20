@@ -58,7 +58,7 @@ export default function ChannelTasks() {
         channelTasksApi.getChannelTasks(channelId),
       ]);
       setChannel(ch);
-      setTasks(Array.isArray(ts) ? ts : ts?.tasks || []);
+      setTasks(Array.isArray(ts) ? ts : ts?.items || ts?.tasks || []);
       try {
         const ms = await channelApi.getChannelMembers(channelId);
         setMembers(Array.isArray(ms) ? ms : ms?.members || ms?.data || []);
@@ -106,7 +106,7 @@ export default function ChannelTasks() {
     setTasks((prev) =>
       prev.map((t) =>
         t.id === taskId
-          ? { ...t, assigned_to_id: assignedToId, assigned_to_name: members.find((m) => m.id === assignedToId)?.name || null }
+          ? { ...t, assigned_to_id: assignedToId, assigned_to_name: members.find((m) => m.user_id === assignedToId)?.name || null }
           : t,
       ),
     );
@@ -290,7 +290,7 @@ export default function ChannelTasks() {
             <select className="input" {...createForm.register('assigned_to_id')}>
               <option value="">Unassigned</option>
               {members.map((m) => (
-                <option key={m.id} value={m.id}>{m.name || m.user_name || m.email || `Member #${m.id}`}</option>
+                <option key={m.user_id} value={m.user_id}>{m.name || m.user_name || m.email || `Member #${m.user_id}`}</option>
               ))}
             </select>
           </div>
@@ -378,7 +378,7 @@ export default function ChannelTasks() {
               <select name="assigned_to_id" className="input" defaultValue={selectedTask.assigned_to_id || ''} required>
                 <option value="" disabled>Select a member</option>
                 {members.map((m) => (
-                  <option key={m.id} value={m.id}>{m.name || m.user_name || m.email || `Member #${m.id}`}</option>
+                  <option key={m.user_id} value={m.user_id}>{m.name || m.user_name || m.email || `Member #${m.user_id}`}</option>
                 ))}
               </select>
             </div>

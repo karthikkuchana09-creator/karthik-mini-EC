@@ -67,29 +67,30 @@ def validate_workspace_task_assignment(
     db: Session,
     workspace_id: int,
     user: User,
-    assignee_id: int,
+    assignee_id: int | None,
 ) -> WorkspaceMember:
     _get_workspace_or_404(db, workspace_id)
 
     member = _get_membership_or_404(db, workspace_id, user.id)
 
-    assignee = _get_membership_or_none(db, workspace_id, assignee_id)
-    if not assignee:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Assignee is not a member of this workspace",
-        )
+    if assignee_id is not None:
+        assignee = _get_membership_or_none(db, workspace_id, assignee_id)
+        if not assignee:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Assignee is not a member of this workspace",
+            )
 
-    is_workspace_admin_or_mod = member.role in (
-        WorkspaceMemberRole.WORKSPACE_ADMIN,
-        WorkspaceMemberRole.MODERATOR,
-    )
-    is_manager_or_above = user.role.value in ("manager", "admin", "super_admin")
-
-    if not is_workspace_admin_or_mod and not is_manager_or_above:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only workspace admin, moderator, or manager can assign tasks",
+        is_workspace_admin_or_mod = member.role in (
+            WorkspaceMemberRole.WORKSPACE_ADMIN,
+            WorkspaceMemberRole.MODERATOR,
         )
+        is_manager_or_above = user.role.value in ("manager", "admin", "super_admin")
+
+        if not is_workspace_admin_or_mod and not is_manager_or_above:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only workspace admin, moderator, or manager can assign tasks",
+            )
 
     return member

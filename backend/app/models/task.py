@@ -30,7 +30,7 @@ class Task(TenantMixin, Base):
     is_sla_breached: Mapped[bool] = mapped_column(Boolean, default=False)
 
     created_by_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), index=True)
-    assigned_to_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), index=True)
+    assigned_to_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     updated_by: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
 
     workspace_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("workspaces.id", ondelete="SET NULL"), nullable=True, index=True)
@@ -66,3 +66,11 @@ class Task(TenantMixin, Base):
 
     documents: Mapped[list["Document"]] = relationship("Document", back_populates="task")
     task_documents: Mapped[list["TaskDocument"]] = relationship(back_populates="task")
+
+    @property
+    def assigned_to_name(self) -> Optional[str]:
+        return self.assignee.name if self.assignee else None
+
+    @property
+    def created_by_name(self) -> Optional[str]:
+        return self.creator.name if self.creator else None

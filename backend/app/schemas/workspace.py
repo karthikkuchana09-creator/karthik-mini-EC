@@ -69,5 +69,8 @@ class WorkspaceResponse(BaseModel):
     is_archived: bool
     created_at: datetime
     updated_at: datetime
+    member_count: int = 0
+    channel_count: int = 0
+    task_count: int = 0
 
     model_config = {"from_attributes": True}

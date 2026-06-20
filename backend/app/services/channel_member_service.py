@@ -1,8 +1,10 @@
+from datetime import datetime, timezone
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from fastapi import HTTPException, status
 from app.models.channel import Channel, ChannelType
 from app.models.channel_member import ChannelMember
+from app.models.workspace_member import WorkspaceMember
 from app.models.user import User
 from app.core.log import get_logger
 
@@ -79,6 +81,29 @@ def join_channel(db: Session, channel_id: int, user_id: int) -> ChannelMember:
         "User %d joined channel %d", user_id, channel_id,
     )
     return member
+
+
+def list_channel_members(db: Session, channel_id: int) -> list[ChannelMember]:
+    channel = _get_channel_or_404(db, channel_id)
+    explicit = db.scalars(
+        select(ChannelMember)
+        .where(ChannelMember.channel_id == channel_id)
+        .options(joinedload(ChannelMember.user))
+    ).all()
+    if channel.channel_type == ChannelType.PUBLIC:
+        explicit_user_ids = {m.user_id for m in explicit}
+        q = select(User).join(WorkspaceMember, WorkspaceMember.user_id == User.id).where(
+            WorkspaceMember.workspace_id == channel.workspace_id,
+            WorkspaceMember.is_active == True,
+        )
+        if explicit_user_ids:
+            q = q.where(User.id.notin_(explicit_user_ids))
+        wm_users = db.scalars(q).all()
+        for u in wm_users:
+            cm = ChannelMember(id=-(u.id), channel_id=channel_id, user_id=u.id, tenant_id=channel.tenant_id, joined_at=datetime.now(timezone.utc), is_muted=False)
+            cm.user = u
+            explicit.append(cm)
+    return list(explicit)
 
 
 def leave_channel(db: Session, channel_id: int, user_id: int) -> None:

@@ -1,5 +1,5 @@
 import re
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from enum import Enum
 from typing import Any, Optional, Union
 
@@ -146,8 +146,13 @@ def validate_future_date(v: date) -> date:
 
 
 def validate_future_datetime(v: datetime) -> datetime:
-    if v < datetime.utcnow():
-        raise ValueError("Date must be in the future")
+    now = datetime.now(timezone.utc)
+    if v.tzinfo is None:
+        if v < now.replace(tzinfo=None):
+            raise ValueError("Date must be in the future")
+    else:
+        if v < now:
+            raise ValueError("Date must be in the future")
     return v
 
 

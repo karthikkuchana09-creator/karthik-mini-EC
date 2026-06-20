@@ -55,7 +55,7 @@ function TabFallback() {
 }
 
 export default function WorkspaceDetails() {
-  const { workspaceId } = useParams();
+  const { id: workspaceId } = useParams();
   const navigate = useNavigate();
   const wId = Number(workspaceId);
 
