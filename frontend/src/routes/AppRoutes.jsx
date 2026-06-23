@@ -9,7 +9,7 @@ const AuthPage = lazy(() => import('../pages/AuthPage'));
 const GoogleCallback = lazy(() => import('../pages/GoogleCallback'));
 const Dashboard = lazy(() => import('../pages/Dashboard'));
 const Kanban = lazy(() => import('../pages/Kanban'));
-const Approvals = lazy(() => import('../pages/Approvals'));
+const Approvals = lazy(() => import('../pages/approvals/Approvals'));
 const TaskList = lazy(() => import('../pages/TaskList'));
 const CreateTask = lazy(() => import('../pages/CreateTask'));
 const EditTask = lazy(() => import('../pages/EditTask'));
@@ -146,6 +146,7 @@ export default function AppRoutes() {
         <Route path="/admin/tenants/:id/settings" element={<ProtectedRouteWrapper allowedRoles={['admin']}><TenantCollaborationSettings /></ProtectedRouteWrapper>} />
         <Route path="/admin/tenants/:id/usage" element={<ProtectedRouteWrapper allowedRoles={['admin']}><TenantUsageDashboard /></ProtectedRouteWrapper>} />
         <Route path="/workspaces" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager']}><Workspaces /></ProtectedRouteWrapper>} />
+        <Route path="/workspaces/new" element={<Navigate to="/workspaces" replace />} />
         <Route path="/workspaces/:workspaceId" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager']}><WorkspaceDetails /></ProtectedRouteWrapper>} />
         <Route path="/workspaces/:workspaceId/tasks/:taskId" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager', 'employee']}><WorkspaceTaskDetailPage /></ProtectedRouteWrapper>} />
         <Route path="/workspaces/:id/members" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager']}><WorkspaceMembers /></ProtectedRouteWrapper>} />

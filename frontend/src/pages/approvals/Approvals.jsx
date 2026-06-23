@@ -8,10 +8,9 @@ import ErrorMessage from '../../components/common/ErrorMessage';
 import EmptyState from '../../components/common/EmptyState';
 import ApprovalCard from '../../components/approvals/ApprovalCard';
 import ApprovalActions from '../../components/approvals/ApprovalActions';
-import ConfirmModal from '../../components/common/ConfirmModal';
 import FilterBar from '../../components/common/FilterBar';
 import { Modal } from '../../components/ui';
-import { FiCheckCircle, FiHistory } from 'react-icons/fi';
+import { FiCheckCircle, FiRotateCcw } from 'react-icons/fi';
 import * as approvalsApi from '../../api/approvals';
 
 export default function Approvals() {
@@ -19,7 +18,6 @@ export default function Approvals() {
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState({});
   const [selectedApproval, setSelectedApproval] = useState(null);
-  const [showConfirm, setShowConfirm] = useState(null);
 
   const { data: approvals, isLoading, error, refetch } = useQuery({
     queryKey: ['approvals', filters],
@@ -27,7 +25,7 @@ export default function Approvals() {
   });
 
   const actionMutation = useMutation({
-    mutationFn: ({ id, action, comment }) => approvalsApi.updateApproval(id, { status: action, comment }),
+    mutationFn: ({ id, action, comment }) => approvalsApi.updateApproval(id, action, comment),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['approvals'] });
       setSelectedApproval(null);
@@ -66,7 +64,7 @@ export default function Approvals() {
             onClick={() => navigate('/approvals/history')}
             className="btn-secondary"
           >
-            <FiHistory className="w-4 h-4" /> History
+            <FiRotateCcw className="w-4 h-4" /> History
           </button>
         }
       />

@@ -22,7 +22,7 @@ export default function ApprovalActions({ approvalId, onAction, loading = false 
   const actions = [
     { key: 'approved', label: 'Approve', icon: FiCheck, className: 'btn-success' },
     { key: 'rejected', label: 'Reject', icon: FiX, className: 'btn-danger' },
-    { key: 'on_hold', label: 'Hold', icon: FiPause, className: 'btn-secondary' },
+    { key: 'hold', label: 'Hold', icon: FiPause, className: 'btn-secondary' },
   ];
 
   return (

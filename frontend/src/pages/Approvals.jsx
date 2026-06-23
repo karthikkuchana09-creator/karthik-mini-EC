@@ -201,6 +201,26 @@ function Approvals() {
                       </div>
                     </td>
                   </tr>
+                ) : error ? (
+                  <tr>
+                    <td colSpan="6" className="px-6 py-16 text-center">
+                      <div className="flex flex-col items-center gap-3">
+                        <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mx-auto">
+                          <svg className="w-6 h-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </div>
+                        <p className="text-sm font-semibold text-red-700">Failed to load approvals</p>
+                        <p className="text-xs text-red-500 mt-1">{error}</p>
+                        <button
+                          onClick={() => window.location.reload()}
+                          className="mt-2 inline-flex items-center px-3 py-1.5 text-xs font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-colors"
+                        >
+                          Retry
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
                 ) : approvals.length === 0 ? (
                   <tr>
                     <td colSpan="6" className="px-6 py-16 text-center">
