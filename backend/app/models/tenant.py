@@ -12,6 +12,9 @@ if TYPE_CHECKING:
     from app.models.tenant_collaboration_usage import TenantCollaborationUsage
     from app.models.workspace import Workspace
     from app.models.channel import Channel
+    from app.models.team import Team
+    from app.models.project import Project
+    from app.models.meeting import Meeting
 
 
 class TenantStatus(str, enum.Enum):
@@ -44,3 +47,6 @@ class Tenant(Base):
     )
     workspaces: Mapped[list["Workspace"]] = relationship(back_populates="tenant")
     channels: Mapped[list["Channel"]] = relationship(back_populates="tenant")
+    teams: Mapped[list["Team"]] = relationship(back_populates="tenant")
+    projects: Mapped[list["Project"]] = relationship(back_populates="tenant")
+    meetings: Mapped[list["Meeting"]] = relationship(back_populates="tenant")

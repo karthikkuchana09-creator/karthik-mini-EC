@@ -16,6 +16,8 @@ if TYPE_CHECKING:
     from app.models.approval import Approval
     from app.models.workspace_message import WorkspaceMessage
     from app.models.channel_message import ChannelMessage
+    from app.models.team import Team
+    from app.models.project import Project
 
 
 class WorkspaceVisibility(str, enum.Enum):
@@ -58,3 +60,5 @@ class Workspace(TenantMixin, Base):
     approvals: Mapped[list["Approval"]] = relationship(back_populates="workspace")
     workspace_messages: Mapped[list["WorkspaceMessage"]] = relationship(back_populates="workspace")
     channel_messages: Mapped[list["ChannelMessage"]] = relationship(back_populates="workspace")
+    teams: Mapped[list["Team"]] = relationship(back_populates="workspace")
+    projects: Mapped[list["Project"]] = relationship(back_populates="workspace")

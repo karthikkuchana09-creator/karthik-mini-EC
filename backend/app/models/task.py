@@ -10,6 +10,8 @@ if TYPE_CHECKING:
     from app.models.workspace import Workspace
     from app.models.channel import Channel
     from app.models.task_document import TaskDocument
+    from app.models.project import Project
+    from app.models.team import Team
 
 
 class Task(TenantMixin, Base):
@@ -35,6 +37,8 @@ class Task(TenantMixin, Base):
 
     workspace_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("workspaces.id", ondelete="SET NULL"), nullable=True, index=True)
     channel_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("channels.id", ondelete="SET NULL"), nullable=True, index=True)
+    project_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("projects.id", ondelete="SET NULL"), nullable=True, index=True)
+    team_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("teams.id", ondelete="SET NULL"), nullable=True, index=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), index=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), onupdate=func.now())
@@ -63,6 +67,8 @@ class Task(TenantMixin, Base):
 
     workspace: Mapped[Optional["Workspace"]] = relationship(back_populates="tasks")
     channel: Mapped[Optional["Channel"]] = relationship(back_populates="tasks")
+    project: Mapped[Optional["Project"]] = relationship(back_populates="tasks")
+    team: Mapped[Optional["Team"]] = relationship(back_populates="tasks")
 
     documents: Mapped[list["Document"]] = relationship("Document", back_populates="task")
     task_documents: Mapped[list["TaskDocument"]] = relationship(back_populates="task")

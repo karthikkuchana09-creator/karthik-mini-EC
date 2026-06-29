@@ -1,19 +1,15 @@
-from typing import Optional, Literal
+from typing import Optional
 from datetime import datetime
 from pydantic import BaseModel, Field, field_validator
 from app.core.validators import string_length
 from app.core.sanitizer import sanitize_text
 
-ChannelTypeEnum = Literal["PUBLIC", "PRIVATE", "ANNOUNCEMENT", "PROJECT"]
 
-
-class ChannelCreate(BaseModel):
+class TeamCreate(BaseModel):
     tenant_id: int
     workspace_id: int
     name: str
     description: Optional[str] = None
-    channel_type: ChannelTypeEnum = "PUBLIC"
-    project_id: Optional[int] = None
     created_by: int
 
     @field_validator("name")
@@ -29,11 +25,9 @@ class ChannelCreate(BaseModel):
         return v
 
 
-class ChannelUpdate(BaseModel):
+class TeamUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     description: Optional[str] = None
-    channel_type: Optional[ChannelTypeEnum] = None
-    project_id: Optional[int] = None
 
     @field_validator("description", mode="before")
     @classmethod
@@ -43,16 +37,13 @@ class ChannelUpdate(BaseModel):
         return v
 
 
-class ChannelResponse(BaseModel):
+class TeamResponse(BaseModel):
     id: int
     tenant_id: int
     workspace_id: int
     name: str
     description: Optional[str] = None
-    channel_type: ChannelTypeEnum
-    project_id: Optional[int] = None
-    created_by: int
-    is_archived: bool
+    created_by: Optional[int] = None
     created_at: datetime
     updated_at: datetime
 

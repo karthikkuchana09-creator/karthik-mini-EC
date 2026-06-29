@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi_pagination import add_pagination
-from app.routes import auth, tasks, users, comments, approvals, dashboard, documents, audit_logs, notifications, ai, leaves, organizations, subscription, credits, usage, payments, webhooks, billing, super_admin, monitoring, sla_rules, sla_tracking, approval_escalations, approval_delegations, notification_preferences as notification_prefs_router, tenants, tenant_onboarding, tenant_collaboration_settings, tenant_collaboration_usage, workspaces, workspace_members, channels, workspace_channels, channel_members, saas_dashboard, workspace_messages, channel_messages, workspace_tasks, channel_tasks, task_documents_route as task_documents, approval_documents_route as approval_documents
+from app.routes import auth, tasks, users, comments, approvals, dashboard, documents, audit_logs, notifications, ai, leaves, organizations, subscription, credits, usage, payments, webhooks, billing, super_admin, monitoring, sla_rules, sla_tracking, approval_escalations, approval_delegations, notification_preferences as notification_prefs_router, tenants, tenant_onboarding, tenant_collaboration_settings, tenant_collaboration_usage, workspaces, workspace_members, channels, workspace_channels, channel_members, saas_dashboard, workspace_messages, channel_messages, workspace_tasks, channel_tasks, task_documents_route as task_documents, approval_documents_route as approval_documents, teams, team_members, projects, project_teams, project_channels, project_tasks, project_documents, project_meetings, meeting_attendees, meeting_notes, ai_meeting_summaries, project_calendar, team_workload, project_workload
 from app.websocket.routes import router as ws_router
 from app.websocket.manager import manager
 from app.websocket.pubsub import ws_pubsub
@@ -119,6 +119,20 @@ app.include_router(workspace_tasks.router)
 app.include_router(channel_tasks.router)
 app.include_router(task_documents.router)
 app.include_router(approval_documents.router)
+app.include_router(teams.router)
+app.include_router(team_members.router)
+app.include_router(projects.router)
+app.include_router(project_teams.router)
+app.include_router(project_channels.router)
+app.include_router(project_tasks.router)
+app.include_router(project_documents.router)
+app.include_router(project_meetings.router)
+app.include_router(meeting_attendees.router)
+app.include_router(meeting_notes.router)
+app.include_router(ai_meeting_summaries.router)
+app.include_router(project_calendar.router)
+app.include_router(team_workload.router)
+app.include_router(project_workload.router)
 
 add_pagination(app)
 logger.info("Application started")

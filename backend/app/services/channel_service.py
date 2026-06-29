@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session, joinedload
 from fastapi import HTTPException, status
 from app.models.tenant import Tenant
 from app.models.workspace import Workspace
+from app.models.project import Project
 from app.models.channel import Channel, ChannelType
 from app.models.tenant_collaboration_settings import TenantCollaborationSettings
 from app.schemas.channel import ChannelCreate, ChannelUpdate
@@ -40,6 +41,29 @@ def _get_channel_or_404(db: Session, channel_id: int) -> Channel:
             detail="Channel not found",
         )
     return channel
+
+
+def _get_project_or_404(db: Session, project_id: int) -> Project:
+    project = db.scalar(select(Project).where(Project.id == project_id))
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Project not found",
+        )
+    return project
+
+
+def _validate_same_workspace_and_tenant(channel: Channel, project: Project) -> None:
+    if channel.workspace_id != project.workspace_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Channel and project must belong to the same workspace",
+        )
+    if channel.tenant_id != project.tenant_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Channel and project must belong to the same tenant",
+        )
 
 
 def _check_channel_limit(db: Session, workspace_id: int) -> None:
@@ -93,12 +117,26 @@ def create_channel(db: Session, data: ChannelCreate) -> Channel:
 
     _check_channel_limit(db, data.workspace_id)
 
+    if data.project_id is not None:
+        project = _get_project_or_404(db, data.project_id)
+        if project.tenant_id != data.tenant_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Project does not belong to this tenant",
+            )
+        if project.workspace_id != data.workspace_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Project does not belong to this workspace",
+            )
+
     channel = Channel(
         tenant_id=data.tenant_id,
         workspace_id=data.workspace_id,
         name=data.name,
         description=data.description,
         channel_type=ChannelType(data.channel_type),
+        project_id=data.project_id,
         created_by=data.created_by,
     )
     db.add(channel)
@@ -187,3 +225,46 @@ def restore_channel(db: Session, channel_id: int) -> Channel:
     db.refresh(channel)
     logger.info("Restored channel id=%d", channel.id)
     return channel
+
+
+def link_channel_to_project(db: Session, channel_id: int, project_id: int) -> Channel:
+    channel = _get_channel_or_404(db, channel_id)
+    project = _get_project_or_404(db, project_id)
+    _validate_same_workspace_and_tenant(channel, project)
+
+    channel.project_id = project_id
+    db.commit()
+    db.refresh(channel)
+    logger.info("Linked channel id=%d to project id=%d", channel_id, project_id)
+    return channel
+
+
+def remove_channel_from_project(db: Session, channel_id: int) -> Channel:
+    channel = _get_channel_or_404(db, channel_id)
+    if channel.project_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Channel is not linked to any project",
+        )
+    channel.project_id = None
+    db.commit()
+    db.refresh(channel)
+    logger.info("Removed channel id=%d from project", channel_id)
+    return channel
+
+
+def list_channels_by_project(
+    db: Session, project_id: int,
+    include_archived: bool = False,
+) -> list[Channel]:
+    _get_project_or_404(db, project_id)
+
+    stmt = (
+        select(Channel)
+        .where(Channel.project_id == project_id)
+        .order_by(Channel.created_at.asc())
+    )
+    if not include_archived:
+        stmt = stmt.where(Channel.is_archived == False)
+
+    return list(db.scalars(stmt).all())

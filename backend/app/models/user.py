@@ -24,6 +24,13 @@ if TYPE_CHECKING:
     from app.models.channel_message import ChannelMessage
     from app.models.task_document import TaskDocument
     from app.models.approval_document import ApprovalDocument
+    from app.models.team import Team
+    from app.models.team_member import TeamMember
+    from app.models.project import Project
+    from app.models.project_document import ProjectDocument
+    from app.models.meeting import Meeting
+    from app.models.meeting_attendee import MeetingAttendee
+    from app.models.meeting_note import MeetingNote
 
 
 class UserRole(str, enum.Enum):
@@ -123,4 +130,20 @@ class User(Base):
     )
     approval_documents: Mapped[list["ApprovalDocument"]] = relationship(
         "ApprovalDocument", back_populates="uploader"
+    )
+
+    teams: Mapped[list["Team"]] = relationship("Team", back_populates="creator")
+    team_memberships: Mapped[list["TeamMember"]] = relationship(
+        "TeamMember", back_populates="user"
+    )
+    projects: Mapped[list["Project"]] = relationship("Project", back_populates="creator")
+    project_documents: Mapped[list["ProjectDocument"]] = relationship(
+        "ProjectDocument", back_populates="uploader"
+    )
+    meetings: Mapped[list["Meeting"]] = relationship("Meeting", back_populates="creator")
+    meeting_attendances: Mapped[list["MeetingAttendee"]] = relationship(
+        "MeetingAttendee", back_populates="user"
+    )
+    meeting_notes: Mapped[list["MeetingNote"]] = relationship(
+        "MeetingNote", back_populates="creator"
     )

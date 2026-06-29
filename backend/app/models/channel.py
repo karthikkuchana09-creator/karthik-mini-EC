@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from app.models.task import Task
     from app.models.approval import Approval
     from app.models.channel_message import ChannelMessage
+    from app.models.project import Project
 
 
 class ChannelType(str, enum.Enum):
@@ -42,6 +43,9 @@ class Channel(TenantMixin, Base):
     created_by: Mapped[int] = mapped_column(
         Integer, ForeignKey("users.id", ondelete="CASCADE")
     )
+    project_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("projects.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     is_archived: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
@@ -50,6 +54,7 @@ class Channel(TenantMixin, Base):
 
     tenant: Mapped["Tenant"] = relationship(back_populates="channels")
     workspace: Mapped["Workspace"] = relationship(back_populates="channels")
+    project: Mapped[Optional["Project"]] = relationship(back_populates="channels")
     creator: Mapped["User"] = relationship(back_populates="created_channels")
     members: Mapped[list["ChannelMember"]] = relationship(back_populates="channel")
     tasks: Mapped[list["Task"]] = relationship(back_populates="channel")
