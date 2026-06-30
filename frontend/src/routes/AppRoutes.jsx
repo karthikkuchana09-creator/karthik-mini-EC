@@ -65,10 +65,18 @@ const ChannelDetails = lazy(() => import('../pages/channels/ChannelDetails'));
 const ChannelMsg = lazy(() => import('../pages/channels/ChannelMessages'));
 const ChannelMsgTasks = lazy(() => import('../pages/channels/ChannelTasks'));
 const ChannelMsgDocs = lazy(() => import('../pages/channels/ChannelDocuments'));
-const WorkspaceTaskDetailPage = lazy(() => import('../pages/tasks/WorkspaceTaskDetails'));
-const ChannelTaskDetailPage = lazy(() => import('../pages/tasks/ChannelTaskDetails'));
-const TaskDocPage = lazy(() => import('../pages/tasks/TaskDocuments'));
-const ApprovalDocPage = lazy(() => import('../pages/approvals/ApprovalDocuments'));
+  const WorkspaceTaskDetailPage = lazy(() => import('../pages/tasks/WorkspaceTaskDetails'));
+  const ChannelTaskDetailPage = lazy(() => import('../pages/tasks/ChannelTaskDetails'));
+  const TaskDocPage = lazy(() => import('../pages/tasks/TaskDocuments'));
+  const ApprovalDocPage = lazy(() => import('../pages/approvals/ApprovalDocuments'));
+
+// Phase 10C — Collaboration Hierarchy Extension
+const Phase10CTeamsPage = lazy(() => import('../pages/phase10c/TeamsPage'));
+const Phase10CTeamDetailPage = lazy(() => import('../pages/phase10c/TeamDetailPage'));
+const Phase10CTeamWorkloadPage = lazy(() => import('../pages/phase10c/TeamWorkloadPage'));
+const Phase10CProjectsPage = lazy(() => import('../pages/phase10c/Projects'));
+const Phase10CProjectDetailPage = lazy(() => import('../pages/phase10c/ProjectDetailPage'));
+const WorkspaceTeams = lazy(() => import('../pages/phase10c/Teams'));
 
 function PageLoader() {
   return (
@@ -150,6 +158,7 @@ export default function AppRoutes() {
         <Route path="/workspaces/:workspaceId" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager']}><WorkspaceDetails /></ProtectedRouteWrapper>} />
         <Route path="/workspaces/:workspaceId/tasks/:taskId" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager', 'employee']}><WorkspaceTaskDetailPage /></ProtectedRouteWrapper>} />
         <Route path="/workspaces/:id/members" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager']}><WorkspaceMembers /></ProtectedRouteWrapper>} />
+        <Route path="/workspaces/:workspaceId/teams" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager', 'employee']}><WorkspaceTeams /></ProtectedRouteWrapper>} />
         <Route path="/channels" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager', 'employee']}><Channels /></ProtectedRouteWrapper>} />
         <Route path="/channels/:channelId" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager', 'employee']}><ChannelDetails /></ProtectedRouteWrapper>} />
         <Route path="/channels/:channelId/tasks/:taskId" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager', 'employee']}><ChannelTaskDetailPage /></ProtectedRouteWrapper>} />
@@ -171,6 +180,13 @@ export default function AppRoutes() {
         <Route path="/channel-list/:channelId/tasks/:taskId" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager', 'employee']}><ChannelTaskDetailPage /></ProtectedRouteWrapper>} />
         <Route path="/channel-list/:channelId/tasks/:taskId/documents" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager', 'employee']}><TaskDocPage /></ProtectedRouteWrapper>} />
         <Route path="/approvals/:approvalId/documents" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager']}><ApprovalDocPage /></ProtectedRouteWrapper>} />
+
+        {/* Phase 10C — Collaboration Hierarchy Extension */}
+        <Route path="/teams" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager', 'employee']}><Phase10CTeamsPage /></ProtectedRouteWrapper>} />
+        <Route path="/teams/:teamId" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager', 'employee']}><Phase10CTeamDetailPage /></ProtectedRouteWrapper>} />
+        <Route path="/teams/:teamId/workload" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager', 'employee']}><Phase10CTeamWorkloadPage /></ProtectedRouteWrapper>} />
+        <Route path="/projects" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager', 'employee']}><Phase10CProjectsPage /></ProtectedRouteWrapper>} />
+        <Route path="/projects/:projectId" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager', 'employee']}><Phase10CProjectDetailPage /></ProtectedRouteWrapper>} />
         <Route path="/organization" element={<ProtectedRouteWrapper><OrganizationManagement /></ProtectedRouteWrapper>} />
         <Route path="/pricing" element={<ProtectedRouteWrapper><PricingPage /></ProtectedRouteWrapper>} />
         <Route path="/credits" element={<ProtectedRouteWrapper><CreditDashboard /></ProtectedRouteWrapper>} />

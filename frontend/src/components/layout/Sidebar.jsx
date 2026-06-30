@@ -28,6 +28,10 @@ import {
   FiLayers,
   FiHash,
   FiServer,
+  FiFolder,
+  FiInfo,
+  FiVideo,
+  FiMessageSquare,
 } from 'react-icons/fi';
 
 const sections = [
@@ -76,6 +80,25 @@ const sections = [
       { to: '/channels', label: 'Channels', icon: FiHash, roles: ['admin', 'manager', 'employee'] },
       { to: '/tasks', label: 'My Channel Tasks', icon: FiCheckSquare, roles: ['admin', 'manager', 'employee'] },
       { to: '/documents', label: 'Channel Documents', icon: FiFile, roles: ['admin', 'manager', 'employee', 'viewer'] },
+    ],
+  },
+  {
+    label: 'TEAMS & PROJECTS',
+    roles: ['admin', 'manager', 'employee', 'viewer'],
+    items: [
+      { to: '/teams', label: 'Teams', icon: FiUsers, roles: ['admin', 'manager', 'employee'] },
+      {
+        to: '/projects', label: 'Projects', icon: FiFolder, roles: ['admin', 'manager', 'employee', 'viewer'],
+        children: [
+          { label: 'Project Details', icon: FiInfo },
+          { label: 'Teams', icon: FiUsers },
+          { label: 'Channels', icon: FiMessageSquare },
+          { label: 'Tasks', icon: FiCheckSquare },
+          { label: 'Documents', icon: FiFile },
+          { label: 'Meetings', icon: FiVideo },
+          { label: 'Calendar', icon: FiCalendar },
+        ],
+      },
     ],
   },
   {
@@ -171,6 +194,64 @@ export default function Sidebar({ open, collapsed, onClose, onToggleCollapse }) 
                 <div className="space-y-0.5">
                   {visible.map((item) => {
                     const Icon = item.icon;
+                    if (item.children) {
+                      return (
+                        <div key={item.to}>
+                          <NavLink
+                            to={item.to}
+                            end={item.to === '/dashboard'}
+                            onClick={onClose}
+                            className={({ isActive }) =>
+                              `group relative flex items-center rounded-xl text-sm font-medium transition-all duration-200 ${
+                                collapsed ? 'justify-center w-full h-10' : 'gap-3 px-3 py-2.5'
+                              } ${
+                                isActive
+                                  ? 'bg-indigo-600/20 text-indigo-300 shadow-sm shadow-indigo-500/10'
+                                  : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/60'
+                              }`
+                            }
+                          >
+                            {({ isActive }) => (
+                              <>
+                                {isActive && !collapsed && (
+                                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-indigo-400 rounded-r-full shadow-sm shadow-indigo-400/40" />
+                                )}
+                                {isActive && collapsed && (
+                                  <span className="absolute inset-0 rounded-xl ring-1 ring-indigo-500/40" />
+                                )}
+                                <Icon className={`w-5 h-5 shrink-0 transition-transform duration-200 ${isActive ? '' : 'group-hover:scale-110'}`} />
+                                <span className={`truncate transition-all duration-300 ${collapsed ? 'w-0 opacity-0 overflow-hidden' : 'w-auto opacity-100'}`}>
+                                  {item.label}
+                                </span>
+                                {isActive && !collapsed && (
+                                  <span className="ml-auto w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse opacity-60" />
+                                )}
+                                {collapsed && (
+                                  <div className="absolute left-full ml-3 px-2.5 py-1.5 bg-gray-800 text-gray-200 text-xs font-medium rounded-lg shadow-xl border border-gray-700 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap z-50 pointer-events-none">
+                                    {item.label}
+                                    <div className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-gray-800" />
+                                  </div>
+                                )}
+                              </>
+                            )}
+                          </NavLink>
+                          {!collapsed && (
+                            <div className="ml-5 mt-0.5 space-y-0.5 pl-3 border-l border-gray-800/60">
+                              {item.children.map((child) => {
+                                const ChildIcon = child.icon;
+                                return (
+                                  <div key={child.label}
+                                    className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-[11px] text-gray-500 cursor-default">
+                                    <ChildIcon className="w-3.5 h-3.5 text-gray-600 shrink-0" />
+                                    <span className="truncate">{child.label}</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }
                     return (
                       <NavLink
                         key={item.to}
@@ -195,12 +276,8 @@ export default function Sidebar({ open, collapsed, onClose, onToggleCollapse }) 
                             {isActive && collapsed && (
                               <span className="absolute inset-0 rounded-xl ring-1 ring-indigo-500/40" />
                             )}
-                            <Icon className={`w-5 h-5 shrink-0 transition-transform duration-200 ${
-                              isActive ? '' : 'group-hover:scale-110'
-                            }`} />
-                            <span className={`truncate transition-all duration-300 ${
-                              collapsed ? 'w-0 opacity-0 overflow-hidden' : 'w-auto opacity-100'
-                            }`}>
+                            <Icon className={`w-5 h-5 shrink-0 transition-transform duration-200 ${isActive ? '' : 'group-hover:scale-110'}`} />
+                            <span className={`truncate transition-all duration-300 ${collapsed ? 'w-0 opacity-0 overflow-hidden' : 'w-auto opacity-100'}`}>
                               {item.label}
                             </span>
                             {isActive && !collapsed && (
