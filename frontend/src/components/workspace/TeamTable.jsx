@@ -1,6 +1,8 @@
 import DataTable from '../common/DataTable';
 
-export default function TeamTable({ teams, loading, onView, onEdit, onArchive }) {
+import { FiRotateCcw } from 'react-icons/fi';
+
+export default function TeamTable({ teams, loading, onView, onEdit, onArchive, onRestore }) {
   const columns = [
     {
       Header: 'Name',
@@ -32,6 +34,12 @@ export default function TeamTable({ teams, loading, onView, onEdit, onArchive })
           </span>
         );
       },
+    },
+    {
+      Header: 'Lead',
+      accessor: 'lead',
+      width: '130px',
+      Cell: ({ value }) => value || '-',
     },
     {
       Header: 'Members',
@@ -68,7 +76,15 @@ export default function TeamTable({ teams, loading, onView, onEdit, onArchive })
                 Edit
               </button>
             )}
-            {!isArchived && (
+            {isArchived ? (
+              <button
+                onClick={(e) => { e.stopPropagation(); onRestore?.(row); }}
+                className="px-2 py-1 text-xs font-medium text-gray-600 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
+              >
+                <FiRotateCcw className="w-3 h-3 inline mr-0.5" />
+                Restore
+              </button>
+            ) : (
               <button
                 onClick={(e) => { e.stopPropagation(); onArchive(row); }}
                 className="px-2 py-1 text-xs font-medium text-gray-600 hover:text-amber-600 hover:bg-amber-50 rounded transition-colors"

@@ -40,8 +40,10 @@ export default function Teams() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
+  const [showRestoreConfirm, setShowRestoreConfirm] = useState(false);
   const [selectedTeam, setSelectedTeam] = useState(null);
   const [archiving, setArchiving] = useState(false);
+  const [restoring, setRestoring] = useState(false);
 
   const fetchTeams = useCallback(async () => {
     setLoading(true);
@@ -114,6 +116,27 @@ export default function Teams() {
       toast.error(getErrorMessage(err, 'Failed to archive team'));
     } finally {
       setArchiving(false);
+    }
+  }
+
+  function openRestore(team) {
+    setSelectedTeam(team);
+    setShowRestoreConfirm(true);
+  }
+
+  async function handleRestore() {
+    if (!selectedTeam) return;
+    setRestoring(true);
+    try {
+      await teamService.restoreWorkspaceTeam(wId, selectedTeam.id);
+      toast.success('Team restored successfully');
+      setShowRestoreConfirm(false);
+      setSelectedTeam(null);
+      fetchTeams();
+    } catch (err) {
+      toast.error(getErrorMessage(err, 'Failed to restore team'));
+    } finally {
+      setRestoring(false);
     }
   }
 
@@ -246,6 +269,7 @@ export default function Teams() {
               onView={handleView}
               onEdit={openEdit}
               onArchive={openArchive}
+              onRestore={openRestore}
             />
           ))}
         </div>
@@ -256,6 +280,7 @@ export default function Teams() {
           onView={handleView}
           onEdit={openEdit}
           onArchive={openArchive}
+          onRestore={openRestore}
         />
       )}
 
@@ -281,10 +306,21 @@ export default function Teams() {
         onClose={() => { setShowArchiveConfirm(false); setSelectedTeam(null); }}
         onConfirm={handleArchive}
         title="Archive Team"
-        message={`Are you sure you want to archive "${selectedTeam?.name}"? This will not delete the team, but it will be hidden from active views.`}
+        message={`Are you sure you want to archive "${selectedTeam?.name}"? It can be restored later.`}
         confirmText={archiving ? 'Archiving...' : 'Archive Team'}
         loading={archiving}
         variant="warning"
+      />
+
+      <ConfirmModal
+        isOpen={showRestoreConfirm}
+        onClose={() => { setShowRestoreConfirm(false); setSelectedTeam(null); }}
+        onConfirm={handleRestore}
+        title="Restore Team"
+        message={`Restore "${selectedTeam?.name}" to active status?`}
+        confirmText={restoring ? 'Restoring...' : 'Restore Team'}
+        loading={restoring}
+        variant="primary"
       />
     </div>
   );

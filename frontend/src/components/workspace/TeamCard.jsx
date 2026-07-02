@@ -1,7 +1,7 @@
-import { FiUsers, FiEdit2, FiArchive, FiEye, FiCalendar } from 'react-icons/fi';
+import { FiUsers, FiEdit2, FiArchive, FiRotateCcw, FiEye, FiCalendar } from 'react-icons/fi';
 import { CARD_CLASSES } from '../../config/ui';
 
-export default function TeamCard({ team, onView, onEdit, onArchive }) {
+export default function TeamCard({ team, onView, onEdit, onArchive, onRestore }) {
   const isArchived = team.status === 'archived';
 
   return (
@@ -12,6 +12,7 @@ export default function TeamCard({ team, onView, onEdit, onArchive }) {
         </div>
         <div className="flex-1 min-w-0">
           <h3 className="text-sm font-semibold text-gray-900 truncate">{team.name}</h3>
+          {team.lead && <p className="text-[11px] text-gray-500 truncate mt-0.5">Lead: {team.lead}</p>}
           <div className="flex items-center gap-2 mt-1">
             <span
               className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${
@@ -63,19 +64,25 @@ export default function TeamCard({ team, onView, onEdit, onArchive }) {
             Edit
           </button>
         )}
-        <button
-          onClick={() => onArchive(team)}
-          className={`inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors ${
-            isArchived
-              ? 'text-gray-400 cursor-not-allowed'
-              : 'text-gray-600 hover:text-amber-600 hover:bg-amber-50'
-          }`}
-          title={isArchived ? 'Already archived' : 'Archive team'}
-          disabled={isArchived}
-        >
-          <FiArchive className="w-3.5 h-3.5" />
-          {isArchived ? 'Archived' : 'Archive'}
-        </button>
+        {isArchived ? (
+          <button
+            onClick={() => onRestore?.(team)}
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-md transition-colors"
+            title="Restore team"
+          >
+            <FiRotateCcw className="w-3.5 h-3.5" />
+            Restore
+          </button>
+        ) : (
+          <button
+            onClick={() => onArchive(team)}
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:text-amber-600 hover:bg-amber-50 rounded-md transition-colors"
+            title="Archive team"
+          >
+            <FiArchive className="w-3.5 h-3.5" />
+            Archive
+          </button>
+        )}
       </div>
     </div>
   );

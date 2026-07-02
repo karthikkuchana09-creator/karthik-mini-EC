@@ -159,6 +159,7 @@ export default function AppRoutes() {
         <Route path="/workspaces/:workspaceId/tasks/:taskId" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager', 'employee']}><WorkspaceTaskDetailPage /></ProtectedRouteWrapper>} />
         <Route path="/workspaces/:id/members" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager']}><WorkspaceMembers /></ProtectedRouteWrapper>} />
         <Route path="/workspaces/:workspaceId/teams" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager', 'employee']}><WorkspaceTeams /></ProtectedRouteWrapper>} />
+        <Route path="/workspaces/:workspaceId/teams/:teamId" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager', 'employee']}><Phase10CTeamDetailPage /></ProtectedRouteWrapper>} />
         <Route path="/channels" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager', 'employee']}><Channels /></ProtectedRouteWrapper>} />
         <Route path="/channels/:channelId" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager', 'employee']}><ChannelDetails /></ProtectedRouteWrapper>} />
         <Route path="/channels/:channelId/tasks/:taskId" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager', 'employee']}><ChannelTaskDetailPage /></ProtectedRouteWrapper>} />
