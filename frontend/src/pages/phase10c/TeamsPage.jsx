@@ -50,13 +50,13 @@ export default function TeamsPage() {
   const filtered = teams.filter((t) => {
     const q = search.toLowerCase();
     if (q && !t.name?.toLowerCase().includes(q) && !t.description?.toLowerCase().includes(q)) return false;
-    if (filter === 'active') return t.status !== 'archived';
-    if (filter === 'archived') return t.status === 'archived';
+    if (filter === 'active') return !t.is_archived;
+    if (filter === 'archived') return t.is_archived;
     return true;
   });
 
-  const activeCount = teams.filter((t) => t.status !== 'archived').length;
-  const archivedCount = teams.filter((t) => t.status === 'archived').length;
+  const activeCount = teams.filter((t) => !t.is_archived).length;
+  const archivedCount = teams.filter((t) => t.is_archived).length;
 
   const FILTER_TABS = [
     { key: 'all', label: 'All', count: teams.length },
@@ -204,8 +204,7 @@ export default function TeamsPage() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {filtered.map((team) => {
-            const isArchived = team.status === 'archived';
-            const cfg = STATUS_COLORS[isArchived ? 'archived' : 'active'];
+            const cfg = STATUS_COLORS[team.is_archived ? 'archived' : 'active'];
             return (
               <div
                 key={team.id}
@@ -227,7 +226,7 @@ export default function TeamsPage() {
                   <div className="flex items-center gap-2">
                     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${cfg.bg}`}>
                       <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
-                      {isArchived ? 'Archived' : 'Active'}
+                      {team.is_archived ? 'Archived' : 'Active'}
                     </span>
                     {team.member_count !== undefined && (
                       <span className="text-[10px] text-gray-400">{team.member_count} members</span>
@@ -241,7 +240,7 @@ export default function TeamsPage() {
                   >
                     View
                   </Link>
-                  {!isArchived && (
+                  {!team.is_archived && (
                     <button
                       onClick={() => openEdit(team)}
                       className="px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
@@ -249,7 +248,7 @@ export default function TeamsPage() {
                       Edit
                     </button>
                   )}
-                  {isArchived ? (
+                  {team.is_archived ? (
                     <button
                       onClick={() => openRestore(team)}
                       className="px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-md transition-colors"

@@ -2,7 +2,7 @@ import { FiUsers, FiEdit2, FiArchive, FiRotateCcw, FiEye, FiCalendar } from 'rea
 import { CARD_CLASSES } from '../../config/ui';
 
 export default function TeamCard({ team, onView, onEdit, onArchive, onRestore }) {
-  const isArchived = team.status === 'archived';
+  const isArchived = team.is_archived;
 
   return (
     <div className={`${CARD_CLASSES} p-5 group`}>

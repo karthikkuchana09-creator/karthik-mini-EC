@@ -163,9 +163,8 @@ function MembersTab({ teamId, members, onRefresh, teamName }) {
 }
 
 function OverviewTab({ team }) {
-  const isArchived = team.status === 'archived';
   const stats = [
-    { label: 'Status', value: isArchived ? 'Archived' : 'Active' },
+    { label: 'Status', value: team.is_archived ? 'Archived' : 'Active' },
     { label: 'Members', value: team.member_count ?? '-' },
     { label: 'Lead', value: team.lead || 'Not assigned' },
     { label: 'Created', value: team.created_at ? new Date(team.created_at).toLocaleDateString() : '-' },
@@ -383,8 +382,6 @@ export default function TeamDetailPage() {
   if (error) return <div className="page-container max-w-5xl"><EmptyState title="Error" message={error} action={<button onClick={fetchTeam} className="btn-secondary btn-sm">Try Again</button>} /></div>;
   if (!team) return null;
 
-  const isArchived = team.status === 'archived';
-
   return (
     <div className="page-container max-w-5xl">
       <Breadcrumb
@@ -408,10 +405,10 @@ export default function TeamDetailPage() {
               </h1>
               <div className="flex items-center flex-wrap gap-2 mt-2">
                 <span className={`inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-[11px] font-semibold ${
-                  isArchived ? 'bg-gray-400/20 text-gray-200' : 'bg-emerald-400/20 text-emerald-100'
+                  team.is_archived ? 'bg-gray-400/20 text-gray-200' : 'bg-emerald-400/20 text-emerald-100'
                 }`}>
-                  <span className={`w-1.5 h-1.5 rounded-full ${isArchived ? 'bg-gray-300' : 'bg-emerald-300'}`} />
-                  {isArchived ? 'Archived' : 'Active'}
+                  <span className={`w-1.5 h-1.5 rounded-full ${team.is_archived ? 'bg-gray-300' : 'bg-emerald-300'}`} />
+                  {team.is_archived ? 'Archived' : 'Active'}
                 </span>
                 {team.lead && (
                   <span className="inline-flex items-center gap-1 text-[11px] text-white/70">

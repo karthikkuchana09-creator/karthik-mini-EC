@@ -6,11 +6,9 @@ from app.core.sanitizer import sanitize_text
 
 
 class TeamCreate(BaseModel):
-    tenant_id: int
-    workspace_id: int
     name: str
     description: Optional[str] = None
-    created_by: int
+    workspace_id: Optional[int] = None
 
     @field_validator("name")
     @classmethod
@@ -40,10 +38,11 @@ class TeamUpdate(BaseModel):
 class TeamResponse(BaseModel):
     id: int
     tenant_id: int
-    workspace_id: int
+    workspace_id: Optional[int] = None
     name: str
     description: Optional[str] = None
     created_by: Optional[int] = None
+    is_archived: bool = False
     created_at: datetime
     updated_at: datetime
 

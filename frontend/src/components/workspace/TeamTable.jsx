@@ -19,10 +19,10 @@ export default function TeamTable({ teams, loading, onView, onEdit, onArchive, o
     },
     {
       Header: 'Status',
-      accessor: 'status',
+      accessor: 'is_archived',
       width: '100px',
       Cell: ({ value }) => {
-        const isArchived = value === 'archived';
+        const isArchived = value;
         return (
           <span
             className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${
@@ -59,7 +59,7 @@ export default function TeamTable({ teams, loading, onView, onEdit, onArchive, o
       width: '160px',
       disableSortBy: true,
       Cell: ({ row }) => {
-        const isArchived = row.status === 'archived';
+        const isArchived = row.is_archived;
         return (
           <div className="flex items-center gap-1">
             <button

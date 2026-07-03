@@ -64,14 +64,14 @@ export default function Teams() {
   const filtered = teams.filter((t) => {
     const q = search.toLowerCase();
     if (q && !t.name?.toLowerCase().includes(q) && !t.description?.toLowerCase().includes(q)) return false;
-    if (filter === 'active') return t.status !== 'archived';
-    if (filter === 'archived') return t.status === 'archived';
+    if (filter === 'active') return !t.is_archived;
+    if (filter === 'archived') return t.is_archived;
     return true;
   });
 
   async function handleCreate(data) {
     try {
-      await teamService.createWorkspaceTeam(wId, data);
+      await teamService.createTeam({ ...data, workspace_id: wId });
       toast.success('Team created successfully');
       fetchTeams();
     } catch (err) {
@@ -83,7 +83,7 @@ export default function Teams() {
   async function handleEdit(data) {
     if (!selectedTeam) return;
     try {
-      await teamService.updateWorkspaceTeam(wId, selectedTeam.id, data);
+      await teamService.updateTeam(selectedTeam.id, data);
       toast.success('Team updated successfully');
       setSelectedTeam(null);
       fetchTeams();
@@ -107,7 +107,7 @@ export default function Teams() {
     if (!selectedTeam) return;
     setArchiving(true);
     try {
-      await teamService.archiveWorkspaceTeam(wId, selectedTeam.id);
+      await teamService.archiveTeam(selectedTeam.id);
       toast.success('Team archived successfully');
       setShowArchiveConfirm(false);
       setSelectedTeam(null);
@@ -149,8 +149,8 @@ export default function Teams() {
     setSelectedTeam(null);
   }
 
-  const activeCount = teams.filter((t) => t.status !== 'archived').length;
-  const archivedCount = teams.filter((t) => t.status === 'archived').length;
+  const activeCount = teams.filter((t) => !t.is_archived).length;
+  const archivedCount = teams.filter((t) => t.is_archived).length;
 
   return (
     <div className="page-container">

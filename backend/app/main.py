@@ -20,6 +20,7 @@ from app.core.background_tasks import task_queue
 from app.core.redis_client import close as close_redis
 from app.services.enterprise_scheduler import enterprise_scheduler
 from app.services.seed_tenants import seed_example_tenants
+from app.services.seed_technova import seed_technova
 from app.db.session import SessionLocal
 
 setup_logging()
@@ -34,6 +35,7 @@ async def lifespan(app: FastAPI):
     db = SessionLocal()
     try:
         seed_example_tenants(db)
+        seed_technova(db)
     finally:
         db.close()
     manager.start_heartbeat()

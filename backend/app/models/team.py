@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING, Optional
 from datetime import datetime
-from sqlalchemy import String, Integer, DateTime, Text, ForeignKey
+from sqlalchemy import Boolean, String, Integer, DateTime, Text, ForeignKey
 from sqlalchemy.sql import func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
@@ -23,9 +23,10 @@ class Team(TenantMixin, Base):
     __tenant_nullable__ = False
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    workspace_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("workspaces.id", ondelete="CASCADE"), index=True
+    workspace_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("workspaces.id", ondelete="SET NULL"), nullable=True, index=True
     )
+    is_archived: Mapped[bool] = mapped_column(Boolean, default=False)
     name: Mapped[str] = mapped_column(String(255))
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_by: Mapped[Optional[int]] = mapped_column(

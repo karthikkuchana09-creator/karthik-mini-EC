@@ -1,6 +1,8 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 from app.models.project_team import ProjectTeam
+from app.models.team import Team
+from app.models.team_member import TeamMember
 from app.services.business_validation_service import (
     get_project_or_404, get_team_or_404, validate_same_tenant,
     validate_same_workspace, validate_no_duplicate_project_team,
@@ -25,7 +27,14 @@ def assign_team(db: Session, project_id: int, team_id: int) -> ProjectTeam:
     )
     db.add(link)
     db.commit()
-    db.refresh(link)
+
+    link = db.scalar(
+        select(ProjectTeam)
+        .options(
+            selectinload(ProjectTeam.team).selectinload(Team.members).selectinload(TeamMember.user)
+        )
+        .where(ProjectTeam.id == link.id)
+    )
     logger.info(
         "Assigned team id=%d to project id=%d", team_id, project_id,
     )
@@ -37,7 +46,9 @@ def list_assigned_teams(db: Session, project_id: int) -> list[ProjectTeam]:
 
     stmt = (
         select(ProjectTeam)
-        .options(selectinload(ProjectTeam.team))
+        .options(
+            selectinload(ProjectTeam.team).selectinload(Team.members).selectinload(TeamMember.user)
+        )
         .where(ProjectTeam.project_id == project_id)
         .order_by(ProjectTeam.created_at.asc())
     )
