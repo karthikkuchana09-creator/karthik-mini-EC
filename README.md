@@ -131,8 +131,8 @@ A full-stack, multi-tenant enterprise task management platform with role-based a
 **1. Clone the repository**
 
 ```bash
-git clone https://github.com/your-org/karthik-mini-ec.git
-cd karthik-mini-ec
+git clone https://github.com/karthikkuchana09-creator/karthik-mini-EC.git
+cd karthik-mini-EC
 ```
 
 **2. Backend setup**
@@ -150,9 +150,8 @@ env\Scripts\activate
 # Install dependencies
 pip install -r requirements.txt
 
-# Copy and configure environment variables
-cp backend/.env backend/.env.local
-# Edit backend/.env.local with your settings
+# Configure environment variables
+# Edit backend/.env with your database and app settings
 
 # Run database migrations
 cd backend
@@ -240,7 +239,7 @@ karthik-mini-EC/
 │   │   ├── templates/               # Email/invoice templates
 │   │   ├── utils/                   # Helpers
 │   │   └── websocket/               # WS manager, pub/sub, auth
-│   ├── alembic/                     # Database migrations (18 files)
+│   ├── alembic/                     # Database migrations (19 files)
 │   ├── sql/                         # Raw SQL schema & seeds
 │   └── tests/                       # Pytest test suite
 ├── frontend/

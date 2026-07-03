@@ -5,8 +5,17 @@ __pycache__/
 *.so
 .env
 venv/
-env/
 .venv/
+*.egg-info/
+.eggs/
+*.egg
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+.tox/
 
 # Database
 *.db
@@ -27,6 +36,9 @@ Thumbs.db
 node_modules/
 frontend/dist/
 package-lock.json
+
+# Uploads (runtime artifacts)
+backend/uploads/
 
 # Temp scripts
 create_user.py
