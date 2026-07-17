@@ -62,6 +62,15 @@ A full-stack, multi-tenant enterprise task management platform with role-based a
 - **Notification System** — Multi-channel in-app notifications with user preferences
 - **Document Management** — File upload/download with task linking
 
+### Platform Services (Phase 10D)
+- **Workflow Engine** — Configurable multi-stage workflows with rules, triggers, and execution history
+- **Custom Reports** — Saved report builder with filters, group-by, aggregations, and CSV/JSON export
+- **Global Search** — Cross-entity full-text search with filters, saved searches, and ranking
+- **Knowledge Base** — Article management with categories, versioning, and rich content editing
+- **Custom Forms** — Dynamic form builder with field types (text, number, date, select, file), submissions, and responses
+- **Notification Rules** — Configurable trigger-based notification rules for task, approval, meeting, and document events
+- **Analytics Dashboard** — Real-time KPI charts, entity breakdowns, and trend analysis
+
 ---
 
 ## Architecture
@@ -88,8 +97,8 @@ A full-stack, multi-tenant enterprise task management platform with role-based a
 │  ┌────────────┐  ┌──────────┐  ┌────────────┐  ┌───────────────┐  │
 │  │ Middleware  │  │  Routes  │──│  Services  │──│  Repository   │  │
 │  │ Stack:     │  │          │  │ (Business  │  │  (Data        │  │
-│  │ • Audit    │  │  24 REST │  │  Logic)    │  │   Access)     │  │
-│  │ • Logging  │  │  routers │  │  37 files  │  │  14 files     │  │
+│  │ • Audit    │  │  34 REST │  │  Logic)    │  │   Access)     │  │
+│  │ • Logging  │  │  routers │  │  45 files  │  │  21 files     │  │
 │  │ • Tenant   │  │   + WS   │  │            │  │               │  │
 │  │ • Rate     │  │  router  │  │            │  │               │  │
 │  │   Limiter  │  │          │  │            │  │               │  │
@@ -98,7 +107,7 @@ A full-stack, multi-tenant enterprise task management platform with role-based a
 │                                                         ▼          │
 │  ┌──────────────────────────────────────────────────────────────┐   │
 │  │                    Models (SQLAlchemy 2.0)                   │   │
-│  │  24 model files — User, Task, Organization, Approval, ...   │   │
+│  │  38 model files — User, Task, Organization, Approval, ...   │   │
 │  └──────────────────────────────────────────────────────────────┘   │
 │                                                                     │
 │  ┌─────────────┐  ┌──────────────┐  ┌───────────────────────────┐  │
@@ -219,6 +228,17 @@ karthik-mini-EC/
 │   │   │   ├── rules.py             # Rules engine with thresholds
 │   │   │   ├── cache.py             # AI cache warming
 │   │   │   └── scheduler.py         # Periodic AI refresh
+│   │   ├── api/                     # API routers
+│   │   │   ├── platform/            # Phase 10D platform services
+│   │   │   │   ├── workflows.py     # 10 endpoints — CRUD, execute, rules
+│   │   │   │   ├── reports.py       # 11 endpoints — CRUD, data, export
+│   │   │   │   ├── search.py        # 5 endpoints — cross-entity search
+│   │   │   │   ├── knowledge_base.py# 12 endpoints — articles, categories
+│   │   │   │   ├── custom_forms.py  # 12 endpoints — forms, fields, submissions
+│   │   │   │   ├── notification_rules.py # 5 endpoints — rule CRUD
+│   │   │   │   ├── analytics.py     # 5 endpoints — overview, trends
+│   │   │   │   └── saved_searches.py# 4 endpoints — saved search CRUD
+│   │   │   └── ...                  # Other domain routers
 │   │   ├── core/                    # Core infrastructure
 │   │   │   ├── config.py            # Pydantic settings
 │   │   │   ├── security.py          # JWT, bcrypt, OAuth
@@ -228,33 +248,66 @@ karthik-mini-EC/
 │   │   │   ├── cache.py             # Dual backend caching
 │   │   │   ├── exceptions.py        # Structured exception hierarchy
 │   │   │   ├── audit_middleware.py  # Immutable audit logging
+│   │   │   ├── body_size_middleware.py # Request body size limits
+│   │   │   ├── csrf.py             # CSRF token validation
+│   │   │   ├── security_headers.py # Security response headers
+│   │   │   ├── suspicious_activity.py # Suspicious activity detection
 │   │   │   ├── redis_client.py      # Async Redis wrapper
 │   │   │   └── background_tasks.py  # Task queue
 │   │   ├── db/                      # Database session & base
-│   │   ├── models/                  # 24 SQLAlchemy ORM models
-│   │   ├── repository/              # 14 data access layer files
-│   │   ├── routes/                  # 28 route files + deps.py
-│   │   ├── schemas/                 # 20 Pydantic schemas
-│   │   ├── services/                # 37 business logic files
+│   │   ├── models/                  # 38 SQLAlchemy ORM models
+│   │   │   └── platform/            # 14 models — workflows, reports, KB, forms
+│   │   ├── repository/              # 21 data access layer files
+│   │   │   └── platform/            # 7 repositories — platform services
+│   │   ├── routes/                  # Route files + deps.py
+│   │   ├── schemas/                 # Pydantic schemas
+│   │   │   └── platform/            # 8 schema files — platform services
+│   │   ├── services/                # Business logic files
+│   │   │   ├── platform/            # 8 services — platform business logic
+│   │   │   ├── seed_technova.py     # TechNova tenant auto-seeder
+│   │   │   └── enterprise_audit_service.py # Enterprise audit logging
 │   │   ├── templates/               # Email/invoice templates
 │   │   ├── utils/                   # Helpers
 │   │   └── websocket/               # WS manager, pub/sub, auth
-│   ├── alembic/                     # Database migrations (19 files)
+│   ├── alembic/                     # Database migrations
+│   │   └── versions/                # Migration scripts
 │   ├── sql/                         # Raw SQL schema & seeds
+│   │   ├── seed_phase10d.py         # Platform services seed data
+│   │   └── ...                      # Other SQL scripts
 │   └── tests/                       # Pytest test suite
 ├── frontend/
 │   ├── src/
 │   │   ├── main.jsx                 # App entry point
 │   │   ├── App.jsx                  # Root component
-│   │   ├── api/                     # 22 Axios API modules
+│   │   ├── api/                     # 27 Axios API modules
 │   │   ├── app/                     # Global store
-│   │   ├── components/              # UI primitives, layout, guards, etc.
+│   │   ├── components/
+│   │   │   ├── platform/            # Platform UI components
+│   │   │   │   ├── workflows/       # Workflow cards, tables, modals
+│   │   │   │   ├── reports/         # Report builder, filters, preview
+│   │   │   │   ├── search/          # Search bar, filters, results
+│   │   │   │   ├── knowledge-base/  # Article editor, viewer, categories
+│   │   │   │   ├── custom-forms/    # Form builder, field editor, table
+│   │   │   │   ├── notification-rules/ # Rule cards, forms, tables
+│   │   │   │   └── analytics/       # Analytics cards, chart containers
+│   │   │   ├── layout/              # Sidebar, Navbar
+│   │   │   └── ...                  # Other UI components
 │   │   ├── config/                  # Roles, permissions, UI constants
 │   │   ├── context/                 # Auth, Notification, WebSocket
-│   │   ├── hooks/                   # 17 custom hooks
-│   │   ├── pages/                   # 35 page components
+│   │   ├── hooks/
+│   │   │   └── platform/            # Platform-specific query hooks
+│   │   ├── pages/
+│   │   │   ├── platform/            # 8 platform pages
+│   │   │   ├── reports/             # Report builder, list, viewer
+│   │   │   ├── workflows/           # Workflow builder, list, executions
+│   │   │   ├── forms/               # Form builder, list, submissions
+│   │   │   ├── knowledge/           # KB articles, categories, editor
+│   │   │   ├── search/              # Search results page
+│   │   │   └── ...                  # Other pages (35+ total)
 │   │   ├── routes/                  # Lazy-loaded route definitions
-│   │   ├── services/                # TanStack Query hooks + service objects
+│   │   ├── services/
+│   │   │   ├── platform/            # Platform service hooks
+│   │   │   └── ...                  # TanStack Query hooks
 │   │   └── utils/                   # Formatting, error handling, JWT utils
 │   ├── package.json
 │   ├── vite.config.js
@@ -283,6 +336,13 @@ Once running, interactive OpenAPI documentation is available at:
 | **Dashboard** | `GET /dashboard/summary`, `/dashboard/task-distribution`, `/dashboard/approval-stats` | Aggregated stats and KPIs |
 | **AI** | `POST /ai/summary`, `/ai/suggestions`, `/ai/recommendations`, `/ai/performance`, `/ai/workload`, `/ai/delay-risks`, `/ai/productivity`, `/ai/team-intelligence` | AI-powered analytics |
 | **Payments** | `POST /payments/create-order`, `/payments/verify`, `GET /subscription/plans`, `/billing/*` | Razorpay payment processing |
+| **Workflows** | `GET/POST /workflows`, `GET/PUT/DELETE /workflows/{id}`, `POST /workflows/{id}/execute`, `GET /workflows/{id}/executions`, `GET/POST/PUT/DELETE /workflows/{id}/rules` | Configurable multi-stage workflows with rules and execution history |
+| **Reports** | `GET/POST /reports`, `GET/PUT/DELETE /reports/{id}`, `GET /reports/{id}/data`, `GET /reports/{id}/export`, `GET /reports/projects`, `/tasks`, `/approvals`, `/documents` | Saved report builder, ad-hoc entity reports, CSV/JSON export |
+| **Search** | `GET /search` (cross-entity), `GET/POST/DELETE /saved-searches` | Full-text global search with filters and saved searches |
+| **Knowledge Base** | `GET/POST /knowledge/articles`, `GET/PUT/DELETE /knowledge/articles/{id}`, `GET/POST /knowledge/categories` | Article management with categories, versioning |
+| **Custom Forms** | `GET/POST /custom-forms`, `GET/PUT/DELETE /custom-forms/{id}`, `POST /custom-forms/{id}/submit`, `GET /custom-forms/{id}/submissions` | Dynamic form builder with field types and submissions |
+| **Notification Rules** | `GET/POST /notification-rules`, `GET/PUT/DELETE /notification-rules/{id}` | Trigger-based notification configuration |
+| **Analytics** | `GET /analytics/overview`, `/analytics/entities`, `/analytics/trends` | Real-time KPIs, entity breakdowns, trend analysis |
 | **WebSocket** | `ws://localhost:8000/ws?token=<jwt>` | Real-time events (Kanban, tasks, approvals, notifications) |
 
 ---
