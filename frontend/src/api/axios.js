@@ -102,8 +102,30 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
+function useMock() {
+  return import.meta.env.VITE_MOCK_DATA === 'true' || sessionStorage.getItem('useMockData') === 'true';
+}
+
 api.interceptors.request.use(
-  (config) => {
+  async (config) => {
+    if (useMock()) {
+      const { matchMock } = await import('../services/mockData');
+      const method = config.method?.toLowerCase() || 'get';
+      const url = config.url || '';
+      const result = matchMock(method, url, config);
+      if (result) {
+        if (import.meta.env.DEV) console.log(`[MOCK] ${method.toUpperCase()} ${url}`);
+        config.adapter = () => Promise.resolve({
+          data: result.data,
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+          config,
+        });
+        return config;
+      }
+    }
+
     const token = tokenService.getAccessToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;

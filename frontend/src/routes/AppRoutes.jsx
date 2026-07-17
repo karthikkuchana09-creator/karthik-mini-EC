@@ -52,6 +52,25 @@ const Workspaces = lazy(() => import('../pages/workspace/Workspaces'));
 const WorkspaceMembers = lazy(() => import('../pages/workspace/WorkspaceMembers'));
 const Channels = lazy(() => import('../pages/channel/Channels'));
 
+// Custom Forms
+const FormList = lazy(() => import('../pages/forms/FormList'));
+const FormBuilder = lazy(() => import('../pages/forms/FormBuilder'));
+const FormView = lazy(() => import('../pages/forms/FormView'));
+const FormSubmissions = lazy(() => import('../pages/forms/FormSubmissions'));
+
+// Workflows
+const WorkflowList = lazy(() => import('../pages/workflows/WorkflowList'));
+const WorkflowBuilder = lazy(() => import('../pages/workflows/WorkflowBuilder'));
+const WorkflowExecutions = lazy(() => import('../pages/workflows/WorkflowExecutions'));
+
+// Search
+const SearchResults = lazy(() => import('../pages/search/SearchResults'));
+
+// Reports
+const ReportList = lazy(() => import('../pages/reports/ReportList'));
+const ReportBuilder = lazy(() => import('../pages/reports/ReportBuilder'));
+const ReportViewer = lazy(() => import('../pages/reports/ReportViewer'));
+
 
 // Phase 10B — Workspace & Channel Communication
 const WorkspaceList = lazy(() => import('../pages/workspaces/WorkspaceList'));
@@ -70,12 +89,29 @@ const ChannelMsgDocs = lazy(() => import('../pages/channels/ChannelDocuments'));
   const TaskDocPage = lazy(() => import('../pages/tasks/TaskDocuments'));
   const ApprovalDocPage = lazy(() => import('../pages/approvals/ApprovalDocuments'));
 
+// Phase 10D — Platform Services
+const PlatformWorkflows = lazy(() => import('../pages/platform/Workflows'));
+const PlatformNotificationRules = lazy(() => import('../pages/platform/NotificationRules'));
+const PlatformGlobalSearch = lazy(() => import('../pages/platform/GlobalSearch'));
+const PlatformAnalytics = lazy(() => import('../pages/platform/Analytics'));
+const PlatformKnowledgeBase = lazy(() => import('../pages/platform/KnowledgeBase'));
+const PlatformCustomForms = lazy(() => import('../pages/platform/CustomForms'));
+const PlatformReports = lazy(() => import('../pages/platform/Reports'));
+const PlatformSavedSearches = lazy(() => import('../pages/platform/SavedSearches'));
+
+// Knowledge Base
+const KnowledgeBase = lazy(() => import('../pages/knowledge/KnowledgeBase'));
+const KnowledgeArticle = lazy(() => import('../pages/knowledge/KnowledgeArticle'));
+const KnowledgeEditor = lazy(() => import('../pages/knowledge/KnowledgeEditor'));
+const CategoryManager = lazy(() => import('../pages/knowledge/CategoryManager'));
+
 // Phase 10C — Collaboration Hierarchy Extension
 const Phase10CTeamsPage = lazy(() => import('../pages/phase10c/TeamsPage'));
 const Phase10CTeamDetailPage = lazy(() => import('../pages/phase10c/TeamDetailPage'));
 const Phase10CTeamWorkloadPage = lazy(() => import('../pages/phase10c/TeamWorkloadPage'));
 const Phase10CProjectsPage = lazy(() => import('../pages/phase10c/Projects'));
 const Phase10CProjectDetailPage = lazy(() => import('../pages/phase10c/ProjectDetailPage'));
+const Phase10CProjectChannelsPage = lazy(() => import('../pages/phase10c/ProjectChannelsPage'));
 const WorkspaceTeams = lazy(() => import('../pages/phase10c/Teams'));
 
 function PageLoader() {
@@ -142,6 +178,13 @@ export default function AppRoutes() {
         <Route path="/approval-delegations" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager']}><ApprovalDelegations /></ProtectedRouteWrapper>} />
         <Route path="/approvals/delegations" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager']}><ApprovalDelegations /></ProtectedRouteWrapper>} />
         <Route path="/documents" element={<ProtectedRouteWrapper><Documents /></ProtectedRouteWrapper>} />
+
+        {/* Custom Forms */}
+        <Route path="/forms" element={<ProtectedRouteWrapper><FormList /></ProtectedRouteWrapper>} />
+        <Route path="/forms/new" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager']}><FormBuilder /></ProtectedRouteWrapper>} />
+        <Route path="/forms/:id" element={<ProtectedRouteWrapper><FormView /></ProtectedRouteWrapper>} />
+        <Route path="/forms/:id/edit" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager']}><FormBuilder /></ProtectedRouteWrapper>} />
+        <Route path="/forms/:id/submissions" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager']}><FormSubmissions /></ProtectedRouteWrapper>} />
         <Route path="/notifications" element={<ProtectedRouteWrapper><Notifications /></ProtectedRouteWrapper>} />
         <Route path="/notifications/preferences" element={<ProtectedRouteWrapper><NotificationPreferences /></ProtectedRouteWrapper>} />
         <Route path="/settings/notification-preferences" element={<ProtectedRouteWrapper><NotificationPreferences /></ProtectedRouteWrapper>} />
@@ -188,6 +231,7 @@ export default function AppRoutes() {
         <Route path="/teams/:teamId/workload" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager', 'employee']}><Phase10CTeamWorkloadPage /></ProtectedRouteWrapper>} />
         <Route path="/projects" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager', 'employee']}><Phase10CProjectsPage /></ProtectedRouteWrapper>} />
         <Route path="/projects/:projectId" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager', 'employee']}><Phase10CProjectDetailPage /></ProtectedRouteWrapper>} />
+        <Route path="/projects/:projectId/channels" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager', 'employee']}><Phase10CProjectChannelsPage /></ProtectedRouteWrapper>} />
         <Route path="/organization" element={<ProtectedRouteWrapper><OrganizationManagement /></ProtectedRouteWrapper>} />
         <Route path="/pricing" element={<ProtectedRouteWrapper><PricingPage /></ProtectedRouteWrapper>} />
         <Route path="/credits" element={<ProtectedRouteWrapper><CreditDashboard /></ProtectedRouteWrapper>} />
@@ -197,6 +241,39 @@ export default function AppRoutes() {
         <Route path="/team-intelligence" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager']}><TeamIntelligence /></ProtectedRouteWrapper>} />
         <Route path="/employee-productivity" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager']}><EmployeeProductivity /></ProtectedRouteWrapper>} />
         <Route path="/delay-risk-monitor" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager']}><DelayRiskMonitor /></ProtectedRouteWrapper>} />
+        <Route path="/knowledge-base" element={<ProtectedRouteWrapper><KnowledgeBase /></ProtectedRouteWrapper>} />
+        <Route path="/knowledge-base/new" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager']}><KnowledgeEditor /></ProtectedRouteWrapper>} />
+        <Route path="/knowledge-base/categories" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager']}><CategoryManager /></ProtectedRouteWrapper>} />
+        <Route path="/knowledge-base/:id" element={<ProtectedRouteWrapper><KnowledgeArticle /></ProtectedRouteWrapper>} />
+        <Route path="/knowledge-base/:id/edit" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager']}><KnowledgeEditor /></ProtectedRouteWrapper>} />
+
+        {/* Workflows */}
+        <Route path="/workflows" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager']}><WorkflowList /></ProtectedRouteWrapper>} />
+        <Route path="/workflows/new" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager']}><WorkflowBuilder /></ProtectedRouteWrapper>} />
+        <Route path="/workflows/:id" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager']}><WorkflowBuilder /></ProtectedRouteWrapper>} />
+        <Route path="/workflows/:id/edit" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager']}><WorkflowBuilder /></ProtectedRouteWrapper>} />
+        <Route path="/workflows/:id/executions" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager']}><WorkflowExecutions /></ProtectedRouteWrapper>} />
+
+        {/* Search */}
+        <Route path="/search" element={<ProtectedRouteWrapper><SearchResults /></ProtectedRouteWrapper>} />
+
+        {/* Reports */}
+        <Route path="/reports" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager']}><ReportList /></ProtectedRouteWrapper>} />
+        <Route path="/reports/new" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager']}><ReportBuilder /></ProtectedRouteWrapper>} />
+        <Route path="/reports/:id" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager']}><ReportViewer /></ProtectedRouteWrapper>} />
+        <Route path="/reports/:id/edit" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager']}><ReportBuilder /></ProtectedRouteWrapper>} />
+
+        {/* Phase 10D — Platform Services */}
+        <Route path="/platform/workflows" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager']}><PlatformWorkflows /></ProtectedRouteWrapper>} />
+        <Route path="/platform/notification-rules" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager']}><PlatformNotificationRules /></ProtectedRouteWrapper>} />
+        <Route path="/platform/search" element={<ProtectedRouteWrapper><PlatformGlobalSearch /></ProtectedRouteWrapper>} />
+        <Route path="/platform/analytics" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager']}><PlatformAnalytics /></ProtectedRouteWrapper>} />
+        <Route path="/platform/knowledge-base" element={<ProtectedRouteWrapper><PlatformKnowledgeBase /></ProtectedRouteWrapper>} />
+        <Route path="/platform/custom-forms" element={<ProtectedRouteWrapper><PlatformCustomForms /></ProtectedRouteWrapper>} />
+        <Route path="/platform/reports" element={<ProtectedRouteWrapper allowedRoles={['admin', 'manager']}><PlatformReports /></ProtectedRouteWrapper>} />
+        <Route path="/platform/saved-searches" element={<ProtectedRouteWrapper><PlatformSavedSearches /></ProtectedRouteWrapper>} />
+        <Route path="/platform/audit-logs" element={<ProtectedRouteWrapper allowedRoles={['admin', 'auditor']}><AuditLogs /></ProtectedRouteWrapper>} />
+
         <Route path="/login-v2" element={<RedirectIfAuthed><Login /></RedirectIfAuthed>} />
       </Route>
     </Routes>

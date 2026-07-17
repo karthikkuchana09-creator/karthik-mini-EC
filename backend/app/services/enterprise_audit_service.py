@@ -225,3 +225,273 @@ def log_comment_delete(db: Session, user_id: int, task_id: int, count: int) -> N
                old_data={"task_id": task_id, "count": count},
                module_name="comment", action_type="delete", record_id=task_id,
                **_enrich({}))
+
+
+# ── Knowledge Base ───────────────────────────────────────────────────
+
+def log_kb_category_create(db: Session, user_id: int, category_id: int, data: dict) -> None:
+    log_action(db, user_id, "create", "knowledge_category", category_id,
+               new_value=data, new_data=data,
+               module_name="knowledge_base", action_type="create", record_id=category_id,
+               **_enrich({}))
+
+
+def log_kb_category_update(db: Session, user_id: int, category_id: int,
+                           old: Optional[dict], new: Optional[dict]) -> None:
+    log_action(db, user_id, "update", "knowledge_category", category_id,
+               old_value=old, new_value=new,
+               old_data=old, new_data=new,
+               module_name="knowledge_base", action_type="update", record_id=category_id,
+               **_enrich({}))
+
+
+def log_kb_category_delete(db: Session, user_id: int, category_id: int, data: dict) -> None:
+    log_action(db, user_id, "delete", "knowledge_category", category_id,
+               old_value=data, old_data=data,
+               module_name="knowledge_base", action_type="delete", record_id=category_id,
+               **_enrich({}))
+
+
+def log_kb_article_create(db: Session, user_id: int, article_id: int, data: dict) -> None:
+    log_action(db, user_id, "create", "knowledge_article", article_id,
+               new_value=data, new_data=data,
+               module_name="knowledge_base", action_type="create", record_id=article_id,
+               **_enrich({}))
+
+
+def log_kb_article_update(db: Session, user_id: int, article_id: int,
+                          old: Optional[dict], new: Optional[dict]) -> None:
+    log_action(db, user_id, "update", "knowledge_article", article_id,
+               old_value=old, new_value=new,
+               old_data=old, new_data=new,
+               module_name="knowledge_base", action_type="update", record_id=article_id,
+               **_enrich({}))
+
+
+def log_kb_article_delete(db: Session, user_id: int, article_id: int, data: dict) -> None:
+    log_action(db, user_id, "delete", "knowledge_article", article_id,
+               old_value=data, old_data=data,
+               module_name="knowledge_base", action_type="delete", record_id=article_id,
+               **_enrich({}))
+
+
+def log_kb_article_restore(db: Session, user_id: int, article_id: int,
+                           version_number: int, data: dict) -> None:
+    log_action(db, user_id, "restore", "knowledge_article", article_id,
+               new_value={**data, "restored_from_version": version_number},
+               new_data={**data, "restored_from_version": version_number},
+               module_name="knowledge_base", action_type="restore", record_id=article_id,
+               **_enrich({}))
+
+
+# ── Custom Forms ─────────────────────────────────────────────────────
+
+def log_form_create(db: Session, user_id: int, form_id: int, data: dict) -> None:
+    log_action(db, user_id, "create", "custom_form", form_id,
+               new_value=data, new_data=data,
+               module_name="custom_form", action_type="create", record_id=form_id,
+               **_enrich({}))
+
+
+def log_form_update(db: Session, user_id: int, form_id: int,
+                    old: Optional[dict], new: Optional[dict]) -> None:
+    log_action(db, user_id, "update", "custom_form", form_id,
+               old_value=old, new_value=new,
+               old_data=old, new_data=new,
+               module_name="custom_form", action_type="update", record_id=form_id,
+               **_enrich({}))
+
+
+def log_form_delete(db: Session, user_id: int, form_id: int, data: dict) -> None:
+    log_action(db, user_id, "delete", "custom_form", form_id,
+               old_value=data, old_data=data,
+               module_name="custom_form", action_type="delete", record_id=form_id,
+               **_enrich({}))
+
+
+def log_form_field_create(db: Session, user_id: int, field_id: int, data: dict) -> None:
+    log_action(db, user_id, "create", "custom_form_field", field_id,
+               new_value=data, new_data=data,
+               module_name="custom_form", action_type="create", record_id=field_id,
+               **_enrich({}))
+
+
+def log_form_field_update(db: Session, user_id: int, field_id: int,
+                          old: Optional[dict], new: Optional[dict]) -> None:
+    log_action(db, user_id, "update", "custom_form_field", field_id,
+               old_value=old, new_value=new,
+               old_data=old, new_data=new,
+               module_name="custom_form", action_type="update", record_id=field_id,
+               **_enrich({}))
+
+
+def log_form_field_delete(db: Session, user_id: int, field_id: int, data: dict) -> None:
+    log_action(db, user_id, "delete", "custom_form_field", field_id,
+               old_value=data, old_data=data,
+               module_name="custom_form", action_type="delete", record_id=field_id,
+               **_enrich({}))
+
+
+# ── Workflow Automation ──────────────────────────────────────────────
+
+def log_workflow_create(db: Session, user_id: int, workflow_id: int, data: dict) -> None:
+    log_action(db, user_id, "create", "workflow", workflow_id,
+               new_value=data, new_data=data,
+               module_name="workflow", action_type="create", record_id=workflow_id,
+               **_enrich({}))
+
+
+def log_workflow_update(db: Session, user_id: int, workflow_id: int,
+                        old: Optional[dict], new: Optional[dict]) -> None:
+    log_action(db, user_id, "update", "workflow", workflow_id,
+               old_value=old, new_value=new,
+               old_data=old, new_data=new,
+               module_name="workflow", action_type="update", record_id=workflow_id,
+               **_enrich({}))
+
+
+def log_workflow_delete(db: Session, user_id: int, workflow_id: int, data: dict) -> None:
+    log_action(db, user_id, "delete", "workflow", workflow_id,
+               old_value=data, old_data=data,
+               module_name="workflow", action_type="delete", record_id=workflow_id,
+               **_enrich({}))
+
+
+def log_workflow_rule_create(db: Session, user_id: int, rule_id: int, data: dict) -> None:
+    log_action(db, user_id, "create", "workflow_rule", rule_id,
+               new_value=data, new_data=data,
+               module_name="workflow", action_type="create", record_id=rule_id,
+               **_enrich({}))
+
+
+def log_workflow_rule_update(db: Session, user_id: int, rule_id: int,
+                             old: Optional[dict], new: Optional[dict]) -> None:
+    log_action(db, user_id, "update", "workflow_rule", rule_id,
+               old_value=old, new_value=new,
+               old_data=old, new_data=new,
+               module_name="workflow", action_type="update", record_id=rule_id,
+               **_enrich({}))
+
+
+def log_workflow_rule_delete(db: Session, user_id: int, rule_id: int, data: dict) -> None:
+    log_action(db, user_id, "delete", "workflow_rule", rule_id,
+               old_value=data, old_data=data,
+               module_name="workflow", action_type="delete", record_id=rule_id,
+               **_enrich({}))
+
+
+def log_workflow_execution(db: Session, user_id: int, execution_id: int,
+                           workflow_id: int, status: str, data: dict) -> None:
+    log_action(db, user_id, "execute", "workflow_execution", execution_id,
+               new_value={"workflow_id": workflow_id, "status": status, **data},
+               new_data={"workflow_id": workflow_id, "status": status, **data},
+               module_name="workflow", action_type=status, record_id=execution_id,
+               **_enrich({}))
+
+
+# ── Notification Rules ───────────────────────────────────────────────
+
+def log_notification_rule_create(db: Session, user_id: int, rule_id: int, data: dict) -> None:
+    log_action(db, user_id, "create", "notification_rule", rule_id,
+               new_value=data, new_data=data,
+               module_name="notification_rule", action_type="create", record_id=rule_id,
+               **_enrich({}))
+
+
+def log_notification_rule_update(db: Session, user_id: int, rule_id: int,
+                                 old: Optional[dict], new: Optional[dict]) -> None:
+    log_action(db, user_id, "update", "notification_rule", rule_id,
+               old_value=old, new_value=new,
+               old_data=old, new_data=new,
+               module_name="notification_rule", action_type="update", record_id=rule_id,
+               **_enrich({}))
+
+
+def log_notification_rule_delete(db: Session, user_id: int, rule_id: int, data: dict) -> None:
+    log_action(db, user_id, "delete", "notification_rule", rule_id,
+               old_value=data, old_data=data,
+               module_name="notification_rule", action_type="delete", record_id=rule_id,
+               **_enrich({}))
+
+
+# ── Reports ──────────────────────────────────────────────────────────
+
+def log_report_create(db: Session, user_id: int, report_id: int, data: dict) -> None:
+    log_action(db, user_id, "create", "report", report_id,
+               new_value=data, new_data=data,
+               module_name="report", action_type="create", record_id=report_id,
+               **_enrich({}))
+
+
+def log_report_update(db: Session, user_id: int, report_id: int,
+                      old: Optional[dict], new: Optional[dict]) -> None:
+    log_action(db, user_id, "update", "report", report_id,
+               old_value=old, new_value=new,
+               old_data=old, new_data=new,
+               module_name="report", action_type="update", record_id=report_id,
+               **_enrich({}))
+
+
+def log_report_delete(db: Session, user_id: int, report_id: int, data: dict) -> None:
+    log_action(db, user_id, "delete", "report", report_id,
+               old_value=data, old_data=data,
+               module_name="report", action_type="delete", record_id=report_id,
+               **_enrich({}))
+
+
+def log_report_execute(db: Session, user_id: int, report_id: int,
+                       entity_type: str, result_summary: dict) -> None:
+    log_action(db, user_id, "execute", "report", report_id,
+               new_value={"entity_type": entity_type, **result_summary},
+               new_data={"entity_type": entity_type, **result_summary},
+               module_name="report", action_type="execute", record_id=report_id,
+               **_enrich({}))
+
+
+# ── Search ───────────────────────────────────────────────────────────
+
+def log_search(db: Session, user_id: int, query: str, entity_types: list[str],
+               result_count: int, tenant_id: Optional[int] = None) -> None:
+    log_action(db, user_id, "search", "search", None,
+               new_value={"query": query, "entity_types": entity_types, "result_count": result_count},
+               new_data={"query": query, "entity_types": entity_types, "result_count": result_count},
+               module_name="search", action_type="query", record_id=None,
+               **_enrich({}))
+
+
+# ── Analytics ────────────────────────────────────────────────────────
+
+def log_analytics_request(db: Session, user_id: int, analytics_type: str,
+                          filters: Optional[dict] = None) -> None:
+    log_action(db, user_id, "view", "analytics", None,
+               new_value={"analytics_type": analytics_type, "filters": filters},
+               new_data={"analytics_type": analytics_type, "filters": filters},
+               module_name="analytics", action_type="view", record_id=None,
+               **_enrich({}))
+
+
+# ── Saved Searches ───────────────────────────────────────────────────
+
+def log_saved_search_create(db: Session, user_id: int, search_id: int, data: dict) -> None:
+    log_action(db, user_id, "create", "saved_search", search_id,
+               new_value=data, new_data=data,
+               module_name="saved_search", action_type="create", record_id=search_id,
+               **_enrich({}))
+
+
+def log_saved_search_delete(db: Session, user_id: int, search_id: int, data: dict) -> None:
+    log_action(db, user_id, "delete", "saved_search", search_id,
+               old_value=data, old_data=data,
+               module_name="saved_search", action_type="delete", record_id=search_id,
+               **_enrich({}))
+
+
+# ── Form Submissions ─────────────────────────────────────────────────
+
+def log_form_submission(db: Session, user_id: int, submission_id: int,
+                        form_id: int, tenant_id: Optional[int] = None) -> None:
+    log_action(db, user_id, "submit", "form_submission", submission_id,
+               new_value={"form_id": form_id},
+               new_data={"form_id": form_id},
+               module_name="custom_form", action_type="submit", record_id=submission_id,
+               **_enrich({}))

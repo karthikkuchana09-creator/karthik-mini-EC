@@ -108,6 +108,12 @@ class Permissions:
     tenant_collaboration_usage_read = "tenant:collaboration_usage_read"
     tenant_collaboration_usage_recalculate = "tenant:collaboration_usage_recalculate"
 
+    workflow_create = "workflow:create"
+    workflow_read = "workflow:read"
+    workflow_update = "workflow:update"
+    workflow_delete = "workflow:delete"
+    workflow_execute = "workflow:execute"
+
     workspace_create = "workspace:create"
     workspace_read = "workspace:read"
     workspace_update = "workspace:update"
@@ -118,6 +124,25 @@ class Permissions:
     workspace_member_list = "workspace_member:list"
     workspace_member_update_role = "workspace_member:update_role"
     workspace_member_remove = "workspace_member:remove"
+
+    knowledge_article_create = "knowledge_article:create"
+    knowledge_article_read = "knowledge_article:read"
+    knowledge_article_update = "knowledge_article:update"
+    knowledge_article_delete = "knowledge_article:delete"
+    knowledge_category_manage = "knowledge_category:manage"
+
+    custom_form_create = "custom_form:create"
+    custom_form_read = "custom_form:read"
+    custom_form_update = "custom_form:update"
+    custom_form_delete = "custom_form:delete"
+    custom_form_submit = "custom_form:submit"
+
+    report_create = "report:create"
+    report_read = "report:read"
+    report_update = "report:update"
+    report_delete = "report:delete"
+
+    search_global = "search:global"
 
     channel_create = "channel:create"
     channel_read = "channel:read"
@@ -205,12 +230,36 @@ ROLE_PERMISSIONS = {
 
         Permissions.notification_preference_manage,
 
+        Permissions.workflow_create,
+        Permissions.workflow_read,
+        Permissions.workflow_update,
+        Permissions.workflow_delete,
+        Permissions.workflow_execute,
+
         Permissions.tenant_create,
         Permissions.tenant_list,
         Permissions.tenant_read,
         Permissions.tenant_update,
         Permissions.tenant_activate,
         Permissions.tenant_suspend,
+
+        Permissions.knowledge_article_create,
+        Permissions.knowledge_article_read,
+        Permissions.knowledge_article_update,
+        Permissions.knowledge_article_delete,
+        Permissions.knowledge_category_manage,
+
+        Permissions.custom_form_create,
+        Permissions.custom_form_read,
+        Permissions.custom_form_update,
+        Permissions.custom_form_delete,
+        Permissions.custom_form_submit,
+
+        Permissions.search_global,
+        Permissions.report_create,
+        Permissions.report_read,
+        Permissions.report_update,
+        Permissions.report_delete,
     },
     "manager": {
         Permissions.task_create,
@@ -253,6 +302,23 @@ ROLE_PERMISSIONS = {
         Permissions.approval_delegation_update,
 
         Permissions.notification_preference_manage,
+
+        Permissions.workflow_create,
+        Permissions.workflow_read,
+        Permissions.workflow_update,
+        Permissions.workflow_delete,
+        Permissions.workflow_execute,
+
+        Permissions.knowledge_article_read,
+        Permissions.knowledge_article_create,
+        Permissions.knowledge_article_update,
+
+        Permissions.custom_form_create,
+        Permissions.custom_form_read,
+        Permissions.custom_form_update,
+        Permissions.custom_form_submit,
+
+        Permissions.search_global,
     },
     "employee": {
         Permissions.task_create,
@@ -273,6 +339,11 @@ ROLE_PERMISSIONS = {
         Permissions.audit_view,
 
         Permissions.sla_tracking_read,
+
+        Permissions.knowledge_article_read,
+        Permissions.custom_form_read,
+        Permissions.custom_form_submit,
+        Permissions.search_global,
     },
 }
 

@@ -44,3 +44,18 @@ from .meeting import Meeting, MeetingStatus
 from .meeting_attendee import MeetingAttendee, AttendeeStatus
 from .meeting_note import MeetingNote
 from .ai_meeting_summary import AIMeetingSummary
+from .platform import (
+    KnowledgeCategory,
+    KnowledgeArticle,
+    KnowledgeArticleVersion,
+    CustomForm,
+    CustomFormField,
+    FormSubmission,
+    WorkflowDefinition,
+    WorkflowRule,
+    WorkflowExecution,
+    NotificationRule,
+    SavedSearch,
+    Report,
+)
+

@@ -20,6 +20,7 @@ from app.core.tenant import TenantResolver
 from app.services.email_service import send_reset_password_email
 from app.services.audit_log_service import log_action
 from app.services.tenant_service import TenantService
+from app.core.suspicious_activity import record_failed_login, record_token_reuse, log_suspicious_login, record_reset_token_reuse
 
 logger = get_logger("auth_service")
 
@@ -159,6 +160,8 @@ def login_user(db: Session, email: str, password: str) -> dict:
     user = db.scalar(select(User).where(User.email == email))
     if not user or not verify_password(password, user.hashed_password):
         logger.warning("Login failed: invalid credentials email=%s", email)
+        if record_failed_login(email):
+            log_suspicious_login(db, email, reason="brute_force")
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     if not user.is_active:
@@ -202,6 +205,8 @@ def login_org_user(db: Session, email: str, password: str, tenant_slug: Optional
 
     user = db.scalar(select(User).where(User.email == email))
     if not user or not verify_password(password, user.hashed_password):
+        if record_failed_login(f"{email}@{tenant_slug or 'unknown'}"):
+            log_suspicious_login(db, email, reason="brute_force")
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     if not user.is_active:
@@ -248,6 +253,7 @@ def refresh_access_token(db: Session, raw_refresh_token: str) -> dict:
     if not stored_token:
         raise HTTPException(status_code=401, detail="Invalid refresh token")
     if stored_token.is_revoked:
+        record_token_reuse(token_hash, db, stored_token.user_id)
         _revoke_token_family(db, stored_token)
         raise HTTPException(status_code=401, detail="Refresh token has been revoked")
     if stored_token.expires_at < datetime.utcnow():
@@ -337,6 +343,7 @@ def reset_password(db: Session, raw_token: str, new_password: str):
     if not stored_token:
         raise HTTPException(status_code=400, detail="Invalid or expired reset token")
     if stored_token.is_used:
+        record_reset_token_reuse(token_hash, db)
         raise HTTPException(status_code=400, detail="Reset token has already been used")
     if stored_token.expires_at < datetime.utcnow():
         raise HTTPException(status_code=400, detail="Reset token has expired")

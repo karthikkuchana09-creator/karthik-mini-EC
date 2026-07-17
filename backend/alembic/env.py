@@ -4,6 +4,7 @@ from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 from app.db.base import Base
 from app.models import user, task, document, audit_log, notification, ai, refresh_token, password_reset_token, leave, comment, approval, approval_history, approval_escalation, approval_delegation, organization, organization_settings, invitation, subscription, sla_rule, sla_tracking, notification_preference, tenant, tenant_onboarding, tenant_collaboration_settings, tenant_collaboration_usage, workspace, workspace_member, workspace_message, channel, channel_member, channel_message, task_document, approval_document, team, team_member, project, project_team, project_document, meeting, meeting_attendee, meeting_note, ai_meeting_summary
+from app.models import platform as platform_models
 
 from alembic import context
 

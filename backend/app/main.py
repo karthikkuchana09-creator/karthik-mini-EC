@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi_pagination import add_pagination
 from app.routes import auth, tasks, users, comments, approvals, dashboard, documents, audit_logs, notifications, ai, leaves, organizations, subscription, credits, usage, payments, webhooks, billing, super_admin, monitoring, sla_rules, sla_tracking, approval_escalations, approval_delegations, notification_preferences as notification_prefs_router, tenants, tenant_onboarding, tenant_collaboration_settings, tenant_collaboration_usage, workspaces, workspace_members, channels, workspace_channels, channel_members, saas_dashboard, workspace_messages, channel_messages, workspace_tasks, channel_tasks, task_documents_route as task_documents, approval_documents_route as approval_documents, teams, team_members, projects, project_teams, project_channels, project_tasks, project_documents, project_meetings, meeting_attendees, meeting_notes, ai_meeting_summaries, project_calendar, team_workload, project_workload
+from app.api.platform import knowledge_base_router, custom_forms_router, workflows_router, search_router, reports_router, notification_rules_router, saved_searches_router, analytics_router
 from app.websocket.routes import router as ws_router
 from app.websocket.manager import manager
 from app.websocket.pubsub import ws_pubsub
@@ -18,6 +19,10 @@ from app.core.audit_middleware import EnterpriseAuditMiddleware
 from app.core.exceptions import register_exception_handlers
 from app.core.background_tasks import task_queue
 from app.core.redis_client import close as close_redis
+from app.core.input_middleware import InputCleaningMiddleware
+from app.core.security_headers import SecurityHeadersMiddleware
+from app.core.body_size_middleware import RequestBodySizeMiddleware
+from app.core.csrf import CSRFMiddleware
 from app.services.enterprise_scheduler import enterprise_scheduler
 from app.services.seed_tenants import seed_example_tenants
 from app.services.seed_technova import seed_technova
@@ -59,6 +64,16 @@ app = FastAPI(lifespan=lifespan)
 
 register_exception_handlers(app)
 
+app.add_middleware(SecurityHeadersMiddleware)
+
+app.add_middleware(RequestBodySizeMiddleware)
+
+if settings.INPUT_CLEANING_ENABLED:
+    app.add_middleware(InputCleaningMiddleware)
+
+if settings.CSRF_PROTECTION_ENABLED:
+    app.add_middleware(CSRFMiddleware)
+
 app.add_middleware(EnterpriseAuditMiddleware)
 
 app.add_middleware(RequestLogMiddleware)
@@ -73,7 +88,7 @@ app.add_middleware(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.FRONTEND_URL],
+    allow_origins=[settings.FRONTEND_URL, "http://localhost:8000", "http://127.0.0.1:8000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -135,6 +150,14 @@ app.include_router(ai_meeting_summaries.router)
 app.include_router(project_calendar.router)
 app.include_router(team_workload.router)
 app.include_router(project_workload.router)
+app.include_router(knowledge_base_router)
+app.include_router(custom_forms_router)
+app.include_router(workflows_router)
+app.include_router(search_router)
+app.include_router(reports_router)
+app.include_router(notification_rules_router)
+app.include_router(saved_searches_router)
+app.include_router(analytics_router)
 
 add_pagination(app)
 logger.info("Application started")

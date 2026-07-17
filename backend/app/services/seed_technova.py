@@ -14,6 +14,8 @@ from app.models.organization import Organization, SubscriptionPlan
 from app.models.organization_settings import OrganizationSettings
 from app.models.user import User, UserRole, SubscriptionRole
 from app.models.workspace_member import WorkspaceMember, WorkspaceMemberRole
+from app.models.platform.workflow_definition import WorkflowDefinition
+from app.models.platform.workflow_rule import WorkflowRule
 from app.core.security import hash_password
 from app.core.log import get_logger
 
@@ -30,6 +32,7 @@ def seed_technova(db: Session):
     _ensure_tasks(db, project, workspace, teams, admin, org)
     _ensure_meetings(db, project, admin)
     _ensure_documents(db, project, admin)
+    _ensure_workflows(db, tenant, admin)
     db.commit()
     logger.info("TechNova seeding complete")
 
@@ -323,3 +326,135 @@ def _ensure_documents(db: Session, project: Project, admin: User):
             db.add(doc)
             db.flush()
             logger.info("Created document record: %s", dd["name"])
+
+
+def _ensure_workflows(db: Session, tenant: Tenant, admin: User):
+    wf_defs = [
+        {
+            "name": "Task Overdue Notification",
+            "description": "Automatically notify team lead and project manager when a task becomes overdue beyond 2 days",
+            "entity_type": "TASK",
+            "trigger_event": "on_overdue",
+            "rules": [
+                {
+                    "name": "Notify Team Lead & PM on Overdue Task",
+                    "description": "Send notification to team lead and project manager when a task is overdue by more than 48 hours",
+                    "condition_config": {
+                        "field": "status",
+                        "operator": "eq",
+                        "value": "overdue",
+                        "time_delay_hours": 48,
+                    },
+                    "action_config": {
+                        "type": "notify",
+                        "params": {
+                            "recipients": ["team_lead", "project_manager"],
+                            "message": "Task {entity_name} is overdue by more than 2 days. Immediate attention required.",
+                            "channels": ["email", "in_app"],
+                        },
+                    },
+                    "priority": 1,
+                },
+            ],
+        },
+        {
+            "name": "Approval Reminder",
+            "description": "Send reminders for pending approvals beyond the configured threshold",
+            "entity_type": "APPROVAL",
+            "trigger_event": "on_approval_pending",
+            "rules": [
+                {
+                    "name": "Remind Approver & Creator on Pending Approval",
+                    "description": "Send reminder to both the approver and the request creator when an approval has been pending for more than 48 hours",
+                    "condition_config": {
+                        "field": "status",
+                        "operator": "eq",
+                        "value": "pending",
+                        "time_delay_hours": 48,
+                    },
+                    "action_config": {
+                        "type": "notify",
+                        "params": {
+                            "recipients": ["approver", "creator"],
+                            "message": "Approval request {entity_name} is pending for over 48 hours. Please review.",
+                            "channels": ["email", "in_app"],
+                        },
+                    },
+                    "priority": 1,
+                },
+            ],
+        },
+        {
+            "name": "New Project Onboarding",
+            "description": "Automate project onboarding by creating default channels and adding welcome documentation",
+            "entity_type": "PROJECT",
+            "trigger_event": "on_create",
+            "rules": [
+                {
+                    "name": "Create Default Channels",
+                    "description": "Create a set of default collaboration channels when a new project is created",
+                    "condition_config": {"field": "status", "operator": "eq", "value": "active"},
+                    "action_config": {
+                        "type": "create_channels",
+                        "params": {
+                            "channels": ["general", "announcements", "development", "design"],
+                        },
+                    },
+                    "priority": 1,
+                },
+                {
+                    "name": "Add Welcome Document",
+                    "description": "Add a welcome document with project guidelines and onboarding steps",
+                    "condition_config": {"field": "status", "operator": "eq", "value": "active"},
+                    "action_config": {
+                        "type": "create_document",
+                        "params": {
+                            "title": "Welcome to the Project",
+                            "content": "## Welcome\n\nThis document outlines the project guidelines, team contacts, and onboarding steps.",
+                            "template": "project_welcome",
+                        },
+                    },
+                    "priority": 2,
+                },
+            ],
+        },
+    ]
+
+    for wd in wf_defs:
+        existing = db.scalar(
+            select(WorkflowDefinition).where(
+                WorkflowDefinition.tenant_id == tenant.id,
+                WorkflowDefinition.name == wd["name"],
+            )
+        )
+        if existing:
+            logger.info("Workflow already exists: %s", wd["name"])
+            continue
+
+        wf = WorkflowDefinition(
+            tenant_id=tenant.id,
+            name=wd["name"],
+            description=wd["description"],
+            entity_type=wd["entity_type"],
+            trigger_event=wd["trigger_event"],
+            status="active",
+            is_deleted=False,
+            created_by=admin.id,
+        )
+        db.add(wf)
+        db.flush()
+
+        for rd in wd["rules"]:
+            rule = WorkflowRule(
+                workflow_id=wf.id,
+                name=rd["name"],
+                description=rd["description"],
+                condition_config=rd["condition_config"],
+                action_config=rd["action_config"],
+                priority=rd["priority"],
+                is_active=True,
+            )
+            db.add(rule)
+            db.flush()
+
+        logger.info("Created workflow: %s with %d rules", wd["name"], len(wd["rules"]))

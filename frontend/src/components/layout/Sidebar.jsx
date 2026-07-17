@@ -32,6 +32,12 @@ import {
   FiInfo,
   FiVideo,
   FiMessageSquare,
+  FiGitBranch,
+  FiSearch,
+  FiBookOpen,
+  FiFileText,
+  FiPieChart,
+  FiBell,
 } from 'react-icons/fi';
 
 const sections = [
@@ -40,18 +46,56 @@ const sections = [
     roles: ['admin', 'manager', 'employee', 'viewer'],
     items: [
       { to: '/dashboard', label: 'Dashboard', icon: FiHome, roles: ['admin', 'manager', 'employee', 'viewer'] },
-      { to: '/delay-risk-monitor', label: 'Analytics', icon: FiBarChart2, roles: ['admin', 'manager'] },
       { to: '/ai-analytics', label: 'AI Insights', icon: FiCpu, roles: ['admin', 'manager'] },
     ],
   },
   {
-    label: 'WORK MANAGEMENT',
+    label: 'TENANT',
+    roles: ['admin'],
+    items: [
+      { to: '/admin/tenants', label: 'Tenants', icon: FiServer, roles: ['admin'] },
+      { to: '/admin/tenants/onboarding', label: 'Tenant Onboarding', icon: FiUsers, roles: ['admin'] },
+      { to: '/super-admin-dashboard', label: 'Platform Overview', icon: FiStar, roles: ['admin'] },
+      { to: '/saas-dashboard', label: 'SaaS Dashboard', icon: FiGrid, roles: ['admin'] },
+      { to: '/admin-dashboard', label: 'Admin Dashboard', icon: FiTrendingUp, roles: ['admin'] },
+      { to: '/admin-monitoring', label: 'Monitoring', icon: FiBarChart2, roles: ['admin'] },
+      { to: '/admin', label: 'Admin', icon: FiSettings, roles: ['admin'] },
+    ],
+  },
+  {
+    label: 'WORKSPACE',
+    roles: ['admin', 'manager', 'employee', 'viewer'],
+    items: [
+      { to: '/workspace-list', label: 'Workspaces', icon: FiLayers, roles: ['admin', 'manager', 'employee'] },
+      { to: '/teams', label: 'Teams', icon: FiUsers, roles: ['admin', 'manager', 'employee'] },
+      { to: '/channels', label: 'Channels', icon: FiMessageSquare, roles: ['admin', 'manager', 'employee'] },
+      {
+        to: '/projects', label: 'Projects', icon: FiFolder, roles: ['admin', 'manager', 'employee', 'viewer'],
+        children: [
+          { to: '/projects', label: 'Project Details', icon: FiInfo },
+          { to: '/teams', label: 'Teams', icon: FiUsers },
+          { to: '/projects', label: 'Project Channels', icon: FiHash },
+          { to: '/tasks', label: 'Tasks', icon: FiCheckSquare },
+          { to: '/documents', label: 'Documents', icon: FiFile },
+          { to: '/projects', label: 'Meetings', icon: FiVideo },
+          { to: '/projects', label: 'Calendar', icon: FiCalendar },
+        ],
+      },
+    ],
+  },
+  {
+    label: 'APPROVALS',
     roles: ['admin', 'manager', 'employee'],
     items: [
-      { to: '/tasks', label: 'Tasks', icon: FiCheckSquare, roles: ['admin', 'manager', 'employee'] },
-      { to: '/kanban', label: 'Kanban Board', icon: FiLayout, roles: ['admin', 'manager', 'employee'] },
+      { to: '/approvals', label: 'Approvals', icon: FiCheckCircle, roles: ['admin', 'manager'] },
       { to: '/my-approvals', label: 'My Approvals', icon: FiCheckCircle, roles: ['employee'] },
-      { to: '/leaves/apply', label: 'Leave Requests', icon: FiCalendar, roles: ['admin', 'manager', 'employee'] },
+    ],
+  },
+  {
+    label: 'DOCUMENTS',
+    roles: ['admin', 'manager', 'employee', 'viewer'],
+    items: [
+      { to: '/documents', label: 'All Documents', icon: FiFile, roles: ['admin', 'manager', 'employee', 'viewer'] },
     ],
   },
   {
@@ -65,79 +109,13 @@ const sections = [
     ],
   },
   {
-    label: 'WORKSPACE COLLABORATION',
-    roles: ['admin', 'manager', 'employee', 'viewer'],
-    items: [
-      { to: '/workspace-list', label: 'Workspaces', icon: FiLayers, roles: ['admin', 'manager', 'employee'] },
-      { to: '/tasks', label: 'My Workspace Tasks', icon: FiCheckSquare, roles: ['admin', 'manager', 'employee'] },
-      { to: '/documents', label: 'Workspace Documents', icon: FiFile, roles: ['admin', 'manager', 'employee', 'viewer'] },
-    ],
-  },
-  {
-    label: 'CHANNEL COLLABORATION',
-    roles: ['admin', 'manager', 'employee', 'viewer'],
-    items: [
-      { to: '/channels', label: 'Channels', icon: FiHash, roles: ['admin', 'manager', 'employee'] },
-      { to: '/tasks', label: 'My Channel Tasks', icon: FiCheckSquare, roles: ['admin', 'manager', 'employee'] },
-      { to: '/documents', label: 'Channel Documents', icon: FiFile, roles: ['admin', 'manager', 'employee', 'viewer'] },
-    ],
-  },
-  {
-    label: 'TEAMS & PROJECTS',
-    roles: ['admin', 'manager', 'employee', 'viewer'],
-    items: [
-      { to: '/teams', label: 'Teams', icon: FiUsers, roles: ['admin', 'manager', 'employee'] },
-      {
-        to: '/projects', label: 'Projects', icon: FiFolder, roles: ['admin', 'manager', 'employee', 'viewer'],
-        children: [
-          { label: 'Project Details', icon: FiInfo },
-          { label: 'Teams', icon: FiUsers },
-          { label: 'Channels', icon: FiMessageSquare },
-          { label: 'Tasks', icon: FiCheckSquare },
-          { label: 'Documents', icon: FiFile },
-          { label: 'Meetings', icon: FiVideo },
-          { label: 'Calendar', icon: FiCalendar },
-        ],
-      },
-    ],
-  },
-  {
-    label: 'APPROVALS',
-    roles: ['admin', 'manager'],
-    items: [
-      { to: '/approvals', label: 'Approvals', icon: FiCheckCircle, roles: ['admin', 'manager'] },
-      { to: '/approvals', label: 'Approval Documents', icon: FiFile, roles: ['admin', 'manager'] },
-    ],
-  },
-  {
     label: 'ORGANIZATION',
     roles: ['admin', 'manager'],
     items: [
-      { to: '/organization', label: 'Organization', icon: FiGrid, roles: ['admin', 'manager'] },
+      { to: '/organization', label: 'Org Chart', icon: FiGrid, roles: ['admin', 'manager'] },
       { to: '/team-intelligence', label: 'Team Intelligence', icon: FiUsersGroup, roles: ['admin', 'manager'] },
       { to: '/manager-dashboard', label: 'Manager Dashboard', icon: FiTrendingUp, roles: ['manager'] },
       { to: '/employee-productivity', label: 'Employee Productivity', icon: FiZap, roles: ['admin', 'manager'] },
-    ],
-  },
-  {
-    label: 'ADMINISTRATION',
-    roles: ['admin', 'auditor'],
-    items: [
-      { to: '/audit-logs', label: 'Audit Logs', icon: FiShield, roles: ['admin', 'auditor'] },
-      { to: '/notifications/preferences', label: 'Notification Preferences', icon: FiSliders, roles: ['admin', 'manager', 'employee', 'auditor'] },
-    ],
-  },
-  {
-    label: 'SUPER ADMIN',
-    roles: ['admin'],
-    items: [
-      { to: '/admin/tenants', label: 'Tenants', icon: FiServer, roles: ['admin'] },
-      { to: '/admin/tenants/onboarding', label: 'Tenant Onboarding', icon: FiUsers, roles: ['admin'] },
-      { to: '/super-admin-dashboard', label: 'Platform Overview', icon: FiStar, roles: ['admin'] },
-      { to: '/saas-dashboard', label: 'SaaS Dashboard', icon: FiGrid, roles: ['admin'] },
-      { to: '/admin-dashboard', label: 'Admin Dashboard', icon: FiTrendingUp, roles: ['admin'] },
-      { to: '/admin-monitoring', label: 'Monitoring', icon: FiBarChart2, roles: ['admin'] },
-      { to: '/admin', label: 'Admin', icon: FiSettings, roles: ['admin'] },
     ],
   },
   {
@@ -146,6 +124,27 @@ const sections = [
     items: [
       { to: '/pricing', label: 'Pricing', icon: FiDollarSign, roles: ['admin', 'manager'] },
       { to: '/credits', label: 'Credits', icon: FiCreditCard, roles: ['admin', 'manager', 'employee'] },
+    ],
+  },
+  {
+    label: 'ADMINISTRATION',
+    roles: ['admin', 'auditor'],
+    items: [
+      { to: '/notifications/preferences', label: 'Notification Preferences', icon: FiSliders, roles: ['admin', 'manager', 'employee', 'auditor'] },
+    ],
+  },
+  {
+    label: 'PLATFORM SERVICES',
+    roles: ['admin', 'manager'],
+    items: [
+      { to: '/platform/workflows', label: 'Workflow Automation', icon: FiGitBranch, roles: ['admin', 'manager'] },
+      { to: '/platform/notification-rules', label: 'Notification Engine', icon: FiBell, roles: ['admin', 'manager'] },
+      { to: '/platform/search', label: 'Global Search', icon: FiSearch, roles: ['admin', 'manager'] },
+      { to: '/platform/analytics', label: 'Analytics Dashboard', icon: FiBarChart2, roles: ['admin', 'manager'] },
+      { to: '/platform/knowledge-base', label: 'Knowledge Base', icon: FiBookOpen, roles: ['admin', 'manager'] },
+      { to: '/platform/custom-forms', label: 'Custom Forms', icon: FiFileText, roles: ['admin', 'manager'] },
+      { to: '/platform/reports', label: 'Reporting', icon: FiPieChart, roles: ['admin', 'manager'] },
+      { to: '/audit-logs', label: 'Audit Logs', icon: FiShield, roles: ['admin', 'manager', 'auditor'] },
     ],
   },
 ];
@@ -240,11 +239,21 @@ export default function Sidebar({ open, collapsed, onClose, onToggleCollapse }) 
                               {item.children.map((child) => {
                                 const ChildIcon = child.icon;
                                 return (
-                                  <div key={child.label}
-                                    className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-[11px] text-gray-500 cursor-default">
+                                  <NavLink
+                                    key={child.label}
+                                    to={child.to}
+                                    onClick={onClose}
+                                    className={({ isActive }) =>
+                                      `flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-[11px] transition-all duration-150 ${
+                                        isActive
+                                          ? 'bg-indigo-600/15 text-indigo-300'
+                                          : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800/40'
+                                      }`
+                                    }
+                                  >
                                     <ChildIcon className="w-3.5 h-3.5 text-gray-600 shrink-0" />
                                     <span className="truncate">{child.label}</span>
-                                  </div>
+                                  </NavLink>
                                 );
                               })}
                             </div>

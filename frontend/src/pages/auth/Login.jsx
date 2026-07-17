@@ -2,8 +2,10 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { tokenService } from '../../services/tokenService';
+import { mockAuth } from '../../services/mockData';
 import toast from 'react-hot-toast';
-import { FiMail, FiLock, FiEye, FiEyeOff, FiArrowRight } from 'react-icons/fi';
+import { FiMail, FiLock, FiEye, FiEyeOff, FiArrowRight, FiServer } from 'react-icons/fi';
 
 export default function Login() {
   const { login } = useAuth();
@@ -84,9 +86,34 @@ export default function Login() {
             </button>
           </form>
 
-          <p className="text-center text-sm text-gray-500 mt-6">
-            Don&apos;t have an account?{' '}
-            <Link to="/register" className="text-indigo-600 hover:text-indigo-800 font-medium">Contact your admin</Link>
+          <div className="relative my-6">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-200" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-white px-2 text-gray-400">or</span>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              sessionStorage.setItem('useMockData', 'true');
+              tokenService.setUser(mockAuth.user);
+              tokenService.setAccessToken(mockAuth.access_token);
+              tokenService.setRefreshToken(mockAuth.refresh_token);
+              login(mockAuth.user, mockAuth.access_token, mockAuth.refresh_token);
+              toast.success('Welcome to TechNova Demo!');
+              navigate('/dashboard');
+            }}
+            className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border-2 border-dashed border-indigo-300 text-indigo-600 hover:border-indigo-500 hover:bg-indigo-50 transition-all duration-200 font-medium text-sm"
+          >
+            <FiServer className="w-4 h-4" />
+            Demo Access — TechNova Solutions
+          </button>
+
+          <p className="text-center text-xs text-gray-400 mt-4">
+            No backend required. Pre-loaded with sample enterprise data.
           </p>
         </div>
       </div>

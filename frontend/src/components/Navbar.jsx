@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
 import NotificationDropdown from './NotificationDropdown';
+import SearchBar from './search/SearchBar';
 
 function Navbar({ onMenuClick, sidebarCollapsed, onToggleCollapse }) {
   const { user, logout } = useAuth();
@@ -79,6 +80,10 @@ function Navbar({ onMenuClick, sidebarCollapsed, onToggleCollapse }) {
             </div>
             <span className="text-lg font-bold text-gray-900 tracking-tight whitespace-nowrap">Mini EC</span>
           </div>
+        </div>
+
+        <div className="hidden sm:block flex-1 max-w-md mx-4">
+          <SearchBar />
         </div>
 
         <div className="flex items-center gap-2">

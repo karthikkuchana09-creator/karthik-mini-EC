@@ -31,6 +31,7 @@ if TYPE_CHECKING:
     from app.models.meeting import Meeting
     from app.models.meeting_attendee import MeetingAttendee
     from app.models.meeting_note import MeetingNote
+    from app.models.platform.custom_form import CustomForm
 
 
 class UserRole(str, enum.Enum):
@@ -146,4 +147,7 @@ class User(Base):
     )
     meeting_notes: Mapped[list["MeetingNote"]] = relationship(
         "MeetingNote", back_populates="creator"
+    )
+    created_forms: Mapped[list["CustomForm"]] = relationship(
+        "CustomForm", back_populates="creator"
     )

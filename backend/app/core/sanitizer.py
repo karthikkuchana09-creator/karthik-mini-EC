@@ -1,5 +1,7 @@
 import re
 import unicodedata
+from pydantic import AfterValidator
+from typing_extensions import Annotated
 
 
 HTML_TAG_RE = re.compile(r"<[^>]*>")
@@ -77,3 +79,10 @@ class InputCleaner:
             else:
                 cleaned[key] = value
         return cleaned
+
+
+def _sanitize_pydantic(v: str) -> str:
+    return sanitize_text(v, max_length=5000)
+
+
+SanitizedStr = Annotated[str, AfterValidator(_sanitize_pydantic)]
